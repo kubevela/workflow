@@ -1,0 +1,244 @@
+/*
+Copyright 2022 The KubeVela Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package types
+
+import (
+	"context"
+
+	"cuelang.org/go/cue"
+
+	"github.com/kubevela/workflow/api/v1alpha1"
+	wfContext "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/packages"
+	"github.com/kubevela/workflow/pkg/cue/process"
+	monitorCtx "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/tasks/template"
+)
+
+// TaskRunner is a task runner
+type TaskRunner interface {
+	Name() string
+	Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool
+	Run(ctx wfContext.Context, options *TaskRunOptions) (v1alpha1.StepStatus, *Operation, error)
+}
+
+// TaskDiscover is the interface to obtain the TaskGenerator
+type TaskDiscover interface {
+	GetTaskGenerator(ctx context.Context, name string) (TaskGenerator, error)
+}
+
+// Engine is the engine to run workflow
+type Engine interface {
+	Run(taskRunners []TaskRunner, dag bool) error
+	GetStepStatus(stepName string) v1alpha1.WorkflowStepStatus
+	GetCommonStepStatus(stepName string) v1alpha1.StepStatus
+	SetParentRunner(name string)
+	GetOperation() *Operation
+}
+
+// TaskRunOptions is the options for task run
+type TaskRunOptions struct {
+	Data          *value.Value
+	PCtx          process.Context
+	PreCheckHooks []TaskPreCheckHook
+	PreStartHooks []TaskPreStartHook
+	PostStopHooks []TaskPostStopHook
+	GetTracer     func(id string, step v1alpha1.WorkflowStep) monitorCtx.Context
+	RunSteps      func(isDag bool, runners ...TaskRunner) (*v1alpha1.WorkflowRunStatus, error)
+	Debug         func(step string, v *value.Value) error
+	StepStatus    map[string]v1alpha1.StepStatus
+	Engine        Engine
+}
+
+// PreCheckResult is the result of pre check.
+type PreCheckResult struct {
+	Skip    bool
+	Timeout bool
+}
+
+// PreCheckOptions is the options for pre check.
+type PreCheckOptions struct {
+	PackageDiscover *packages.PackageDiscover
+	ProcessContext  process.Context
+}
+
+// TaskPreCheckHook is the hook for pre check.
+type TaskPreCheckHook func(step v1alpha1.WorkflowStep, options *PreCheckOptions) (*PreCheckResult, error)
+
+// TaskPreStartHook run before task execution.
+type TaskPreStartHook func(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.WorkflowStep) error
+
+// TaskPostStopHook  run after task execution.
+type TaskPostStopHook func(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus) error
+
+// Operation is workflow operation object.
+type Operation struct {
+	Suspend            bool
+	Terminated         bool
+	Waiting            bool
+	Skip               bool
+	FailedAfterRetries bool
+}
+
+// TaskGenerator will generate taskRunner.
+type TaskGenerator func(wfStep v1alpha1.WorkflowStep, options *TaskGeneratorOptions) (TaskRunner, error)
+
+// GeneratorOptions is the options for generate task.
+type TaskGeneratorOptions struct {
+	ID                 string
+	PrePhase           v1alpha1.WorkflowStepPhase
+	StepConvertor      func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	SubTaskRunners     []TaskRunner
+	SubStepExecuteMode v1alpha1.WorkflowMode
+	PackageDiscover    *packages.PackageDiscover
+	ProcessContext     process.Context
+}
+
+// Handler is provider's processing method.
+type Handler func(ctx wfContext.Context, v *value.Value, act Action) error
+
+// Providers is provider discover interface.
+type Providers interface {
+	GetHandler(provider, name string) (Handler, bool)
+	Register(provider string, m map[string]Handler)
+}
+
+type StepGeneratorOptions struct {
+	Providers       Providers
+	PackageDiscover *packages.PackageDiscover
+	ProcessCtx      process.Context
+	TemplateLoader  template.Loader
+}
+
+// Action is that workflow provider can do.
+type Action interface {
+	Suspend(message string)
+	Terminate(message string)
+	Wait(message string)
+	Fail(message string)
+}
+
+// Parameter defines a parameter for cli from capability template
+type Parameter struct {
+	Name     string      `json:"name"`
+	Short    string      `json:"short,omitempty"`
+	Required bool        `json:"required,omitempty"`
+	Default  interface{} `json:"default,omitempty"`
+	Usage    string      `json:"usage,omitempty"`
+	Ignore   bool        `json:"ignore,omitempty"`
+	Type     cue.Kind    `json:"type,omitempty"`
+	Alias    string      `json:"alias,omitempty"`
+	JSONType string      `json:"jsonType,omitempty"`
+}
+
+const (
+	// ContextKeyMetadata is key that refer to application metadata.
+	ContextKeyMetadata = "metadata__"
+	// ContextPrefixFailedTimes is the prefix that refer to the failed times of the step in workflow context config map.
+	ContextPrefixFailedTimes = "failed_times"
+	// ContextPrefixBackoffTimes is the prefix that refer to the backoff times in workflow context config map.
+	ContextPrefixBackoffTimes = "backoff_times"
+	// ContextPrefixBackoffReason is the prefix that refer to the current backoff reason in workflow context config map
+	ContextPrefixBackoffReason = "backoff_reason"
+	// ContextKeyLastExecuteTime is the key that refer to the last execute time in workflow context config map.
+	ContextKeyLastExecuteTime = "last_execute_time"
+	// ContextKeyNextExecuteTime is the key that refer to the next execute time in workflow context config map.
+	ContextKeyNextExecuteTime = "next_execute_time"
+)
+
+const (
+	// WorkflowStepTypeSuspend type suspend
+	WorkflowStepTypeSuspend = "suspend"
+	// WorkflowStepTypeApplyComponent type apply-component
+	WorkflowStepTypeApplyComponent = "apply-component"
+	// WorkflowStepTypeBuiltinApplyComponent type builtin-apply-component
+	WorkflowStepTypeBuiltinApplyComponent = "builtin-apply-component"
+	// WorkflowStepTypeStepGroup type step-group
+	WorkflowStepTypeStepGroup = "step-group"
+)
+
+var (
+	// MaxWorkflowStepErrorRetryTimes is the max retry times of the failed workflow step.
+	MaxWorkflowStepErrorRetryTimes = 10
+	// MaxWorkflowWaitBackoffTime is the max time to wait before reconcile wait workflow again
+	MaxWorkflowWaitBackoffTime = 60
+	// MaxWorkflowFailedBackoffTime is the max time to wait before reconcile failed workflow again
+	MaxWorkflowFailedBackoffTime = 300
+)
+
+// WorkflowState is a string that mark the workflow state
+type WorkflowState string
+
+const (
+	// WorkflowStateInitializing means the workflow is in initial state
+	WorkflowStateInitializing WorkflowState = "Initializing"
+	// WorkflowStateTerminated means workflow is terminated manually, and it won't be started unless the spec changed.
+	WorkflowStateTerminated WorkflowState = "Terminated"
+	// WorkflowStateSuspended means workflow is suspended manually, and it can be resumed.
+	WorkflowStateSuspended WorkflowState = "Suspended"
+	// WorkflowStateSucceeded means workflow is running successfully, all steps finished.
+	WorkflowStateSucceeded WorkflowState = "Succeeded"
+	// WorkflowStateFinished means workflow is end.
+	WorkflowStateFinished WorkflowState = "Finished"
+	// WorkflowStateExecuting means workflow is still running or waiting some steps.
+	WorkflowStateExecuting WorkflowState = "Executing"
+	// WorkflowStateSkipping means it will skip this reconcile and let next reconcile to handle it.
+	WorkflowStateSkipping WorkflowState = "Skipping"
+)
+
+const (
+	// StatusReasonWait is the reason of the workflow progress condition which is Wait.
+	StatusReasonWait = "Wait"
+	// StatusReasonSkip is the reason of the workflow progress condition which is Skip.
+	StatusReasonSkip = "Skip"
+	// StatusReasonRendering is the reason of the workflow progress condition which is Rendering.
+	StatusReasonRendering = "Rendering"
+	// StatusReasonExecute is the reason of the workflow progress condition which is Execute.
+	StatusReasonExecute = "Execute"
+	// StatusReasonSuspend is the reason of the workflow progress condition which is Suspend.
+	StatusReasonSuspend = "Suspend"
+	// StatusReasonTerminate is the reason of the workflow progress condition which is Terminate.
+	StatusReasonTerminate = "Terminate"
+	// StatusReasonParameter is the reason of the workflow progress condition which is ProcessParameter.
+	StatusReasonParameter = "ProcessParameter"
+	// StatusReasonOutput is the reason of the workflow progress condition which is Output.
+	StatusReasonOutput = "Output"
+	// StatusReasonFailedAfterRetries is the reason of the workflow progress condition which is FailedAfterRetries.
+	StatusReasonFailedAfterRetries = "FailedAfterRetries"
+	// StatusReasonTimeout is the reason of the workflow progress condition which is Timeout.
+	StatusReasonTimeout = "Timeout"
+	// StatusReasonAction is the reason of the workflow progress condition which is Action.
+	StatusReasonAction = "Action"
+)
+
+// IsStepFinish will decide whether step is finish.
+func IsStepFinish(phase v1alpha1.WorkflowStepPhase, reason string) bool {
+	// if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
+	// 	return phase == v1alpha1.WorkflowStepPhaseSucceeded
+	// }
+	switch phase {
+	case v1alpha1.WorkflowStepPhaseFailed:
+		return reason != "" && reason != StatusReasonExecute
+	case v1alpha1.WorkflowStepPhaseSkipped:
+		return true
+	case v1alpha1.WorkflowStepPhaseSucceeded:
+		return true
+	default:
+		return false
+	}
+}

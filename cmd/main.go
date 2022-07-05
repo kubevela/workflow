@@ -20,19 +20,20 @@ import (
 	"flag"
 	"os"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/oam-dev/workflow/api/v1alpha1"
-	"github.com/oam-dev/workflow/controllers"
+	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/controllers"
+	"github.com/kubevela/workflow/pkg/cue/packages"
+	"github.com/kubevela/workflow/pkg/types"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -57,6 +58,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
+	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
+	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
+	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,9 +94,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	pd, err := packages.NewPackageDiscover(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "Failed to create CRD discovery for CUE package client")
+		if !packages.IsCUEParseErr(err) {
+			os.Exit(1)
+		}
+	}
+
 	if err = (&controllers.WorkflowRunReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		PackageDiscover: pd,
+		Recorder:        event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "WorkflowRun")
 		os.Exit(1)
