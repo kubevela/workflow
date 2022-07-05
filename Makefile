@@ -25,7 +25,7 @@ help: ## Display this help.
 
 .PHONY: reviewable
 reviewable: manifests fmt vet lint staticcheck
-	go mod tidy
+	go mod tidy -compat=1.17
 
 .PHONY: check-diff
 check-diff: reviewable ## Execute auto-gen code commands and ensure branch is clean.

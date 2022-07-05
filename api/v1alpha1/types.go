@@ -20,6 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/kubevela/workflow/api/condition"
 )
 
 // +kubebuilder:object:root=true
@@ -47,14 +49,17 @@ type WorkflowRunList struct {
 }
 
 type WorkflowRunSpec struct {
-	Mode             *WorkflowExecuteMode `json:"mode,omitempty"`
-	WorkflowSpec     *WorkflowSpec        `json:"workflowSpec,omitempty"`
-	WorkflowTemplate string               `json:"workflowTemplate,omitempty"`
+	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`
+	WorkflowSpec *WorkflowSpec        `json:"workflowSpec,omitempty"`
+	WorkflowRef  string               `json:"workflowRef,omitempty"`
 }
 
 // WorkflowRunStatus record the status of workflow run
 type WorkflowRunStatus struct {
+	condition.ConditionedStatus `json:",inline"`
+
 	Mode    WorkflowExecuteMode `json:"mode"`
+	Phase   WorkflowRunPhase    `json:"status"`
 	Message string              `json:"message,omitempty"`
 
 	Suspend      bool   `json:"suspend"`
@@ -79,6 +84,21 @@ type WorkflowExecuteMode struct {
 	Steps    WorkflowMode `json:"steps,omitempty"`
 	SubSteps WorkflowMode `json:"subSteps,omitempty"`
 }
+
+// ApplicationPhase is a label for the condition of an application at the current time
+type WorkflowRunPhase string
+
+const (
+	WorkflowRunInitializing WorkflowRunPhase = "Initializing"
+	// ApplicationRunningWorkflow means the app is running workflow
+	WorkflowRunExecuting WorkflowRunPhase = "executing"
+	// ApplicationWorkflowSuspending means the app's workflow is suspending
+	WorkflowRunSuspending WorkflowRunPhase = "suspending"
+	// ApplicationWorkflowTerminated means the app's workflow is terminated
+	WorkflowRunTerminated WorkflowRunPhase = "terminated"
+	// ApplicationWorkflowFinished means the app's workflow is finished
+	WorkflowRunSucceeded WorkflowRunPhase = "succeeded"
+)
 
 // +kubebuilder:object:root=true
 
@@ -106,27 +126,8 @@ type WorkflowList struct {
 
 // WorkflowStep defines how to execute a workflow step.
 type WorkflowStep struct {
-	// Name is the unique name of the workflow step.
-	Name string `json:"name"`
-
-	Type string `json:"type"`
-
-	Meta *WorkflowStepMeta `json:"meta,omitempty"`
-
-	// +kubebuilder:pruning:PreserveUnknownFields
-	Properties *runtime.RawExtension `json:"properties,omitempty"`
-
-	SubSteps []WorkflowSubStep `json:"subSteps,omitempty"`
-
-	If string `json:"if,omitempty"`
-
-	Timeout string `json:"timeout,omitempty"`
-
-	DependsOn []string `json:"dependsOn,omitempty"`
-
-	Inputs StepInputs `json:"inputs,omitempty"`
-
-	Outputs StepOutputs `json:"outputs,omitempty"`
+	WorkflowStepBase `json:",inline"`
+	SubSteps         []WorkflowStepBase `json:"subSteps,omitempty"`
 }
 
 // WorkflowStepMeta contains the meta data of a workflow step
@@ -135,26 +136,27 @@ type WorkflowStepMeta struct {
 }
 
 // WorkflowSubStep defines how to execute a workflow subStep.
-type WorkflowSubStep struct {
+type WorkflowStepBase struct {
 	// Name is the unique name of the workflow step.
 	Name string `json:"name"`
-
+	// Type is the type of the workflow step.
 	Type string `json:"type"`
-
+	// Meta is the meta data of the workflow step.
 	Meta *WorkflowStepMeta `json:"meta,omitempty"`
+	// If is the if condition of the step
+	If string `json:"if,omitempty"`
+	// Timeout is the timeout of the step
+	Timeout string `json:"timeout,omitempty"`
+	// DependsOn is the dependency of the step
+	DependsOn []string `json:"dependsOn,omitempty"`
+	// Inputs is the inputs of the step
+	Inputs StepInputs `json:"inputs,omitempty"`
+	// Outputs is the outputs of the step
+	Outputs StepOutputs `json:"outputs,omitempty"`
 
+	// Properties is the properties of the step
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Properties *runtime.RawExtension `json:"properties,omitempty"`
-
-	If string `json:"if,omitempty"`
-
-	Timeout string `json:"timeout,omitempty"`
-
-	DependsOn []string `json:"dependsOn,omitempty"`
-
-	Inputs StepInputs `json:"inputs,omitempty"`
-
-	Outputs StepOutputs `json:"outputs,omitempty"`
 }
 
 // WorkflowMode describes the mode of workflow
@@ -186,13 +188,20 @@ type StepStatus struct {
 // WorkflowStepStatus record the status of a workflow step, include step status and subStep status
 type WorkflowStepStatus struct {
 	StepStatus     `json:",inline"`
-	SubStepsStatus []WorkflowSubStepStatus `json:"subSteps,omitempty"`
+	SubStepsStatus []StepStatus `json:"subSteps,omitempty"`
 }
 
-// WorkflowSubStepStatus record the status of a workflow subStep
-type WorkflowSubStepStatus struct {
-	StepStatus `json:",inline"`
+// SetConditions set condition to workflow run
+func (wr *WorkflowRun) SetConditions(c ...condition.Condition) {
+	wr.Status.SetConditions(c...)
 }
+
+// GetCondition get condition by given condition type
+func (wr *WorkflowRun) GetCondition(t condition.ConditionType) condition.Condition {
+	return wr.Status.GetCondition(t)
+}
+
+const WorkflowRunConditionType string = "WorkflowRun"
 
 // WorkflowStepPhase describes the phase of a workflow step.
 type WorkflowStepPhase string

@@ -46,6 +46,8 @@ spec:
                     description: WorkflowMode describes the mode of workflow
                     type: string
                 type: object
+              workflowRef:
+                type: string
               workflowSpec:
                 description: Workflow defines workflow steps and other attributes
                 properties:
@@ -55,13 +57,15 @@ spec:
                         step.
                       properties:
                         dependsOn:
+                          description: DependsOn is the dependency of the step
                           items:
                             type: string
                           type: array
                         if:
+                          description: If is the if condition of the step
                           type: string
                         inputs:
-                          description: StepInputs defines variable input of WorkflowStep
+                          description: Inputs is the inputs of the step
                           items:
                             properties:
                               from:
@@ -74,8 +78,7 @@ spec:
                             type: object
                           type: array
                         meta:
-                          description: WorkflowStepMeta contains the meta data of
-                            a workflow step
+                          description: Meta is the meta data of the workflow step.
                           properties:
                             alias:
                               type: string
@@ -84,7 +87,7 @@ spec:
                           description: Name is the unique name of the workflow step.
                           type: string
                         outputs:
-                          description: StepOutputs defines output variable of WorkflowStep
+                          description: Outputs is the outputs of the step
                           items:
                             properties:
                               name:
@@ -97,6 +100,7 @@ spec:
                             type: object
                           type: array
                         properties:
+                          description: Properties is the properties of the step
                           type: object
                           x-kubernetes-preserve-unknown-fields: true
                         subSteps:
@@ -105,14 +109,15 @@ spec:
                               workflow subStep.
                             properties:
                               dependsOn:
+                                description: DependsOn is the dependency of the step
                                 items:
                                   type: string
                                 type: array
                               if:
+                                description: If is the if condition of the step
                                 type: string
                               inputs:
-                                description: StepInputs defines variable input of
-                                  WorkflowStep
+                                description: Inputs is the inputs of the step
                                 items:
                                   properties:
                                     from:
@@ -125,8 +130,8 @@ spec:
                                   type: object
                                 type: array
                               meta:
-                                description: WorkflowStepMeta contains the meta data
-                                  of a workflow step
+                                description: Meta is the meta data of the workflow
+                                  step.
                                 properties:
                                   alias:
                                     type: string
@@ -136,8 +141,7 @@ spec:
                                   step.
                                 type: string
                               outputs:
-                                description: StepOutputs defines output variable of
-                                  WorkflowStep
+                                description: Outputs is the outputs of the step
                                 items:
                                   properties:
                                     name:
@@ -150,11 +154,14 @@ spec:
                                   type: object
                                 type: array
                               properties:
+                                description: Properties is the properties of the step
                                 type: object
                                 x-kubernetes-preserve-unknown-fields: true
                               timeout:
+                                description: Timeout is the timeout of the step
                                 type: string
                               type:
+                                description: Type is the type of the workflow step.
                                 type: string
                             required:
                             - name
@@ -162,8 +169,10 @@ spec:
                             type: object
                           type: array
                         timeout:
+                          description: Timeout is the timeout of the step
                           type: string
                         type:
+                          description: Type is the type of the workflow step.
                           type: string
                       required:
                       - name
@@ -171,12 +180,43 @@ spec:
                       type: object
                     type: array
                 type: object
-              workflowTemplate:
-                type: string
             type: object
           status:
             description: WorkflowRunStatus record the status of workflow run
             properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time this condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A Message containing details about this condition's
+                        last transition from one status to another, if any.
+                      type: string
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: Type of this condition. At most one of each condition
+                        type may apply to a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               contextBackend:
                 description: 'ObjectReference contains enough information to let you
                   inspect or modify the referred object. --- New uses of this type
@@ -252,6 +292,10 @@ spec:
               startTime:
                 format: date-time
                 type: string
+              status:
+                description: ApplicationPhase is a label for the condition of an application
+                  at the current time
+                type: string
               steps:
                 items:
                   description: WorkflowStepStatus record the status of a workflow
@@ -283,8 +327,8 @@ spec:
                       type: string
                     subSteps:
                       items:
-                        description: WorkflowSubStepStatus record the status of a
-                          workflow subStep
+                        description: StepStatus record the base status of workflow
+                          step, which could be workflow step or subStep
                         properties:
                           firstExecuteTime:
                             description: FirstExecuteTime is the first time this step
@@ -333,6 +377,7 @@ spec:
             required:
             - finished
             - mode
+            - status
             - suspend
             - terminated
             type: object
