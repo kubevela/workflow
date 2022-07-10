@@ -16,7 +16,7 @@ A clear and concise description of what the bug is.
 <!--
 Steps to reproduce the behavior:
 1. The YAML files of Component/Trait I used.
-2. The YAML file of Application I applied.
+2. The YAML file of WorkflowRun I applied.
 3. Other operations I have done.
 4. See error
 -->

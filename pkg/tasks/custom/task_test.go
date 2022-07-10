@@ -34,6 +34,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -43,13 +44,13 @@ func TestTaskLoader(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"output": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"output": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			ip, _ := v.MakeValue(`
 myIP: value: "1.1.1.1"            
 `)
 			return v.FillObject(ip)
 		},
-		"input": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"input": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			val, err := v.LookupValue("set", "prefixIP")
 			r.NoError(err)
 			str, err := val.CueValue().String()
@@ -57,18 +58,18 @@ myIP: value: "1.1.1.1"
 			r.Equal(str, "1.1.1.1")
 			return nil
 		},
-		"wait": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"wait": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			act.Wait("I am waiting")
 			return nil
 		},
-		"terminate": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"terminate": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			act.Terminate("I am terminated")
 			return nil
 		},
-		"executeFailed": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"executeFailed": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return errors.New("execute error")
 		},
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
 	})
@@ -179,7 +180,7 @@ close({
 	r.NoError(err)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"input": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"input": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			val, err := v.LookupValue("prefixIP")
 			r.NoError(err)
 			str, err := val.CueValue().String()
@@ -187,10 +188,10 @@ close({
 			r.Equal(str, "1.1.1.1")
 			return nil
 		},
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
-		"error": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"error": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return errors.New("mock error")
 		},
 	})
@@ -303,11 +304,11 @@ func TestSteps(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			echo = echo + "ok"
 			return nil
 		},
-		"error": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"error": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return mockErr
 		},
 	})
@@ -418,7 +419,7 @@ apply: {
 		echo = ""
 		v, err := value.NewValue(tc.base, nil, "", value.TagFieldOrder)
 		r.NoError(err)
-		err = exec.doSteps(wfCtx, v)
+		err = exec.doSteps(nil, wfCtx, v)
 		r.Equal(err != nil, tc.hasErr)
 		r.Equal(echo, tc.expected)
 	}
@@ -430,7 +431,7 @@ func TestPendingInputCheck(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
 	})
@@ -468,7 +469,7 @@ func TestPendingDependsOnCheck(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
 	})
@@ -501,7 +502,7 @@ func TestSkip(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
 	})
@@ -537,7 +538,7 @@ func TestTimeout(t *testing.T) {
 	r := require.New(t)
 	discover := providers.NewProviders()
 	discover.Register("test", map[string]types.Handler{
-		"ok": func(ctx wfContext.Context, v *value.Value, act types.Action) error {
+		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return nil
 		},
 	})

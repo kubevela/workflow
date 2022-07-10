@@ -20,13 +20,16 @@ import (
 	"context"
 
 	"cuelang.org/go/cue"
+	"k8s.io/apiserver/pkg/util/feature"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	monitorCtx "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/features"
+	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
 
@@ -58,7 +61,7 @@ type TaskRunOptions struct {
 	PreCheckHooks []TaskPreCheckHook
 	PreStartHooks []TaskPreStartHook
 	PostStopHooks []TaskPostStopHook
-	GetTracer     func(id string, step v1alpha1.WorkflowStep) monitorCtx.Context
+	GetTracer     func(id string, step v1alpha1.WorkflowStep) monitorContext.Context
 	RunSteps      func(isDag bool, runners ...TaskRunner) (*v1alpha1.WorkflowRunStatus, error)
 	Debug         func(step string, v *value.Value) error
 	StepStatus    map[string]v1alpha1.StepStatus
@@ -110,7 +113,7 @@ type TaskGeneratorOptions struct {
 }
 
 // Handler is provider's processing method.
-type Handler func(ctx wfContext.Context, v *value.Value, act Action) error
+type Handler func(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act Action) error
 
 // Providers is provider discover interface.
 type Providers interface {
@@ -123,6 +126,7 @@ type StepGeneratorOptions struct {
 	PackageDiscover *packages.PackageDiscover
 	ProcessCtx      process.Context
 	TemplateLoader  template.Loader
+	Client          client.Client
 }
 
 // Action is that workflow provider can do.
@@ -147,7 +151,7 @@ type Parameter struct {
 }
 
 const (
-	// ContextKeyMetadata is key that refer to application metadata.
+	// ContextKeyMetadata is key that refer to workflow metadata.
 	ContextKeyMetadata = "metadata__"
 	// ContextPrefixFailedTimes is the prefix that refer to the failed times of the step in workflow context config map.
 	ContextPrefixFailedTimes = "failed_times"
@@ -185,16 +189,12 @@ var (
 type WorkflowState string
 
 const (
-	// WorkflowStateInitializing means the workflow is in initial state
-	WorkflowStateInitializing WorkflowState = "Initializing"
 	// WorkflowStateTerminated means workflow is terminated manually, and it won't be started unless the spec changed.
 	WorkflowStateTerminated WorkflowState = "Terminated"
 	// WorkflowStateSuspended means workflow is suspended manually, and it can be resumed.
 	WorkflowStateSuspended WorkflowState = "Suspended"
 	// WorkflowStateSucceeded means workflow is running successfully, all steps finished.
 	WorkflowStateSucceeded WorkflowState = "Succeeded"
-	// WorkflowStateFinished means workflow is end.
-	WorkflowStateFinished WorkflowState = "Finished"
 	// WorkflowStateExecuting means workflow is still running or waiting some steps.
 	WorkflowStateExecuting WorkflowState = "Executing"
 	// WorkflowStateSkipping means it will skip this reconcile and let next reconcile to handle it.
@@ -226,11 +226,25 @@ const (
 	StatusReasonAction = "Action"
 )
 
+const (
+	// MessageTerminated is the message of failed workflow
+	MessageTerminated = "The workflow terminates because of the failed steps"
+	// MessageSuspendFailedAfterRetries is the message of failed after retries
+	MessageSuspendFailedAfterRetries = "The workflow suspends automatically because the failed times of steps have reached the limit"
+	// MessageInitializingWorkflow is the message of initializing workflow
+	MessageInitializingWorkflow = "Initializing workflow"
+)
+
+const (
+	// AnnotationWorkflowRunDebug is the annotation for debug
+	AnnotationWorkflowRunDebug = "workflowrun.oam.dev/debug"
+)
+
 // IsStepFinish will decide whether step is finish.
 func IsStepFinish(phase v1alpha1.WorkflowStepPhase, reason string) bool {
-	// if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
-	// 	return phase == v1alpha1.WorkflowStepPhaseSucceeded
-	// }
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
+		return phase == v1alpha1.WorkflowStepPhaseSucceeded
+	}
 	switch phase {
 	case v1alpha1.WorkflowStepPhaseFailed:
 		return reason != "" && reason != StatusReasonExecute

@@ -19,11 +19,9 @@ package stdlib
 import (
 	"testing"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/build"
 	"github.com/stretchr/testify/require"
-
-	"cuelang.org/go/cue"
-	"gotest.tools/assert"
 )
 
 func TestGetPackages(t *testing.T) {
@@ -33,7 +31,7 @@ func TestGetPackages(t *testing.T) {
 	var r cue.Runtime
 	for path, content := range pkgs {
 		_, err := r.Compile(path, content)
-		assert.NilError(t, err)
+		re.NoError(err)
 	}
 
 	builder := &build.Instance{}

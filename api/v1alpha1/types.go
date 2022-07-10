@@ -28,7 +28,10 @@ import (
 
 // WorkflowRun is the Schema for the workflowRun API
 // +kubebuilder:storageversion
-// +kubebuilder:resource:categories={oam}
+// +kubebuilder:resource:categories={oam},shortName={wr}
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.status`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=".metadata.creationTimestamp"
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type WorkflowRun struct {
@@ -72,6 +75,7 @@ type WorkflowRunStatus struct {
 	Steps          []WorkflowStepStatus    `json:"steps,omitempty"`
 
 	StartTime metav1.Time `json:"startTime,omitempty"`
+	EndTime   metav1.Time `json:"endTime,omitempty"`
 }
 
 // Workflow defines workflow steps and other attributes
@@ -85,18 +89,19 @@ type WorkflowExecuteMode struct {
 	SubSteps WorkflowMode `json:"subSteps,omitempty"`
 }
 
-// ApplicationPhase is a label for the condition of an application at the current time
+// WorkflowRunPhase is a label for the condition of a WorkflowRun at the current time
 type WorkflowRunPhase string
 
 const (
-	WorkflowRunInitializing WorkflowRunPhase = "Initializing"
-	// ApplicationRunningWorkflow means the app is running workflow
+	// WorkflowRunInitializing means the workflow run is initializing
+	WorkflowRunInitializing WorkflowRunPhase = "initializing"
+	// WorkflowRunExecuting means the workflow run is executing
 	WorkflowRunExecuting WorkflowRunPhase = "executing"
-	// ApplicationWorkflowSuspending means the app's workflow is suspending
+	// WorkflowRunSuspending means the workflow run is suspending
 	WorkflowRunSuspending WorkflowRunPhase = "suspending"
-	// ApplicationWorkflowTerminated means the app's workflow is terminated
+	// 	WorkflowRunTerminated means the workflow run is terminated
 	WorkflowRunTerminated WorkflowRunPhase = "terminated"
-	// ApplicationWorkflowFinished means the app's workflow is finished
+	// WorkflowRunSucceeded means the workflow run is succeeded
 	WorkflowRunSucceeded WorkflowRunPhase = "succeeded"
 )
 

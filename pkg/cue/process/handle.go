@@ -92,6 +92,7 @@ type RequiredSecrets struct {
 type ContextData struct {
 	Name           string
 	Namespace      string
+	StepName       string
 	WorkflowName   string
 	PublishVersion string
 
@@ -213,14 +214,14 @@ func (ctx *templateContext) BaseContextFile() (string, error) {
 func (ctx *templateContext) ExtendedContextFile() (string, error) {
 	context, err := ctx.BaseContextFile()
 	if err != nil {
-		return "", fmt.Errorf("failed to convert data to application with marshal err %w", err)
+		return "", fmt.Errorf("failed to convert data to workflow with marshal err %w", err)
 	}
 	var bareSecret string
 	if len(ctx.requiredSecrets) > 0 {
 		for _, s := range ctx.requiredSecrets {
 			data, err := json.Marshal(s.Data)
 			if err != nil {
-				return "", fmt.Errorf("failed to convert data %v to application with marshal err %w", data, err)
+				return "", fmt.Errorf("failed to convert data %v to workflow with marshal err %w", data, err)
 			}
 			bareSecret += s.ContextName + ":" + string(data) + "\n"
 		}

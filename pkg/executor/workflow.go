@@ -52,20 +52,12 @@ const (
 	minWorkflowBackoffWaitTime = 1
 	// backoffTimeCoefficient is the coefficient of time to wait before reconcile workflow again
 	backoffTimeCoefficient = 0.05
-
-	// MessageTerminated is the message of failed workflow
-	MessageTerminated = "The workflow terminates automatically because of the failed steps"
-	// MessageSuspendFailedAfterRetries is the message of failed after retries
-	MessageSuspendFailedAfterRetries = "The workflow suspends automatically because the failed times of steps have reached the limit"
-	// MessageInitializingWorkflow is the message of initializing workflow
-	MessageInitializingWorkflow = "Initializing workflow"
 )
 
 type workflowExecutor struct {
 	wr    *v1alpha1.WorkflowRun
 	cli   client.Client
 	wfCtx wfContext.Context
-	debug bool
 }
 
 // New returns a Workflow Executor implementation.
@@ -78,9 +70,6 @@ func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
 
 // ExecuteRunners execute workflow task runners in order.
 func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
-	if len(taskRunners) == 0 {
-		return types.WorkflowStateFinished, nil
-	}
 	status := &w.wr.Status
 	if status.StartTime.IsZero() && len(status.Steps) == 0 {
 		w.wr.Status = v1alpha1.WorkflowRunStatus{
@@ -89,7 +78,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		}
 		StepStatusCache.Delete(fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace))
 		wfContext.CleanupMemoryStore(w.wr.Name, w.wr.Namespace)
-		return types.WorkflowStateInitializing, nil
 	}
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace)
@@ -119,7 +107,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	wfCtx, err := w.makeContext(w.wr.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
-		status.Message = string(types.WorkflowStateExecuting)
 		return types.WorkflowStateExecuting, err
 	}
 	w.wfCtx = wfCtx
@@ -130,7 +117,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if err != nil {
 		ctx.Error(err, "run steps")
 		StepStatusCache.Store(cacheKey, len(status.Steps))
-		status.Message = string(types.WorkflowStateExecuting)
 		return types.WorkflowStateExecuting, err
 	}
 
@@ -149,10 +135,8 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return types.WorkflowStateSuspended, nil
 	}
 	if allTasksSucceeded {
-		status.Message = string(types.WorkflowStateSucceeded)
 		return types.WorkflowStateSucceeded, nil
 	}
-	status.Message = string(types.WorkflowStateExecuting)
 	return types.WorkflowStateExecuting, nil
 }
 
@@ -211,13 +195,17 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 			}
 		}
 	}
+	debug := false
+	if w.wr.Annotations != nil && w.wr.Annotations[types.AnnotationWorkflowRunDebug] == "true" {
+		debug = true
+	}
 	return &engine{
 		status:        wfStatus,
 		monitorCtx:    ctx,
 		wr:            w.wr,
 		wfCtx:         wfCtx,
 		cli:           w.cli,
-		debug:         w.debug,
+		debug:         debug,
 		stepStatus:    stepStatus,
 		stepDependsOn: stepDependsOn,
 		stepTimeout:   make(map[string]time.Time),
@@ -538,9 +526,9 @@ func (e *engine) Run(taskRunners []types.TaskRunner, dag bool) error {
 func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus) {
 	switch {
 	case !e.waiting && e.failedAfterRetries && feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
-		e.status.Message = MessageSuspendFailedAfterRetries
+		e.status.Message = types.MessageSuspendFailedAfterRetries
 	case wfStatus.Terminated && !feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
-		e.status.Message = MessageTerminated
+		e.status.Message = types.MessageTerminated
 	default:
 	}
 }

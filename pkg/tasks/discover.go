@@ -22,9 +22,6 @@ import (
 	"github.com/pkg/errors"
 
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
-	"github.com/kubevela/workflow/pkg/providers/email"
-	"github.com/kubevela/workflow/pkg/providers/util"
-	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -36,7 +33,6 @@ type taskDiscover struct {
 }
 
 func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOptions) types.TaskDiscover {
-	installBuiltinProviders(ctx, options.Providers)
 	return &taskDiscover{
 		builtin: map[string]types.TaskGenerator{
 			types.WorkflowStepTypeSuspend:   builtin.Suspend,
@@ -62,10 +58,4 @@ func (td *taskDiscover) GetTaskGenerator(ctx context.Context, name string) (type
 
 	}
 	return nil, errors.Errorf("can't find task generator: %s", name)
-}
-
-func installBuiltinProviders(ctx monitorContext.Context, providerHandlers types.Providers) {
-	workspace.Install(providerHandlers)
-	email.Install(providerHandlers)
-	util.Install(ctx, providerHandlers)
 }

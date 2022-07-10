@@ -21,7 +21,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -138,7 +137,7 @@ spec: template: metadata: {
 			v, err := value.NewValue(tc.value, nil, "")
 			r.NoError(err)
 			prd := &provider{}
-			err = prd.PatchK8sObject(nil, v, nil)
+			err = prd.PatchK8sObject(nil, nil, v, nil)
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
@@ -152,7 +151,7 @@ spec: template: metadata: {
 			resultValue, err := value.NewValue(tc.patchResult, nil, "")
 			r.NoError(err)
 			r.NoError(resultValue.UnmarshalTo(&expectResult))
-			assert.Equal(t, expectResult, patchResult)
+			r.Equal(expectResult, patchResult)
 		})
 	}
 }
@@ -179,7 +178,7 @@ func TestConvertString(t *testing.T) {
 			v, err := value.NewValue(tc.from, nil, "")
 			r.NoError(err)
 			prd := &provider{}
-			err = prd.String(nil, v, nil)
+			err = prd.String(nil, nil, v, nil)
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
@@ -201,15 +200,14 @@ data: "test"
 `, nil, "")
 	r.NoError(err)
 	logCtx := monitorContext.NewTraceContext(context.Background(), "")
-	prd := &provider{logCtx: logCtx}
-	err = prd.Log(nil, v, nil)
+	prd := &provider{}
+	err = prd.Log(logCtx, nil, v, nil)
 	r.NoError(err)
 }
 
 func TestInstall(t *testing.T) {
-	logCtx := monitorContext.NewTraceContext(context.Background(), "")
 	p := providers.NewProviders()
-	Install(logCtx, p)
+	Install(p)
 	h, ok := p.GetHandler("util", "string")
 	r := require.New(t)
 	r.Equal(ok, true)

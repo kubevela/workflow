@@ -29,11 +29,9 @@ const (
 	ProviderName = "util"
 )
 
-type provider struct {
-	logCtx monitorContext.Context
-}
+type provider struct{}
 
-func (p *provider) PatchK8sObject(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (p *provider) PatchK8sObject(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -62,7 +60,7 @@ func (p *provider) PatchK8sObject(ctx wfContext.Context, v *value.Value, act typ
 }
 
 // String convert byte to string
-func (p *provider) String(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	b, err := v.LookupValue("bt")
 	if err != nil {
 		return err
@@ -75,7 +73,7 @@ func (p *provider) String(ctx wfContext.Context, v *value.Value, act types.Actio
 }
 
 // Log print cue value in log
-func (p *provider) Log(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	data, err := v.LookupValue("data")
 	if err != nil {
 		return err
@@ -84,16 +82,14 @@ func (p *provider) Log(ctx wfContext.Context, v *value.Value, act types.Action) 
 	if err != nil {
 		return err
 	}
-	logCtx := p.logCtx.Fork("cue logs")
+	logCtx := ctx.Fork("cue logs")
 	logCtx.Info(s)
 	return nil
 }
 
 // Install register handlers to provider discover.
-func Install(ctx monitorContext.Context, p types.Providers) {
-	prd := &provider{
-		logCtx: ctx,
-	}
+func Install(p types.Providers) {
+	prd := &provider{}
 	p.Register(ProviderName, map[string]types.Handler{
 		"patch-k8s-object": prd.PatchK8sObject,
 		"string":           prd.String,

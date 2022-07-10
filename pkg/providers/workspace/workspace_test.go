@@ -20,39 +20,40 @@ import (
 	"encoding/json"
 	"testing"
 
-	"gotest.tools/assert"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProvider_Load(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
+	r := require.New(t)
 	p := &provider{}
 	v, err := value.NewValue(`
 component: "server"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Load(wfCtx, v, &mockAction{})
-	assert.NilError(t, err)
+	r.NoError(err)
+	err = p.Load(nil, wfCtx, v, &mockAction{})
+	r.NoError(err)
 	v, err = v.LookupValue("value")
-	assert.NilError(t, err)
+	r.NoError(err)
 	str, err := v.String()
-	assert.NilError(t, err)
-	assert.Equal(t, str, expectedManifest)
+	r.NoError(err)
+	r.Equal(str, expectedManifest)
 
 	// check Get Components
 	v, err = value.NewValue(`{}`, nil, "")
-	assert.NilError(t, err)
-	err = p.Load(wfCtx, v, &mockAction{})
-	assert.NilError(t, err)
+	r.NoError(err)
+	err = p.Load(nil, wfCtx, v, &mockAction{})
+	r.NoError(err)
 	v, err = v.LookupValue("value", "server")
-	assert.NilError(t, err)
+	r.NoError(err)
 	str, err = v.String()
-	assert.NilError(t, err)
-	assert.Equal(t, str, expectedManifest)
+	r.NoError(err)
+	r.Equal(str, expectedManifest)
 
 	errTestCases := []string{
 		`component: "not-found"`,
@@ -62,14 +63,15 @@ component: "server"
 
 	for _, tCase := range errTestCases {
 		errv, err := value.NewValue(tCase, nil, "")
-		assert.NilError(t, err)
-		err = p.Load(wfCtx, errv, &mockAction{})
-		assert.Equal(t, err != nil, true)
+		r.NoError(err)
+		err = p.Load(nil, wfCtx, errv, &mockAction{})
+		r.Error(err)
 	}
 }
 
 func TestProvider_Export(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
+	r := require.New(t)
 	p := &provider{}
 	v, err := value.NewValue(`
 value: {
@@ -80,13 +82,13 @@ value: {
 }
 component: "server"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Export(wfCtx, v, &mockAction{})
-	assert.NilError(t, err)
+	r.NoError(err)
+	err = p.Export(nil, wfCtx, v, &mockAction{})
+	r.NoError(err)
 	component, err := wfCtx.GetComponent("server")
-	assert.NilError(t, err)
+	r.NoError(err)
 	s := component.Workload.String()
-	assert.Equal(t, s, `apiVersion: "v1"
+	r.Equal(s, `apiVersion: "v1"
 kind:       "Pod"
 metadata: {
 	labels: {
@@ -125,42 +127,43 @@ component: "server"
 
 	for _, tCase := range errCases {
 		v, err = value.NewValue(tCase, nil, "")
-		assert.NilError(t, err)
-		err = p.Export(wfCtx, v, &mockAction{})
-		assert.Equal(t, err != nil, true)
+		r.NoError(err)
+		err = p.Export(nil, wfCtx, v, &mockAction{})
+		r.Error(err)
 	}
 }
 
 func TestProvider_DoVar(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	p := &provider{}
+	r := require.New(t)
 
 	v, err := value.NewValue(`
 method: "Put"
 path: "clusterIP"
 value: "1.1.1.1"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.DoVar(wfCtx, v, &mockAction{})
-	assert.NilError(t, err)
+	r.NoError(err)
+	err = p.DoVar(nil, wfCtx, v, &mockAction{})
+	r.NoError(err)
 	varV, err := wfCtx.GetVar("clusterIP")
-	assert.NilError(t, err)
+	r.NoError(err)
 	s, err := varV.CueValue().String()
-	assert.NilError(t, err)
-	assert.Equal(t, s, "1.1.1.1")
+	r.NoError(err)
+	r.Equal(s, "1.1.1.1")
 
 	v, err = value.NewValue(`
 method: "Get"
 path: "clusterIP"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.DoVar(wfCtx, v, &mockAction{})
-	assert.NilError(t, err)
+	r.NoError(err)
+	err = p.DoVar(nil, wfCtx, v, &mockAction{})
+	r.NoError(err)
 	varV, err = v.LookupValue("value")
-	assert.NilError(t, err)
+	r.NoError(err)
 	s, err = varV.CueValue().String()
-	assert.NilError(t, err)
-	assert.Equal(t, s, "1.1.1.1")
+	r.NoError(err)
+	r.Equal(s, "1.1.1.1")
 
 	errCases := []string{`
 value: "1.1.1.1"
@@ -175,91 +178,94 @@ path: "ClusterIP"
 
 	for _, tCase := range errCases {
 		v, err = value.NewValue(tCase, nil, "")
-		assert.NilError(t, err)
-		err = p.DoVar(wfCtx, v, &mockAction{})
-		assert.Equal(t, err != nil, true)
+		r.NoError(err)
+		err = p.DoVar(nil, wfCtx, v, &mockAction{})
+		r.Error(err)
 	}
 }
 
 func TestProvider_Wait(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	p := &provider{}
+	r := require.New(t)
 	act := &mockAction{}
 	v, err := value.NewValue(`
 continue: 100!=100
 message: "test log"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Wait(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.wait, true)
-	assert.Equal(t, act.msg, "test log")
+	r.NoError(err)
+	err = p.Wait(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.wait, true)
+	r.Equal(act.msg, "test log")
 
 	act = &mockAction{}
 	v, err = value.NewValue(`
 continue: 100==100
 message: "not invalid"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Wait(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.wait, false)
-	assert.Equal(t, act.msg, "")
+	r.NoError(err)
+	err = p.Wait(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.wait, false)
+	r.Equal(act.msg, "")
 
 	act = &mockAction{}
 	v, err = value.NewValue(`
 continue: bool
 message: string
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Wait(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.wait, true)
+	r.NoError(err)
+	err = p.Wait(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.wait, true)
 
 	act = &mockAction{}
 	v, err = value.NewValue(``, nil, "")
-	assert.NilError(t, err)
-	err = p.Wait(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.wait, true)
+	r.NoError(err)
+	err = p.Wait(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.wait, true)
 }
 
 func TestProvider_Break(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	p := &provider{}
+	r := require.New(t)
 	act := &mockAction{}
-	err := p.Break(wfCtx, nil, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.terminate, true)
+	err := p.Break(nil, wfCtx, nil, act)
+	r.NoError(err)
+	r.Equal(act.terminate, true)
 
 	act = &mockAction{}
 	v, err := value.NewValue(`
 message: "terminate"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Break(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.terminate, true)
-	assert.Equal(t, act.msg, "terminate")
+	r.NoError(err)
+	err = p.Break(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.terminate, true)
+	r.Equal(act.msg, "terminate")
 }
 
 func TestProvider_Fail(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	p := &provider{}
+	r := require.New(t)
 	act := &mockAction{}
-	err := p.Fail(wfCtx, nil, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.terminate, true)
+	err := p.Fail(nil, wfCtx, nil, act)
+	r.NoError(err)
+	r.Equal(act.terminate, true)
 
 	act = &mockAction{}
 	v, err := value.NewValue(`
 message: "fail"
 `, nil, "")
-	assert.NilError(t, err)
-	err = p.Fail(wfCtx, v, act)
-	assert.NilError(t, err)
-	assert.Equal(t, act.terminate, true)
-	assert.Equal(t, act.msg, "fail")
+	r.NoError(err)
+	err = p.Fail(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.terminate, true)
+	r.Equal(act.msg, "fail")
 }
 
 type mockAction struct {
@@ -291,14 +297,15 @@ func (act *mockAction) Fail(msg string) {
 
 func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	cm := corev1.ConfigMap{}
+	r := require.New(t)
 	testCaseJson, err := yaml.YAMLToJSON([]byte(testCaseYaml))
-	assert.NilError(t, err)
+	r.NoError(err)
 	err = json.Unmarshal(testCaseJson, &cm)
-	assert.NilError(t, err)
+	r.NoError(err)
 
 	wfCtx := new(wfContext.WorkflowContext)
 	err = wfCtx.LoadFromConfigMap(cm)
-	assert.NilError(t, err)
+	r.NoError(err)
 	return wfCtx
 }
 

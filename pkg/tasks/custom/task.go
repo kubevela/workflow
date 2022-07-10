@@ -121,7 +121,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 		tRunner.checkPending = func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool {
 			return CheckPending(ctx, wfStep, stepStatus)
 		}
-		tRunner.run = func(ctx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
+		tRunner.run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
 			if options.GetTracer == nil {
 				options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context {
 					return monitorContext.NewTraceContext(context.Background(), "")
@@ -141,25 +141,6 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			var err error
 			var paramFile string
 
-			defer func() {
-				if exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseSkipped && len(wfStep.Outputs) > 0 {
-					if taskv == nil {
-						taskv, err = convertTemplate(ctx, t.pd, strings.Join([]string{templ, paramFile}, "\n"), exec.wfStatus.ID, options.PCtx)
-						if err != nil {
-							return
-						}
-					}
-					for _, hook := range options.PostStopHooks {
-						if err := hook(ctx, taskv, wfStep, exec.status()); err != nil {
-							exec.err(ctx, false, err, types.StatusReasonOutput)
-							stepStatus = exec.status()
-							operations = exec.operation()
-							return
-						}
-					}
-				}
-			}()
-
 			for _, hook := range options.PreCheckHooks {
 				result, err := hook(wfStep, &types.PreCheckOptions{
 					PackageDiscover: t.pd,
@@ -176,7 +157,6 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				}
 				if result.Timeout {
 					exec.timeout("")
-					return exec.status(), exec.operation(), nil
 				}
 			}
 
@@ -207,7 +187,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				paramFile = fmt.Sprintf(model.ParameterFieldName+": {%s}\n", ps)
 			}
 
-			taskv, err = convertTemplate(ctx, t.pd, strings.Join([]string{templ, paramFile}, "\n"), exec.wfStatus.ID, options.PCtx)
+			taskv, err = convertTemplate(ctx, t.pd, strings.Join([]string{templ, paramFile}, "\n"), wfStep.Name, exec.wfStatus.ID, options.PCtx)
 			if err != nil {
 				exec.err(ctx, false, err, types.StatusReasonRendering)
 				return exec.status(), exec.operation(), nil
@@ -225,10 +205,16 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 					}
 				}()
 			}
-			if err := exec.doSteps(ctx, taskv); err != nil {
+			if err := exec.doSteps(tracer, ctx, taskv); err != nil {
 				tracer.Error(err, "do steps")
 				exec.err(ctx, true, err, types.StatusReasonExecute)
 				return exec.status(), exec.operation(), nil
+			}
+			for _, hook := range options.PostStopHooks {
+				if err := hook(ctx, taskv, wfStep, exec.status()); err != nil {
+					exec.err(ctx, false, err, types.StatusReasonOutput)
+					return exec.status(), exec.operation(), nil
+				}
 			}
 
 			return exec.status(), exec.operation(), nil
@@ -259,7 +245,7 @@ func ValidateIfValue(ctx wfContext.Context, step v1alpha1.WorkflowStep, stepStat
 }
 
 func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, pd *packages.PackageDiscover, template string, stepStatus map[string]v1alpha1.StepStatus, pCtx process.Context) (*value.Value, error) {
-	contextTempl := getContextTemplate(ctx, "", pCtx)
+	contextTempl := getContextTemplate(ctx, step.Name, "", pCtx)
 	inputsTempl := getInputsTemplate(ctx, step)
 	statusTemplate := "\n"
 	statusMap := make(map[string]interface{})
@@ -293,18 +279,18 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, pd *
 	return value.NewValue(template+"\n"+statusTemplate, pd, statusTemplate)
 }
 
-func convertTemplate(ctx wfContext.Context, pd *packages.PackageDiscover, templ, id string, pCtx process.Context) (*value.Value, error) {
-	contextTempl := getContextTemplate(ctx, id, pCtx)
+func convertTemplate(ctx wfContext.Context, pd *packages.PackageDiscover, templ, step, id string, pCtx process.Context) (*value.Value, error) {
+	contextTempl := getContextTemplate(ctx, step, id, pCtx)
 	return value.NewValue(templ+contextTempl, pd, contextTempl, value.ProcessScript, value.TagFieldOrder)
 }
 
 // MakeValueForContext makes context value
-func MakeValueForContext(ctx wfContext.Context, pd *packages.PackageDiscover, id string, pCtx process.Context) (*value.Value, error) {
-	contextTempl := getContextTemplate(ctx, id, pCtx)
+func MakeValueForContext(ctx wfContext.Context, pd *packages.PackageDiscover, step, id string, pCtx process.Context) (*value.Value, error) {
+	contextTempl := getContextTemplate(ctx, step, id, pCtx)
 	return value.NewValue(contextTempl, pd, contextTempl)
 }
 
-func getContextTemplate(ctx wfContext.Context, id string, pCtx process.Context) string {
+func getContextTemplate(ctx wfContext.Context, step, id string, pCtx process.Context) string {
 	var contextTempl string
 	meta, _ := ctx.GetVar(types.ContextKeyMetadata)
 	if meta != nil {
@@ -317,6 +303,8 @@ func getContextTemplate(ctx wfContext.Context, id string, pCtx process.Context) 
 	if pCtx == nil {
 		return ""
 	}
+	pCtx.PushData(model.ContextStepSessionID, id)
+	pCtx.PushData(model.ContextStepName, step)
 	c, err := pCtx.ExtendedContextFile()
 	if err != nil {
 		return ""
@@ -373,9 +361,11 @@ func (exec *executor) Terminate(message string) {
 // Wait let workflow wait.
 func (exec *executor) Wait(message string) {
 	exec.wait = true
-	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseRunning
-	exec.wfStatus.Reason = types.StatusReasonWait
-	exec.wfStatus.Message = message
+	if exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseFailed {
+		exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseRunning
+		exec.wfStatus.Reason = types.StatusReasonWait
+		exec.wfStatus.Message = message
+	}
 }
 
 // Fail let the step fail, its status is failed and reason is Action
@@ -404,7 +394,9 @@ func (exec *executor) err(ctx wfContext.Context, wait bool, err error, reason st
 	exec.wait = wait
 	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
 	exec.wfStatus.Message = err.Error()
-	exec.wfStatus.Reason = reason
+	if exec.wfStatus.Reason == "" {
+		exec.wfStatus.Reason = reason
+	}
 	exec.checkErrorTimes(ctx)
 }
 
@@ -437,7 +429,7 @@ func (exec *executor) printStep(phase string, provider string, do string, v *val
 }
 
 // Handle process task-step value by provider and do.
-func (exec *executor) Handle(ctx wfContext.Context, provider string, do string, v *value.Value) error {
+func (exec *executor) Handle(ctx monitorContext.Context, wfCtx wfContext.Context, provider string, do string, v *value.Value) error {
 	if debugLog(v) {
 		exec.printStep("stepStart", provider, do, v)
 		defer exec.printStep("stepEnd", provider, do, v)
@@ -446,14 +438,14 @@ func (exec *executor) Handle(ctx wfContext.Context, provider string, do string, 
 	if !exist {
 		return errors.Errorf("handler not found")
 	}
-	return h(ctx, v, exec)
+	return h(ctx, wfCtx, v, exec)
 }
 
-func (exec *executor) doSteps(ctx wfContext.Context, v *value.Value) error {
+func (exec *executor) doSteps(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value) error {
 	do := OpTpy(v)
 	if do != "" && do != "steps" {
 		provider := opProvider(v)
-		if err := exec.Handle(ctx, provider, do, v); err != nil {
+		if err := exec.Handle(ctx, wfCtx, provider, do, v); err != nil {
 			return errors.WithMessagef(err, "run step(provider=%s,do=%s)", provider, do)
 		}
 		return nil
@@ -480,7 +472,7 @@ func (exec *executor) doSteps(ctx wfContext.Context, v *value.Value) error {
 				if do == "" {
 					return false, nil
 				}
-				return false, exec.doSteps(ctx, item)
+				return false, exec.doSteps(ctx, wfCtx, item)
 			})
 		}
 		do := OpTpy(in)
@@ -488,12 +480,12 @@ func (exec *executor) doSteps(ctx wfContext.Context, v *value.Value) error {
 			return false, nil
 		}
 		if do == "steps" {
-			if err := exec.doSteps(ctx, in); err != nil {
+			if err := exec.doSteps(ctx, wfCtx, in); err != nil {
 				return false, err
 			}
 		} else {
 			provider := opProvider(in)
-			if err := exec.Handle(ctx, provider, do, in); err != nil {
+			if err := exec.Handle(ctx, wfCtx, provider, do, in); err != nil {
 				return false, errors.WithMessagef(err, "run step(provider=%s,do=%s)", provider, do)
 			}
 		}

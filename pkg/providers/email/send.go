@@ -24,6 +24,7 @@ import (
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -51,7 +52,7 @@ type content struct {
 var emailRoutine sync.Map
 
 // Send sends email
-func (h *provider) Send(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Send(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	stepID, err := v.LookupValue("stepID")
 	if err != nil {
 		return err

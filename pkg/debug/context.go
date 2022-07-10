@@ -22,7 +22,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -67,7 +69,15 @@ func setStore(ctx context.Context, cli client.Client, wr *v1alpha1.WorkflowRun, 
 			cm.Data = map[string]string{
 				"debug": data,
 			}
-			// TODO: add owner reference
+			cm.SetOwnerReferences([]metav1.OwnerReference{
+				{
+					APIVersion: v1alpha1.SchemeGroupVersion.String(),
+					Kind:       v1alpha1.WorkflowRunKind,
+					Name:       wr.Name,
+					UID:        wr.UID,
+					Controller: pointer.BoolPtr(true),
+				},
+			})
 			if err := cli.Create(ctx, cm); err != nil {
 				return err
 			}

@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -51,15 +51,16 @@ func TestLoad(t *testing.T) {
 	}
 	loader := NewWorkflowStepTemplateLoader(cli)
 
+	r := require.New(t)
 	tmpl, err := loader.LoadTemplate(context.Background(), "builtin-apply-component")
-	assert.NilError(t, err)
+	r.NoError(err)
 	expected, err := os.ReadFile("./static/builtin-apply-component.cue")
-	assert.NilError(t, err)
-	assert.Equal(t, tmpl, string(expected))
+	r.NoError(err)
+	r.Equal(tmpl, string(expected))
 
 	tmpl, err = loader.LoadTemplate(context.Background(), "apply-oam-component")
-	assert.NilError(t, err)
-	assert.Equal(t, tmpl, `import (
+	r.NoError(err)
+	r.Equal(tmpl, `import (
 	"vela/op"
 )
 
