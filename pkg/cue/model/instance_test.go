@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -58,9 +58,10 @@ func TestGetCompileError(t *testing.T) {
 			"_|_ // conflicting values \"HELLO\" and \"WORLD\"",
 	}}
 	for _, tt := range testcases {
+		r := require.New(t)
 		errInfo, contains := IndexMatchLine(tt.src, "_|_")
-		assert.Equal(t, tt.wantErr, contains)
-		assert.Equal(t, tt.errInfo, errInfo)
+		r.Equal(tt.wantErr, contains)
+		r.Equal(tt.errInfo, errInfo)
 	}
 
 }
@@ -99,9 +100,9 @@ metadata: name: "test"
 			t.Error(err)
 			return
 		}
-
-		assert.Equal(t, v.gvk, baseObj.GetObjectKind().GroupVersionKind())
-		assert.Equal(t, true, base.IsBase())
+		re := require.New(t)
+		re.Equal(v.gvk, baseObj.GetObjectKind().GroupVersionKind())
+		re.Equal(true, base.IsBase())
 
 		other, err := NewOther(inst.Value())
 		if err != nil {
@@ -114,8 +115,8 @@ metadata: name: "test"
 			return
 		}
 
-		assert.Equal(t, v.gvk, otherObj.GetObjectKind().GroupVersionKind())
-		assert.Equal(t, false, other.IsBase())
+		re.Equal(v.gvk, otherObj.GetObjectKind().GroupVersionKind())
+		re.Equal(false, other.IsBase())
 	}
 }
 
@@ -170,22 +171,24 @@ output: {
 `
 
 	var r cue.Runtime
+	re := require.New(t)
 	inst, err := r.Compile("-", base)
-	assert.NoError(t, err)
+	re.NoError(err)
 	newbase, err := NewBase(inst.Value())
-	assert.NoError(t, err)
+	re.NoError(err)
 	data, err := newbase.Unstructured()
-	assert.Error(t, err)
+	re.Error(err)
 	var expnil *unstructured.Unstructured
-	assert.Equal(t, expnil, data)
+	re.Equal(expnil, data)
 }
 
 func TestError(t *testing.T) {
 	ins := &instance{
 		v: ``,
 	}
+	r := require.New(t)
 	_, err := ins.Unstructured()
-	assert.Equal(t, err.Error(), "Object 'Kind' is missing in '{}'")
+	r.Equal(err.Error(), "Object 'Kind' is missing in '{}'")
 	ins = &instance{
 		v: `
 apiVersion: "apps/v1"
@@ -194,7 +197,7 @@ metadata: name: parameter.name
 `,
 	}
 	_, err = ins.Unstructured()
-	assert.Equal(t, err.Error(), fmt.Sprintf(`failed to have the workload/trait unstructured: metadata.name: reference "%s" not found`, ParameterFieldName))
+	r.Equal(err.Error(), fmt.Sprintf(`failed to have the workload/trait unstructured: metadata.name: reference "%s" not found`, ParameterFieldName))
 	ins = &instance{
 		v: `
 apiVersion: "apps/v1"
@@ -203,8 +206,8 @@ metadata: name: "abc"
 `,
 	}
 	obj, err := ins.Unstructured()
-	assert.Equal(t, err, nil)
-	assert.Equal(t, obj, &unstructured.Unstructured{
+	r.Equal(err, nil)
+	r.Equal(obj, &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
@@ -227,6 +230,6 @@ spec: {
 }`,
 	}
 	o, err := ins.Unstructured()
-	assert.Nil(t, o)
-	assert.NotNil(t, err)
+	r.Nil(o)
+	r.NotNil(err)
 }

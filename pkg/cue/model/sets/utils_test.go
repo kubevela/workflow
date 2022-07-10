@@ -18,14 +18,13 @@ package sets
 import (
 	"testing"
 
-	"cuelang.org/go/cue/format"
-
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"github.com/pkg/errors"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToString(t *testing.T) {
@@ -74,11 +73,12 @@ if foo > 5 {
 	}
 	var r cue.Runtime
 	for _, tcase := range testCases {
+		re := require.New(t)
 		inst, err := r.Compile("-", tcase.s)
-		assert.NilError(t, err)
+		re.NoError(err)
 		str, err := ToString(inst.Value())
-		assert.NilError(t, err)
-		assert.Equal(t, str, tcase.expected)
+		re.NoError(err)
+		re.Equal(str, tcase.expected)
 	}
 }
 
@@ -130,11 +130,12 @@ lacy: """
 
 	var r cue.Runtime
 	for _, tcase := range testCases {
+		re := require.New(t)
 		inst, err := r.Compile("-", tcase.s)
-		assert.NilError(t, err)
+		re.NoError(err)
 		str, err := ToString(inst.Value(), OptBytesToString)
-		assert.NilError(t, err)
-		assert.Equal(t, str, tcase.expected)
+		re.NoError(err)
+		re.Equal(str, tcase.expected)
 	}
 }
 
@@ -229,14 +230,15 @@ wait: {
 
 	var r cue.Runtime
 	for _, tCase := range testCases {
+		re := require.New(t)
 		f, err := parser.ParseFile("-", tCase.src)
-		assert.NilError(t, err)
+		re.NoError(err)
 		err = PreprocessBuiltinFunc(f, "script", doScript)
-		assert.NilError(t, err)
+		re.NoError(err)
 		inst, err := r.CompileFile(f)
-		assert.NilError(t, err)
+		re.NoError(err)
 		bt, _ := inst.Value().MarshalJSON()
-		assert.Equal(t, string(bt), tCase.expectJson)
+		re.Equal(string(bt), tCase.expectJson)
 	}
 }
 
@@ -252,8 +254,9 @@ arr: [1,2]
 top: _
 bottom: _|_
 `)
-	assert.NilError(t, err)
-	assert.Equal(t, s, `a:      *10 | _
+	r := require.New(t)
+	r.NoError(err)
+	r.Equal(s, `a:      *10 | _
 a1:     int
 b:      *"foo" | _
 b1:     string
@@ -271,13 +274,14 @@ x: ["a","b"]
 y: [...string]
 z: []
 `)
-	assert.NilError(t, err)
+	r := require.New(t)
+	r.NoError(err)
 	ListOpen(f)
 
 	bt, err := format.Node(f)
-	assert.NilError(t, err)
+	r.NoError(err)
 	s := string(bt)
-	assert.Equal(t, s, `x: ["a", "b", ...]
+	r.Equal(s, `x: ["a", "b", ...]
 y: [...string]
 z: []
 `)

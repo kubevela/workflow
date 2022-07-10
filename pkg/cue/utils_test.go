@@ -19,7 +19,7 @@ package cue
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -62,13 +62,14 @@ func TestFillUnstructuredObject(t *testing.T) {
 
 	for name, testcase := range testcases {
 		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
 			value, err := value.NewValue("", nil, "")
-			assert.NoError(t, err)
+			r.NoError(err)
 			err = FillUnstructuredObject(value, testcase.obj, "object")
-			assert.NoError(t, err)
+			r.NoError(err)
 			json, err := value.CueValue().MarshalJSON()
-			assert.NoError(t, err)
-			assert.Equal(t, testcase.json, string(json))
+			r.NoError(err)
+			r.Equal(testcase.json, string(json))
 		})
 	}
 }

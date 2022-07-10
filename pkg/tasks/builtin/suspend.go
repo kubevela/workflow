@@ -161,7 +161,7 @@ func GetSuspendStepDurationWaiting(step v1alpha1.WorkflowStep) (time.Duration, e
 func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, pd *packages.PackageDiscover, id string, pCtx process.Context) {
 	status := *stepStatus
 	if status.Phase != v1alpha1.WorkflowStepPhaseSkipped && len(step.Outputs) > 0 {
-		contextValue, err := custom.MakeValueForContext(ctx, pd, id, pCtx)
+		contextValue, err := custom.MakeValueForContext(ctx, pd, step.Name, id, pCtx)
 		if err != nil {
 			status.Phase = v1alpha1.WorkflowStepPhaseFailed
 			if status.Reason == "" {

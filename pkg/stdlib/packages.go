@@ -27,8 +27,13 @@ import (
 
 var (
 	//go:embed pkgs op.cue ql.cue
-	fs embed.FS
+	fs      embed.FS
+	imports []*build.Instance
 )
+
+func init() {
+	imports, _ = getImports("")
+}
 
 // GetPackages Get Stdlib packages
 func GetPackages(tagTempl string) (map[string]string, error) {
@@ -70,9 +75,23 @@ func GetPackages(tagTempl string) (map[string]string, error) {
 
 // AddImportsFor install imports for build.Instance.
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
-	pkgs, err := GetPackages(tagTempl)
+	if tagTempl == "" && imports != nil {
+		inst.Imports = append(inst.Imports, imports...)
+		return nil
+	}
+	im, err := getImports(tagTempl)
 	if err != nil {
 		return err
+	}
+	inst.Imports = append(inst.Imports, im...)
+	return nil
+}
+
+func getImports(tagTempl string) ([]*build.Instance, error) {
+	imports := make([]*build.Instance, 0)
+	pkgs, err := GetPackages(tagTempl)
+	if err != nil {
+		return nil, err
 	}
 	for path, content := range pkgs {
 		p := &build.Instance{
@@ -80,9 +99,9 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 			ImportPath: path,
 		}
 		if err := p.AddFile("-", content); err != nil {
-			return err
+			return nil, err
 		}
-		inst.Imports = append(inst.Imports, p)
+		imports = append(imports, p)
 	}
-	return nil
+	return imports, nil
 }

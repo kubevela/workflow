@@ -22,6 +22,7 @@ import (
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -34,10 +35,10 @@ type provider struct {
 }
 
 // Load get component from context.
-func (h *provider) Load(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Load(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	componentName, _ := v.Field("component")
 	if !componentName.Exists() {
-		componets := ctx.GetComponents()
+		componets := wfCtx.GetComponents()
 		for name, c := range componets {
 			if err := fillComponent(v, c, "value", name); err != nil {
 				return err
@@ -49,7 +50,7 @@ func (h *provider) Load(ctx wfContext.Context, v *value.Value, act types.Action)
 	if err != nil {
 		return err
 	}
-	component, err := ctx.GetComponent(name)
+	component, err := wfCtx.GetComponent(name)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func fillComponent(v *value.Value, component *wfContext.ComponentManifest, paths
 }
 
 // DoVar get & put variable from context.
-func (h *provider) DoVar(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) DoVar(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	methodV, err := v.Field("method")
 	if err != nil {
 		return err
@@ -94,7 +95,7 @@ func (h *provider) DoVar(ctx wfContext.Context, v *value.Value, act types.Action
 
 	switch method {
 	case "Get":
-		value, err := ctx.GetVar(strings.Split(path, ".")...)
+		value, err := wfCtx.GetVar(strings.Split(path, ".")...)
 		if err != nil {
 			return err
 		}
@@ -108,13 +109,13 @@ func (h *provider) DoVar(ctx wfContext.Context, v *value.Value, act types.Action
 		if err != nil {
 			return err
 		}
-		return ctx.SetVar(value, strings.Split(path, ".")...)
+		return wfCtx.SetVar(value, strings.Split(path, ".")...)
 	}
 	return nil
 }
 
 // Export put data into context.
-func (h *provider) Export(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Export(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -129,11 +130,11 @@ func (h *provider) Export(ctx wfContext.Context, v *value.Value, act types.Actio
 	if err != nil {
 		return err
 	}
-	return ctx.PatchComponent(name, val)
+	return wfCtx.PatchComponent(name, val)
 }
 
 // Wait let workflow wait.
-func (h *provider) Wait(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Wait(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 
 	cv := v.CueValue()
 	if cv.Exists() {
@@ -151,7 +152,7 @@ func (h *provider) Wait(ctx wfContext.Context, v *value.Value, act types.Action)
 }
 
 // Break let workflow terminate.
-func (h *provider) Break(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Break(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")
@@ -161,7 +162,7 @@ func (h *provider) Break(ctx wfContext.Context, v *value.Value, act types.Action
 }
 
 // Fail let the step fail, its status is failed and reason is Action
-func (h *provider) Fail(ctx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")

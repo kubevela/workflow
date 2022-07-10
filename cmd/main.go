@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/controllers"
 	"github.com/kubevela/workflow/pkg/cue/packages"
@@ -46,6 +48,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

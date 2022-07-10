@@ -19,15 +19,26 @@ package steps
 import (
 	"context"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/providers"
+	"github.com/kubevela/workflow/pkg/providers/email"
+	"github.com/kubevela/workflow/pkg/providers/kube"
+	"github.com/kubevela/workflow/pkg/providers/util"
+	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks"
+	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
 )
 
 func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
+	options = initStepGeneratorOptions(ctx, wr, options)
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
 	var tasks []types.TaskRunner
 	for _, step := range wr.Spec.WorkflowSpec.Steps {
@@ -43,6 +54,36 @@ func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options type
 		tasks = append(tasks, task)
 	}
 	return tasks, nil
+}
+
+func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) types.StepGeneratorOptions {
+	if options.Providers == nil {
+		options.Providers = providers.NewProviders()
+		installBuiltinProviders(ctx, wr, options.Client, options.Providers)
+	}
+	if options.ProcessCtx == nil {
+		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(wr))
+	}
+	if options.TemplateLoader == nil {
+		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
+	}
+	return options
+}
+
+func installBuiltinProviders(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, client client.Client, providerHandlers types.Providers) {
+	workspace.Install(providerHandlers)
+	email.Install(providerHandlers)
+	util.Install(providerHandlers)
+	kube.Install(providerHandlers, client, nil, []metav1.OwnerReference{
+		{
+			APIVersion:         v1alpha1.SchemeGroupVersion.String(),
+			Kind:               v1alpha1.WorkflowRunKind,
+			Name:               wr.Name,
+			UID:                wr.UID,
+			Controller:         pointer.BoolPtr(true),
+			BlockOwnerDeletion: pointer.BoolPtr(true),
+		},
+	}, nil)
 }
 
 func generateTaskRunner(ctx context.Context,
@@ -106,7 +147,7 @@ func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName s
 	return utils.RandomString(10)
 }
 
-func GenerateContextDataFromWorkflowRun(wr *v1alpha1.WorkflowRun) process.ContextData {
+func generateContextDataFromWorkflowRun(wr *v1alpha1.WorkflowRun) process.ContextData {
 	data := process.ContextData{
 		Name:      wr.Name,
 		Namespace: wr.Namespace,

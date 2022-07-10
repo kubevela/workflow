@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -65,19 +65,21 @@ func TestAlreadyExistMatcher(t *testing.T) {
 	}
 	matcher := AlreadyExistMatcher{}
 	for name, tc := range cases {
+		r := require.New(t)
 		success, err := matcher.Match(tc.input)
 		t.Log(fmt.Sprint("Running test: ", name))
-		assert.Equal(t, tc.want.success, success)
+		r.Equal(tc.want.success, success)
 		if tc.want.err == nil {
-			assert.NoError(t, err)
+			r.NoError(err)
 		} else {
-			assert.Error(t, tc.want.err, err)
+			r.Error(tc.want.err, err)
 		}
 	}
 
 	// Error messages
-	assert.Equal(t, "Expected\n    <string>: myerror\nto be already exist", matcher.FailureMessage("myerror"))
-	assert.Equal(t, "Expected\n    <string>: myerror\nnot to be already exist", matcher.NegatedFailureMessage("myerror"))
+	r := require.New(t)
+	r.Equal("Expected\n    <string>: myerror\nto be already exist", matcher.FailureMessage("myerror"))
+	r.Equal("Expected\n    <string>: myerror\nnot to be already exist", matcher.NegatedFailureMessage("myerror"))
 }
 
 func TestNotFoundMatcher(t *testing.T) {
@@ -121,19 +123,21 @@ func TestNotFoundMatcher(t *testing.T) {
 
 	matcher := NotFoundMatcher{}
 	for name, tc := range cases {
+		r := require.New(t)
 		success, err := matcher.Match(tc.input)
 		t.Log(fmt.Sprint("Running test: ", name))
-		assert.Equal(t, tc.want.success, success)
+		r.Equal(tc.want.success, success)
 		if tc.want.err == nil {
-			assert.NoError(t, err)
+			r.NoError(err)
 		} else {
-			assert.Equal(t, tc.want.err, err)
+			r.Equal(tc.want.err, err)
 		}
 	}
 
 	// Error messages
-	assert.Equal(t, "Expected\n    <string>: myerror\nto be not found", matcher.FailureMessage("myerror"))
-	assert.Equal(t, "Expected\n    <string>: myerror\nnot to be not found", matcher.NegatedFailureMessage("myerror"))
+	r := require.New(t)
+	r.Equal("Expected\n    <string>: myerror\nto be not found", matcher.FailureMessage("myerror"))
+	r.Equal("Expected\n    <string>: myerror\nnot to be not found", matcher.NegatedFailureMessage("myerror"))
 }
 func TestErrorMatcher(t *testing.T) {
 	type input struct {
@@ -202,19 +206,20 @@ func TestErrorMatcher(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
+		r := require.New(t)
 		matcher := ErrorMatcher{
 			ExpectedError: tc.input.expected,
 		}
 		success, err := matcher.Match(tc.input.input)
 		t.Log(fmt.Sprint("Running test: ", name))
-		assert.Equal(t, tc.want.success, success)
+		r.Equal(tc.want.success, success)
 		if tc.want.err == nil {
-			assert.NoError(t, err)
+			r.NoError(err)
 		} else {
-			assert.Equal(t, tc.want.err, err)
+			r.Equal(tc.want.err, err)
 		}
 
-		assert.Equal(t, tc.want.failureMessage, matcher.FailureMessage(tc.input.input))
-		assert.Equal(t, tc.want.negatedFailureMessage, matcher.NegatedFailureMessage(tc.input.input))
+		r.Equal(tc.want.failureMessage, matcher.FailureMessage(tc.input.input))
+		r.Equal(tc.want.negatedFailureMessage, matcher.NegatedFailureMessage(tc.input.input))
 	}
 }

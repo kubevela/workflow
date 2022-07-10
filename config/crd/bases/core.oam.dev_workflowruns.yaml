@@ -14,10 +14,19 @@ spec:
     kind: WorkflowRun
     listKind: WorkflowRunList
     plural: workflowruns
+    shortNames:
+    - wr
     singular: workflowrun
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.status
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: WorkflowRun is the Schema for the workflowRun API
@@ -275,6 +284,9 @@ spec:
                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                     type: string
                 type: object
+              endTime:
+                format: date-time
+                type: string
               finished:
                 type: boolean
               message:
@@ -293,7 +305,7 @@ spec:
                 format: date-time
                 type: string
               status:
-                description: ApplicationPhase is a label for the condition of an application
+                description: WorkflowRunPhase is a label for the condition of a WorkflowRun
                   at the current time
                 type: string
               steps:
@@ -384,3 +396,5 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}

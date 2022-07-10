@@ -16,44 +16,15 @@ limitations under the License.
 
 package v1alpha1
 
-// reason for Application
 const (
-	ReasonParsed          = "Parsed"
-	ReasonRendered        = "Rendered"
-	ReasonPolicyGenerated = "PolicyGenerated"
-	ReasonRevisoned       = "Revisioned"
-	ReasonApplied         = "Applied"
-	ReasonHealthCheck     = "HealthChecked"
-	ReasonDeployed        = "Deployed"
-	ReasonRollout         = "Rollout"
-
-	ReasonFailedParse       = "FailedParse"
-	ReasonFailedRender      = "FailedRender"
-	ReasonFailedRevision    = "FailedRevision"
-	ReasonFailedWorkflow    = "FailedWorkflow"
-	ReasonFailedApply       = "FailedApply"
-	ReasonFailedHealthCheck = "FailedHealthCheck"
-	ReasonFailedStateKeep   = "FailedStateKeep"
-	ReasonFailedGC          = "FailedGC"
-	ReasonFailedRollout     = "FailedRollout"
+	ReasonExecute  = "Execute"
+	ReasonGenerate = "Generate"
 )
 
-// event message for Application
 const (
-	MessageParsed           = "Parsed successfully"
-	MessageRendered         = "Rendered successfully"
-	MessagePolicyGenerated  = "Policy generated successfully"
-	MessageRevisioned       = "Revisioned successfully"
-	MessageApplied          = "Applied successfully"
-	MessageWorkflowFinished = "Workflow finished"
-	MessageHealthCheck      = "Health checked healthy"
-	MessageDeployed         = "Deployed successfully"
-	MessageRollout          = "Rollout successfully"
+	MessageSuccessfully = "WorkflowRun finished successfully"
+	MessageTerminated   = "WorkflowRun finished with termination"
 
-	MessageFailedParse       = "fail to parse application, err: %v"
-	MessageFailedRender      = "fail to render application, err: %v"
-	MessageFailedRevision    = "fail to handle application revision, err: %v"
-	MessageFailedApply       = "fail to apply component, err: %v"
-	MessageFailedHealthCheck = "fail to health check, err: %v"
-	MessageFailedGC          = "fail to garbage collection, err: %v"
+	MessageFailedGenerate = "fail to generate workflow runners"
+	MessageFailedExecute  = "fail to execute"
 )

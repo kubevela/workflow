@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
-	"github.com/bmizerany/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPatch(t *testing.T) {
@@ -359,8 +359,9 @@ containers: [{
 	}
 
 	for i, tcase := range testCase {
+		r := require.New(t)
 		v, _ := StrategyUnify(tcase.base, tcase.patch)
-		assert.Equal(t, v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
+		r.Equal(v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
 	}
 }
 
@@ -573,8 +574,9 @@ metadata: {
 	}
 
 	for i, tcase := range testCase {
+		r := require.New(t)
 		v, _ := StrategyUnify(tcase.base, tcase.patch)
-		assert.Equal(t, v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
+		r.Equal(v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
 	}
 }
 
@@ -598,7 +600,8 @@ x: null
 		return
 	}
 	ms := findCommentTag(inst.Lookup("x").Doc())
-	assert.Equal(t, ms, map[string]string{
+	re := require.New(t)
+	re.Equal(ms, map[string]string{
 		"patchKey": "name",
 		"testKey1": "testValue1",
 		"testKey2": "testValue2",
