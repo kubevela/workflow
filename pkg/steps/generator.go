@@ -26,6 +26,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/kube"
@@ -38,6 +39,10 @@ import (
 )
 
 func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
+	subCtx := ctx.Fork("generate-task-runners", monitorContext.DurationMetric(func(v float64) {
+		metrics.GenerateTaskRunnersDurationHistogram.WithLabelValues("workflowrun").Observe(v)
+	}))
+	defer subCtx.Commit("finish generate task runners")
 	options = initStepGeneratorOptions(ctx, wr, options)
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
 	var tasks []types.TaskRunner

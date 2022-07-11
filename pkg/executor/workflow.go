@@ -23,18 +23,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/debug"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/hooks"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -68,10 +69,9 @@ func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
 	}
 }
 
-// ExecuteRunners execute workflow task runners in order.
-func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
-	status := &w.wr.Status
-	if status.StartTime.IsZero() && len(status.Steps) == 0 {
+func (w *workflowExecutor) workflowRunInitializing() {
+	if w.wr.Status.StartTime.IsZero() && len(w.wr.Status.Steps) == 0 {
+		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
 		w.wr.Status = v1alpha1.WorkflowRunStatus{
 			Mode:      w.getExecuteMode(),
 			StartTime: metav1.Now(),
@@ -79,6 +79,12 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		StepStatusCache.Delete(fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace))
 		wfContext.CleanupMemoryStore(w.wr.Name, w.wr.Namespace)
 	}
+}
+
+// ExecuteRunners execute workflow task runners in order.
+func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
+	w.workflowRunInitializing()
+	status := &w.wr.Status
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace)
 
@@ -582,7 +588,7 @@ func (e *engine) generateRunOptions(dependsOnPhase v1alpha1.WorkflowStepPhase) *
 	options := &types.TaskRunOptions{
 		GetTracer: func(id string, stepStatus v1alpha1.WorkflowStep) monitorContext.Context {
 			return e.monitorCtx.Fork(id, monitorContext.DurationMetric(func(v float64) {
-				// TODO: add metrics here
+				metrics.WorkflowStepDurationHistogram.WithLabelValues("workflowrun", stepStatus.Type).Observe(v)
 			}))
 		},
 		StepStatus: e.stepStatus,

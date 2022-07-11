@@ -38,6 +38,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/executor"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/steps"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -76,6 +77,9 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 	}
+
+	timeReporter := timeReconcile(run)
+	defer timeReporter()
 
 	switch {
 	case run.Spec.WorkflowSpec != nil && len(run.Spec.WorkflowSpec.Steps) > 0:
@@ -201,6 +205,16 @@ func (r *WorkflowRunReconciler) patchStatus(ctx context.Context, wr *v1alpha1.Wo
 func (r *WorkflowRunReconciler) doWorkflowFinish(wr *v1alpha1.WorkflowRun) {
 	wr.Status.Finished = true
 	wr.Status.EndTime = metav1.Now()
+	metrics.WorkflowRunFinishedTimeHistogram.WithLabelValues(string(wr.Status.Phase)).Observe(wr.Status.EndTime.Sub(wr.Status.StartTime.Time).Seconds())
 	executor.StepStatusCache.Delete(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace))
 	wfContext.CleanupMemoryStore(wr.Name, wr.Namespace)
+}
+
+func timeReconcile(wr *v1alpha1.WorkflowRun) func() {
+	t := time.Now()
+	beginPhase := string(wr.Status.Phase)
+	return func() {
+		v := time.Since(t).Seconds()
+		metrics.WorkflowRunReconcileTimeHistogram.WithLabelValues(beginPhase, string(wr.Status.Phase)).Observe(v)
+	}
 }
