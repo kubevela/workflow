@@ -276,18 +276,18 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, pd *
 	statusTemplate += fmt.Sprintf("status: %s\n", status)
 	statusTemplate += contextTempl
 	statusTemplate += "\n" + inputsTempl
-	return value.NewValue(template+"\n"+statusTemplate, pd, statusTemplate)
+	return value.NewValue(template+"\n"+statusTemplate, pd, "")
 }
 
 func convertTemplate(ctx wfContext.Context, pd *packages.PackageDiscover, templ, step, id string, pCtx process.Context) (*value.Value, error) {
 	contextTempl := getContextTemplate(ctx, step, id, pCtx)
-	return value.NewValue(templ+contextTempl, pd, contextTempl, value.ProcessScript, value.TagFieldOrder)
+	return value.NewValue(templ+contextTempl, pd, "", value.ProcessScript, value.TagFieldOrder)
 }
 
 // MakeValueForContext makes context value
 func MakeValueForContext(ctx wfContext.Context, pd *packages.PackageDiscover, step, id string, pCtx process.Context) (*value.Value, error) {
 	contextTempl := getContextTemplate(ctx, step, id, pCtx)
-	return value.NewValue(contextTempl, pd, contextTempl)
+	return value.NewValue(contextTempl, pd, "")
 }
 
 func getContextTemplate(ctx wfContext.Context, step, id string, pCtx process.Context) string {
