@@ -26,7 +26,7 @@ import (
 
 func TestGetPackages(t *testing.T) {
 	re := require.New(t)
-	pkgs, err := GetPackages("context: _")
+	pkgs, err := GetPackages()
 	re.NoError(err)
 	var r cue.Runtime
 	for path, content := range pkgs {
@@ -36,8 +36,8 @@ func TestGetPackages(t *testing.T) {
 
 	builder := &build.Instance{}
 	err = builder.AddFile("-", `
-import "vela/op"
-out: op.context`)
+import "vela/custom"
+out: custom.context`)
 	re.NoError(err)
 	err = AddImportsFor(builder, "context: id: \"xxx\"")
 	re.NoError(err)
