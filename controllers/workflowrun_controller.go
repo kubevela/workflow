@@ -99,6 +99,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	executor.InitializeWorkflowRun(run)
+
 	runners, err := steps.Generate(logCtx, run, types.StepGeneratorOptions{
 		PackageDiscover: r.PackageDiscover,
 		Client:          r.Client,

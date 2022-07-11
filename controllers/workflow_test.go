@@ -155,6 +155,29 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
 	})
 
+	It("get failed to generate", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "failed-generate"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "failed-generate",
+					Type: "invalid",
+				},
+			}}
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+
+		err := reconcileWithReturn(reconciler, wr.Name, wr.Namespace)
+		Expect(err).ShouldNot(BeNil())
+
+		events, err := recorder.GetEventsWithName(wr.Name)
+		Expect(err).Should(BeNil())
+		Expect(len(events)).Should(Equal(1))
+		Expect(events[0].EventType).Should(Equal(corev1.EventTypeWarning))
+		Expect(events[0].Reason).Should(Equal(v1alpha1.ReasonGenerate))
+		Expect(events[0].Message).Should(ContainSubstring(v1alpha1.MessageFailedGenerate))
+	})
+
 	It("should create workflow context ConfigMap", func() {
 		wr := wrTemplate.DeepCopy()
 		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())

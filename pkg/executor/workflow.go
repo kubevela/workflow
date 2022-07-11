@@ -69,21 +69,33 @@ func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
 	}
 }
 
-func (w *workflowExecutor) workflowRunInitializing() {
-	if w.wr.Status.StartTime.IsZero() && len(w.wr.Status.Steps) == 0 {
+func InitializeWorkflowRun(wr *v1alpha1.WorkflowRun) {
+	if wr.Status.StartTime.IsZero() && len(wr.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
-		w.wr.Status = v1alpha1.WorkflowRunStatus{
-			Mode:      w.getExecuteMode(),
+		mode := v1alpha1.WorkflowExecuteMode{
+			Steps:    v1alpha1.WorkflowModeStep,
+			SubSteps: v1alpha1.WorkflowModeDAG,
+		}
+		if wr.Spec.Mode != nil {
+			if wr.Spec.Mode.Steps != "" {
+				mode.Steps = wr.Spec.Mode.Steps
+			}
+			if wr.Spec.Mode.SubSteps != "" {
+				mode.SubSteps = wr.Spec.Mode.SubSteps
+			}
+		}
+		wr.Status = v1alpha1.WorkflowRunStatus{
+			Mode:      mode,
 			StartTime: metav1.Now(),
 		}
-		StepStatusCache.Delete(fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace))
-		wfContext.CleanupMemoryStore(w.wr.Name, w.wr.Namespace)
+		StepStatusCache.Delete(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace))
+		wfContext.CleanupMemoryStore(wr.Name, wr.Namespace)
 	}
 }
 
 // ExecuteRunners execute workflow task runners in order.
 func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
-	w.workflowRunInitializing()
+	InitializeWorkflowRun(w.wr)
 	status := &w.wr.Status
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace)
@@ -91,7 +103,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	allTasksDone, allTasksSucceeded := w.allDone(taskRunners)
 	if status.Finished {
 		StepStatusCache.Delete(cacheKey)
-		// return types.WorkflowStateFinished, nil
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
 		return types.WorkflowStateTerminated, nil
@@ -144,22 +155,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return types.WorkflowStateSucceeded, nil
 	}
 	return types.WorkflowStateExecuting, nil
-}
-
-func (w *workflowExecutor) getExecuteMode() v1alpha1.WorkflowExecuteMode {
-	mode := v1alpha1.WorkflowExecuteMode{
-		Steps:    v1alpha1.WorkflowModeStep,
-		SubSteps: v1alpha1.WorkflowModeDAG,
-	}
-	if w.wr.Spec.Mode != nil {
-		if w.wr.Spec.Mode.Steps != "" {
-			mode.Steps = w.wr.Spec.Mode.Steps
-		}
-		if w.wr.Spec.Mode.SubSteps != "" {
-			mode.SubSteps = w.wr.Spec.Mode.SubSteps
-		}
-	}
-	return mode
 }
 
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {

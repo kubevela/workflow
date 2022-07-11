@@ -17,18 +17,17 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/spf13/pflag"
+	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 
@@ -64,14 +63,10 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
-	feature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
+	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	flag.Parse()
+	klog.InitFlags(nil)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
