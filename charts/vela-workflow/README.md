@@ -80,8 +80,8 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `logDebug`                   | Enable debug logs for development purpose                                                                                  | `false` |
 | `logFilePath`                | If non-empty, write log files in this path                                                                                 | `""`    |
 | `logFileMaxSize`             | Defines the maximum size a log file can grow to. Unit is megabytes. If the value is 0, the maximum file size is unlimited. | `1024`  |
-| `kubeClient.qps`             | The qps for reconcile clients, default is 50                                                                               | `50`    |
-| `kubeClient.burst`           | The burst for reconcile clients, default is 100                                                                            | `100`   |
+| `kubeClient.qps`             | The qps for reconcile clients, default is 50                                                                               | `500`   |
+| `kubeClient.burst`           | The burst for reconcile clients, default is 100                                                                            | `1000`  |
 
 
 ## Uninstallation

@@ -36,6 +36,7 @@ check-diff: reviewable ## Execute auto-gen code commands and ensure branch is cl
 .PHONY: manifests
 manifests: controller-gen ## Generate CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	mv config/crd/bases/* charts/vela-workflow/crds/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.

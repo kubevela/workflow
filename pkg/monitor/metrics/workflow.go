@@ -44,47 +44,56 @@ var (
 
 	// WorkflowRunPhaseCounter report the number of workflow run phase
 	WorkflowRunPhaseCounter = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "workflow_phase_number",
+		Name: "workflowrun_phase_number",
 		Help: "workflow run phase number",
 	}, []string{"phase"})
 
 	// WorkflowRunFinishedTimeHistogram report the time for finished workflow run
 	WorkflowRunFinishedTimeHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:        "workflow_finished_time_seconds",
-		Help:        "workflow finished time distributions.",
+		Name:        "workflowrun_finished_time_seconds",
+		Help:        "workflow run finished time distributions.",
 		Buckets:     histogramBuckets,
 		ConstLabels: prometheus.Labels{},
 	}, []string{"phase"})
 
 	// WorkflowRunInitializedCounter report the workflow run initialize execute number.
 	WorkflowRunInitializedCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "workflow_initialized_num",
-		Help: "workflow initialize times",
+		Name: "workflowrun_initialized_num",
+		Help: "workflow run initialize times",
 	}, []string{})
 
-	// WorkflowStepPhaseGauge report the number of workflow step state
-	WorkflowStepPhaseGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "workflow_step_phase_number",
+	// WorkflowRunStepPhaseGauge report the number of workflow run step state
+	WorkflowRunStepPhaseGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "workflowrun_step_phase_number",
 		Help: "workflow step phase number",
 	}, []string{"step_type", "phase"})
 
 	// WorkflowStepDurationHistogram report the step execution duration.
-	WorkflowStepDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:        "step_duration_ms",
-		Help:        "step latency distributions.",
+	WorkflowRunStepDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:        "workflowrun_step_duration_ms",
+		Help:        "workflow run step latency distributions.",
 		Buckets:     histogramBuckets,
 		ConstLabels: prometheus.Labels{},
 	}, []string{"controller", "step_type"})
+
+	// ClientRequestHistogram report the client request execution duration.
+	ClientRequestHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:        "client_request_time_seconds",
+		Help:        "client request duration distributions.",
+		Buckets:     histogramBuckets,
+		ConstLabels: prometheus.Labels{},
+	}, []string{"verb", "Kind", "apiVersion", "unstructured"})
 )
 
 var collectorGroup = []prometheus.Collector{
 	GenerateTaskRunnersDurationHistogram,
-	WorkflowStepDurationHistogram,
+	WorkflowRunStepDurationHistogram,
 	WorkflowRunReconcileTimeHistogram,
 	WorkflowRunFinishedTimeHistogram,
 	WorkflowRunInitializedCounter,
 	WorkflowRunPhaseCounter,
-	WorkflowStepPhaseGauge,
+	WorkflowRunStepPhaseGauge,
+	ClientRequestHistogram,
 }
 
 func init() {

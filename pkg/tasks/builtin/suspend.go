@@ -59,10 +59,11 @@ func (tr *suspendTaskRunner) Name() string {
 // Run make workflow suspend.
 func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 	stepStatus = v1alpha1.StepStatus{
-		ID:    tr.id,
-		Name:  tr.step.Name,
-		Type:  types.WorkflowStepTypeSuspend,
-		Phase: v1alpha1.WorkflowStepPhaseRunning,
+		ID:      tr.id,
+		Name:    tr.step.Name,
+		Type:    types.WorkflowStepTypeSuspend,
+		Phase:   v1alpha1.WorkflowStepPhaseRunning,
+		Message: "",
 	}
 	operations = &types.Operation{Suspend: true}
 
@@ -132,8 +133,8 @@ func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 }
 
 // Pending check task should be executed or not.
-func (tr *suspendTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool {
-	return custom.CheckPending(ctx, tr.step, stepStatus)
+func (tr *suspendTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus)
 }
 
 // GetSuspendStepDurationWaiting get suspend step wait duration
@@ -160,7 +161,7 @@ func GetSuspendStepDurationWaiting(step v1alpha1.WorkflowStep) (time.Duration, e
 
 func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, pd *packages.PackageDiscover, id string, pCtx process.Context) {
 	status := *stepStatus
-	if status.Phase != v1alpha1.WorkflowStepPhaseSkipped && len(step.Outputs) > 0 {
+	if len(step.Outputs) > 0 {
 		contextValue, err := custom.MakeValueForContext(ctx, pd, step.Name, id, pCtx)
 		if err != nil {
 			status.Phase = v1alpha1.WorkflowStepPhaseFailed
@@ -173,7 +174,7 @@ func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operat
 		}
 
 		for _, hook := range postStopHooks {
-			if err := hook(ctx, contextValue, step, status); err != nil {
+			if err := hook(ctx, contextValue, step, status, nil); err != nil {
 				status.Phase = v1alpha1.WorkflowStepPhaseFailed
 				if status.Reason == "" {
 					status.Reason = types.StatusReasonOutput

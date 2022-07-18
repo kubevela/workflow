@@ -104,8 +104,12 @@ func generateTaskRunner(ctx context.Context,
 			workflowStep := v1alpha1.WorkflowStep{
 				WorkflowStepBase: subStep,
 			}
-			options.ID = generateSubStepID(wr.Status, subStep.Name, step.Name)
-			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, options)
+			o := &types.TaskGeneratorOptions{
+				ID:              generateSubStepID(wr.Status, subStep.Name, step.Name),
+				PackageDiscover: options.PackageDiscover,
+				ProcessContext:  options.ProcessContext,
+			}
+			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, o)
 			if err != nil {
 				return nil, err
 			}

@@ -144,5 +144,5 @@ admissionWebhooks:
 ## @param kubeClient.qps The qps for reconcile clients, default is 50
 ## @param kubeClient.burst The burst for reconcile clients, default is 100
 kubeClient:
-  qps: 50
-  burst: 100
+  qps: 500
+  burst: 1000

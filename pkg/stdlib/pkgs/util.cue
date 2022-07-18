@@ -20,5 +20,5 @@
 	#do:       "log"
 	#provider: "util"
 
-	data: {...}
+	data: {...} | string
 }
