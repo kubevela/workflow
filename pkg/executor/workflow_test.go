@@ -2077,19 +2077,29 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
 			Mode: dagMode,
-			Steps: []v1alpha1.WorkflowStepStatus{{
-				StepStatus: v1alpha1.StepStatus{
-					Name:  "s1",
-					Type:  "success",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+			Steps: []v1alpha1.WorkflowStepStatus{
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s2",
+						Type:  "pending",
+						Phase: v1alpha1.WorkflowStepPhasePending,
+					},
 				},
-			}, {
-				StepStatus: v1alpha1.StepStatus{
-					Name:  "s3",
-					Type:  "success",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s1",
+						Type:  "success",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
 				},
-			}},
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s3",
+						Type:  "success",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
+				},
+			},
 		})).Should(BeEquivalentTo(""))
 
 		state, err = wf.ExecuteRunners(ctx, runners)
@@ -2104,25 +2114,29 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
 			Mode: dagMode,
-			Steps: []v1alpha1.WorkflowStepStatus{{
-				StepStatus: v1alpha1.StepStatus{
-					Name:  "s1",
-					Type:  "success",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+			Steps: []v1alpha1.WorkflowStepStatus{
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s2",
+						Type:  "pending",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
 				},
-			}, {
-				StepStatus: v1alpha1.StepStatus{
-					Name:  "s3",
-					Type:  "success",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s1",
+						Type:  "success",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
 				},
-			}, {
-				StepStatus: v1alpha1.StepStatus{
-					Name:  "s2",
-					Type:  "pending",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s3",
+						Type:  "success",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
 				},
-			}},
+			},
 		})).Should(BeEquivalentTo(""))
 	})
 
@@ -2288,14 +2302,18 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 	return &testTaskRunner{
 		step: step,
 		run:  run,
-		checkPending: func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool {
+		checkPending: func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 			if step.Type != "pending" {
-				return false
+				return false, v1alpha1.StepStatus{}
 			}
 			if pending == true {
-				return true
+				return true, v1alpha1.StepStatus{
+					Phase: v1alpha1.WorkflowStepPhasePending,
+					Name:  step.Name,
+					Type:  step.Type,
+				}
 			}
-			return false
+			return false, v1alpha1.StepStatus{}
 		},
 	}
 }
@@ -2303,7 +2321,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 type testTaskRunner struct {
 	step         v1alpha1.WorkflowStep
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
-	checkPending func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool
+	checkPending func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 }
 
 // Name return step name.
@@ -2349,7 +2367,7 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 }
 
 // Pending check task should be executed or not.
-func (tr *testTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool {
+func (tr *testTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 	return tr.checkPending(ctx, stepStatus)
 }
 

@@ -24,7 +24,7 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: reviewable
-reviewable: manifests fmt vet lint staticcheck
+reviewable: manifests fmt vet lint staticcheck helm-doc-gen
 	go mod tidy -compat=1.17
 
 .PHONY: check-diff
@@ -36,6 +36,7 @@ check-diff: reviewable ## Execute auto-gen code commands and ensure branch is cl
 .PHONY: manifests
 manifests: controller-gen ## Generate CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	mv config/crd/bases/* charts/vela-workflow/crds/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -62,6 +63,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile coverage.txt
 
+.PHONY: helm-doc-gen
+helm-doc-gen: helmdoc
+	readme-generator -v charts/vela-workflow/values.yaml -r charts/vela-workflow/README.md
+
 ##@ Build
 
 .PHONY: build
@@ -73,8 +78,8 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+docker-build: ## Build docker image with the manager.
+	docker build --build-arg=VERSION=$(VELA_VERSION) --build-arg=GITVERSION=$(GIT_COMMIT) -t $(IMG) .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

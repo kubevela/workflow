@@ -75,7 +75,7 @@ func (watcher *workflowRunMetricsWatcher) report() {
 		metrics.WorkflowRunPhaseCounter.WithLabelValues(phase).Set(float64(watcher.phaseCounter[phase]))
 	}
 	for stepPhase := range watcher.stepPhaseDirty {
-		metrics.WorkflowStepPhaseGauge.WithLabelValues(strings.Split(stepPhase, "/")...).Set(float64(watcher.stepPhaseCounter[stepPhase]))
+		metrics.WorkflowRunStepPhaseGauge.WithLabelValues(strings.Split(stepPhase, "/")[:2]...).Set(float64(watcher.stepPhaseCounter[stepPhase]))
 	}
 	watcher.phaseDirty = map[string]struct{}{}
 	watcher.stepPhaseDirty = map[string]struct{}{}

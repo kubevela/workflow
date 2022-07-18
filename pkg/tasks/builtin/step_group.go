@@ -56,16 +56,17 @@ func (tr *stepGroupTaskRunner) Name() string {
 }
 
 // Pending check task should be executed or not.
-func (tr *stepGroupTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool {
-	return custom.CheckPending(ctx, tr.step, stepStatus)
+func (tr *stepGroupTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus)
 }
 
 // Run make workflow step group.
 func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) (status v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 	status = v1alpha1.StepStatus{
-		ID:   tr.id,
-		Name: tr.name,
-		Type: types.WorkflowStepTypeStepGroup,
+		ID:      tr.id,
+		Name:    tr.name,
+		Type:    types.WorkflowStepTypeStepGroup,
+		Message: "",
 	}
 
 	pStatus := &status
@@ -136,6 +137,8 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseStopped)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhaseStopped
+	case subStepCounts[string(v1alpha1.WorkflowStepPhasePending)] > 0:
+		status.Phase = v1alpha1.WorkflowStepPhasePending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseFailed)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhaseFailed
 		switch {

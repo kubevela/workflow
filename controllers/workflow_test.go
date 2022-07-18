@@ -86,35 +86,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{}, client.InNamespace(namespace))).Should(Succeed())
 	})
 
-	It("should record event", func() {
-		wr := wrTemplate.DeepCopy()
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
-			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
-					Name:       "step2",
-					Type:       "test-apply",
-					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
-					Inputs: v1alpha1.StepInputs{
-						{
-							From:         "invalid",
-							ParameterKey: "message",
-						},
-					},
-				},
-			}}
-		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
-
-		err := reconcileWithReturn(reconciler, wr.Name, wr.Namespace)
-		Expect(err).ShouldNot(BeNil())
-
-		events, err := recorder.GetEventsWithName(wr.Name)
-		Expect(err).Should(BeNil())
-		Expect(len(events)).Should(Equal(1))
-		Expect(events[0].EventType).Should(Equal(corev1.EventTypeWarning))
-		Expect(events[0].Reason).Should(Equal(v1alpha1.ReasonExecute))
-		Expect(events[0].Message).Should(ContainSubstring(v1alpha1.MessageFailedExecute))
-	})
-
 	It("get steps from workflow ref", func() {
 		workflow := &v1alpha1.Workflow{
 			TypeMeta: metav1.TypeMeta{
@@ -153,6 +124,29 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(wrObj.Status.Suspend).Should(BeTrue())
 		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+	})
+
+	It("get failed to generate", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "failed-generate"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "failed-generate",
+					Type: "invalid",
+				},
+			}}
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+
+		err := reconcileWithReturn(reconciler, wr.Name, wr.Namespace)
+		Expect(err).ShouldNot(BeNil())
+
+		events, err := recorder.GetEventsWithName(wr.Name)
+		Expect(err).Should(BeNil())
+		Expect(len(events)).Should(Equal(1))
+		Expect(events[0].EventType).Should(Equal(corev1.EventTypeWarning))
+		Expect(events[0].Reason).Should(Equal(v1alpha1.ReasonGenerate))
+		Expect(events[0].Message).Should(ContainSubstring(v1alpha1.MessageFailedGenerate))
 	})
 
 	It("should create workflow context ConfigMap", func() {

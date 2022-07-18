@@ -17,6 +17,8 @@
 package util
 
 import (
+	"encoding/json"
+
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -78,12 +80,20 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 	if err != nil {
 		return err
 	}
-	s, err := data.String()
+	logCtx := ctx.Fork("cue logs")
+	if s, err := data.GetString(); err == nil {
+		logCtx.Info(s)
+		return nil
+	}
+	var tmp interface{}
+	if err := data.UnmarshalTo(&tmp); err != nil {
+		return err
+	}
+	b, err := json.Marshal(tmp)
 	if err != nil {
 		return err
 	}
-	logCtx := ctx.Fork("cue logs")
-	logCtx.Info(s)
+	logCtx.Info(string(b))
 	return nil
 }
 

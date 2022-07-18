@@ -69,21 +69,33 @@ func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
 	}
 }
 
-func (w *workflowExecutor) workflowRunInitializing() {
-	if w.wr.Status.StartTime.IsZero() && len(w.wr.Status.Steps) == 0 {
+func InitializeWorkflowRun(wr *v1alpha1.WorkflowRun) {
+	if wr.Status.StartTime.IsZero() && len(wr.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
-		w.wr.Status = v1alpha1.WorkflowRunStatus{
-			Mode:      w.getExecuteMode(),
+		mode := v1alpha1.WorkflowExecuteMode{
+			Steps:    v1alpha1.WorkflowModeStep,
+			SubSteps: v1alpha1.WorkflowModeDAG,
+		}
+		if wr.Spec.Mode != nil {
+			if wr.Spec.Mode.Steps != "" {
+				mode.Steps = wr.Spec.Mode.Steps
+			}
+			if wr.Spec.Mode.SubSteps != "" {
+				mode.SubSteps = wr.Spec.Mode.SubSteps
+			}
+		}
+		wr.Status = v1alpha1.WorkflowRunStatus{
+			Mode:      mode,
 			StartTime: metav1.Now(),
 		}
-		StepStatusCache.Delete(fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace))
-		wfContext.CleanupMemoryStore(w.wr.Name, w.wr.Namespace)
+		StepStatusCache.Delete(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace))
+		wfContext.CleanupMemoryStore(wr.Name, wr.Namespace)
 	}
 }
 
 // ExecuteRunners execute workflow task runners in order.
 func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
-	w.workflowRunInitializing()
+	InitializeWorkflowRun(w.wr)
 	status := &w.wr.Status
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace)
@@ -91,7 +103,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	allTasksDone, allTasksSucceeded := w.allDone(taskRunners)
 	if status.Finished {
 		StepStatusCache.Delete(cacheKey)
-		// return types.WorkflowStateFinished, nil
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
 		return types.WorkflowStateTerminated, nil
@@ -146,22 +157,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	return types.WorkflowStateExecuting, nil
 }
 
-func (w *workflowExecutor) getExecuteMode() v1alpha1.WorkflowExecuteMode {
-	mode := v1alpha1.WorkflowExecuteMode{
-		Steps:    v1alpha1.WorkflowModeStep,
-		SubSteps: v1alpha1.WorkflowModeDAG,
-	}
-	if w.wr.Spec.Mode != nil {
-		if w.wr.Spec.Mode.Steps != "" {
-			mode.Steps = w.wr.Spec.Mode.Steps
-		}
-		if w.wr.Spec.Mode.SubSteps != "" {
-			mode.SubSteps = w.wr.Spec.Mode.SubSteps
-		}
-	}
-	return mode
-}
-
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {
 	// if all tasks are done, and the terminated is true, then the workflow is terminated
 	return status.Terminated && allTasksDone
@@ -186,17 +181,14 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 
 func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus) *engine {
 	stepStatus := make(map[string]v1alpha1.StepStatus)
-	for _, ss := range wfStatus.Steps {
-		setStepStatus(stepStatus, ss.StepStatus)
-		for _, sss := range ss.SubStepsStatus {
-			setStepStatus(stepStatus, sss)
-		}
-	}
+	setStepStatus(stepStatus, wfStatus.Steps)
 	stepDependsOn := make(map[string][]string)
 	if w.wr.Spec.WorkflowSpec != nil {
 		for _, step := range w.wr.Spec.WorkflowSpec.Steps {
+			hooks.SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, stepStatus[step.Name])
 			stepDependsOn[step.Name] = append(stepDependsOn[step.Name], step.DependsOn...)
 			for _, sub := range step.SubSteps {
+				hooks.SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, stepStatus[step.Name])
 				stepDependsOn[sub.Name] = append(stepDependsOn[sub.Name], sub.DependsOn...)
 			}
 		}
@@ -218,12 +210,12 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 	}
 }
 
-func setStepStatus(statusMap map[string]v1alpha1.StepStatus, status v1alpha1.StepStatus) {
-	statusMap[status.Name] = v1alpha1.StepStatus{
-		Phase:            status.Phase,
-		ID:               status.ID,
-		Reason:           status.Reason,
-		FirstExecuteTime: status.FirstExecuteTime,
+func setStepStatus(statusMap map[string]v1alpha1.StepStatus, status []v1alpha1.WorkflowStepStatus) {
+	for _, ss := range status {
+		statusMap[ss.Name] = ss.StepStatus
+		for _, sss := range ss.SubStepsStatus {
+			statusMap[sss.Name] = sss
+		}
 	}
 }
 
@@ -232,12 +224,7 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 		return 0
 	}
 	stepStatus := make(map[string]v1alpha1.StepStatus)
-	for _, ss := range w.wr.Status.Steps {
-		setStepStatus(stepStatus, ss.StepStatus)
-		for _, sss := range ss.SubStepsStatus {
-			setStepStatus(stepStatus, sss)
-		}
-	}
+	setStepStatus(stepStatus, w.wr.Status.Steps)
 	max := time.Duration(1<<63 - 1)
 	min := max
 	for _, step := range w.wr.Spec.WorkflowSpec.Steps {
@@ -469,7 +456,7 @@ func (e *engine) setNextExecuteTime() {
 	e.wfCtx.SetValueInMemory(next, types.ContextKeyNextExecuteTime)
 }
 
-func (e *engine) runAsDAG(taskRunners []types.TaskRunner) error {
+func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) error {
 	var (
 		todoTasks    []types.TaskRunner
 		pendingTasks []types.TaskRunner
@@ -485,9 +472,15 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner) error {
 		}
 		if !finish {
 			done = false
-			if tRunner.Pending(wfCtx, e.stepStatus) {
+			if pending, status := tRunner.Pending(wfCtx, e.stepStatus); pending {
+				if !pendingRunners {
+					wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
+					e.updateStepStatus(status)
+				}
 				pendingTasks = append(pendingTasks, tRunner)
 				continue
+			} else if status.Phase == v1alpha1.WorkflowStepPhasePending {
+				wfCtx.DeleteValueInMemory(types.ContextPrefixBackoffTimes, stepID)
 			}
 			todoTasks = append(todoTasks, tRunner)
 		} else {
@@ -509,7 +502,7 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner) error {
 		}
 
 		if len(pendingTasks) > 0 {
-			return e.runAsDAG(pendingTasks)
+			return e.runAsDAG(pendingTasks, true)
 		}
 	}
 	return nil
@@ -519,7 +512,7 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner) error {
 func (e *engine) Run(taskRunners []types.TaskRunner, dag bool) error {
 	var err error
 	if dag {
-		err = e.runAsDAG(taskRunners)
+		err = e.runAsDAG(taskRunners, false)
 	} else {
 		err = e.steps(taskRunners, dag)
 	}
@@ -546,6 +539,14 @@ func (e *engine) steps(taskRunners []types.TaskRunner, dag bool) error {
 			if types.IsStepFinish(status.Phase, status.Reason) {
 				continue
 			}
+		}
+		if pending, status := runner.Pending(wfCtx, e.stepStatus); pending {
+			wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
+			e.updateStepStatus(status)
+			if dag {
+				continue
+			}
+			return nil
 		}
 		options := e.generateRunOptions(e.findDependPhase(taskRunners, index, dag))
 
@@ -588,7 +589,7 @@ func (e *engine) generateRunOptions(dependsOnPhase v1alpha1.WorkflowStepPhase) *
 	options := &types.TaskRunOptions{
 		GetTracer: func(id string, stepStatus v1alpha1.WorkflowStep) monitorContext.Context {
 			return e.monitorCtx.Fork(id, monitorContext.DurationMetric(func(v float64) {
-				metrics.WorkflowStepDurationHistogram.WithLabelValues("workflowrun", stepStatus.Type).Observe(v)
+				metrics.WorkflowRunStepDurationHistogram.WithLabelValues("workflowrun", stepStatus.Type).Observe(v)
 			}))
 		},
 		StepStatus: e.stepStatus,

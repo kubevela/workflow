@@ -203,6 +203,15 @@ data: "test"
 	prd := &provider{}
 	err = prd.Log(logCtx, nil, v, nil)
 	r.NoError(err)
+
+	v, err = value.NewValue(`
+data: {
+	message: "test"
+}
+	`, nil, "")
+	r.NoError(err)
+	err = prd.Log(logCtx, nil, v, nil)
+	r.NoError(err)
 }
 
 func TestInstall(t *testing.T) {

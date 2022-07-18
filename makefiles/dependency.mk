@@ -78,6 +78,19 @@ else
 GOLANGCILINT=$(GOBIN)/golangci-lint
 endif
 
+.PHONY: helmdoc
+helmdoc:
+ifeq (, $(shell which readme-generator))
+	@{ \
+	set -e ;\
+	echo 'installing readme-generator-for-helm' ;\
+	npm install -g readme-generator-for-helm ;\
+	}
+else
+	@$(OK) readme-generator-for-helm is already installed
+HELMDOC=$(shell which readme-generator)
+endif
+
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)

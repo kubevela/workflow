@@ -36,7 +36,7 @@ import (
 // TaskRunner is a task runner
 type TaskRunner interface {
 	Name() string
-	Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) bool
+	Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 	Run(ctx wfContext.Context, options *TaskRunOptions) (v1alpha1.StepStatus, *Operation, error)
 }
 
@@ -87,7 +87,7 @@ type TaskPreCheckHook func(step v1alpha1.WorkflowStep, options *PreCheckOptions)
 type TaskPreStartHook func(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.WorkflowStep) error
 
 // TaskPostStopHook  run after task execution.
-type TaskPostStopHook func(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus) error
+type TaskPostStopHook func(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error
 
 // Operation is workflow operation object.
 type Operation struct {

@@ -29,6 +29,7 @@ import (
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/email"
+	"github.com/kubevela/workflow/pkg/providers/http"
 	"github.com/kubevela/workflow/pkg/providers/kube"
 	"github.com/kubevela/workflow/pkg/providers/util"
 	"github.com/kubevela/workflow/pkg/providers/workspace"
@@ -79,6 +80,7 @@ func installBuiltinProviders(ctx monitorContext.Context, wr *v1alpha1.WorkflowRu
 	workspace.Install(providerHandlers)
 	email.Install(providerHandlers)
 	util.Install(providerHandlers)
+	http.Install(providerHandlers, client, wr.Namespace)
 	kube.Install(providerHandlers, client, nil, []metav1.OwnerReference{
 		{
 			APIVersion:         v1alpha1.SchemeGroupVersion.String(),
@@ -102,8 +104,12 @@ func generateTaskRunner(ctx context.Context,
 			workflowStep := v1alpha1.WorkflowStep{
 				WorkflowStepBase: subStep,
 			}
-			options.ID = generateSubStepID(wr.Status, subStep.Name, step.Name)
-			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, options)
+			o := &types.TaskGeneratorOptions{
+				ID:              generateSubStepID(wr.Status, subStep.Name, step.Name),
+				PackageDiscover: options.PackageDiscover,
+				ProcessContext:  options.ProcessContext,
+			}
+			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, o)
 			if err != nil {
 				return nil, err
 			}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	ctrlEvent "sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -43,12 +44,19 @@ import (
 	"github.com/kubevela/workflow/pkg/types"
 )
 
+// Args args used by controller
+type Args struct {
+	// ConcurrentReconciles is the concurrent reconcile number of the controller
+	ConcurrentReconciles int
+}
+
 // WorkflowRunReconciler reconciles a WorkflowRun object
 type WorkflowRunReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
 	PackageDiscover *packages.PackageDiscover
 	Recorder        event.Recorder
+	Args
 }
 
 var (
@@ -81,6 +89,11 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	timeReporter := timeReconcile(run)
 	defer timeReporter()
 
+	if run.Status.Finished {
+		logCtx.Info("WorkflowRun is finished, skip reconcile")
+		return ctrl.Result{}, nil
+	}
+
 	switch {
 	case run.Spec.WorkflowSpec != nil && len(run.Spec.WorkflowSpec.Steps) > 0:
 	case run.Spec.WorkflowRef != "":
@@ -98,6 +111,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	default:
 		return ctrl.Result{}, nil
 	}
+
+	executor.InitializeWorkflowRun(run)
 
 	runners, err := steps.Generate(logCtx, run, types.StepGeneratorOptions{
 		PackageDiscover: r.PackageDiscover,
@@ -148,6 +163,9 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.ConcurrentReconciles,
+		}).
 		WithEventFilter(predicate.Funcs{
 			// filter the changes in workflow status
 			// let workflow handle its reconcile
@@ -155,6 +173,11 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				new, isNewRun := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
 				old, isOldRun := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
 				if !isNewRun || !isOldRun {
+					return false
+				}
+
+				// if the workflow is finished, skip the reconcile
+				if new.Status.Finished {
 					return false
 				}
 
@@ -178,9 +201,6 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			CreateFunc: func(e ctrlEvent.CreateEvent) bool {
 				return true
 			},
-			DeleteFunc: func(e ctrlEvent.DeleteEvent) bool {
-				return true
-			},
 		}).
 		For(&v1alpha1.WorkflowRun{}).
 		Complete(r)
@@ -189,7 +209,7 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr *v1alpha1.WorkflowRun, condition condition.Condition, phase v1alpha1.WorkflowRunPhase) (ctrl.Result, error) {
 	wr.SetConditions(condition)
 	if err := r.patchStatus(ctx, wr, phase); err != nil {
-		return ctrl.Result{}, errors.WithMessage(err, "cannot update workflowrun status")
+		return ctrl.Result{}, errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return ctrl.Result{}, fmt.Errorf("reconcile WorkflowRun error, msg: %s", condition.Message)
 }
@@ -197,7 +217,8 @@ func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr
 func (r *WorkflowRunReconciler) patchStatus(ctx context.Context, wr *v1alpha1.WorkflowRun, phase v1alpha1.WorkflowRunPhase) error {
 	wr.Status.Phase = phase
 	if err := r.Status().Patch(ctx, wr, client.Merge); err != nil {
-		return err
+		executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
+		return errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return nil
 }

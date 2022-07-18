@@ -8,6 +8,7 @@ require (
 	github.com/crossplane/crossplane-runtime v0.14.1-0.20210722005935-0b469fcc77cd
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/google/go-cmp v0.5.8
+	github.com/hashicorp/go-version v1.3.0
 	github.com/oam-dev/kubevela v1.5.0-alpha.2.0.20220706095416-09acc8a98942
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
