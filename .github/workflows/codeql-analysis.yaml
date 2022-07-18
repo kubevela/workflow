@@ -21,7 +21,7 @@ jobs:
       - name: Build Vela Workflow image from Dockerfile
         run: |
           docker build --build-arg GOPROXY=https://proxy.golang.org -t docker.io/oamdev/vela-workflow:${{ github.sha }} -f ./Dockerfile .
-      - name: Run Trivy vulnerability scanner for vela core
+      - name: Run Trivy vulnerability scanner for vela workflow
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'docker.io/oamdev/vela-workflow:${{ github.sha }}'
