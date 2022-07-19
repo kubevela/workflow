@@ -2080,13 +2080,6 @@ var _ = Describe("Test Workflow", func() {
 			Steps: []v1alpha1.WorkflowStepStatus{
 				{
 					StepStatus: v1alpha1.StepStatus{
-						Name:  "s2",
-						Type:  "pending",
-						Phase: v1alpha1.WorkflowStepPhasePending,
-					},
-				},
-				{
-					StepStatus: v1alpha1.StepStatus{
 						Name:  "s1",
 						Type:  "success",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
@@ -2097,6 +2090,13 @@ var _ = Describe("Test Workflow", func() {
 						Name:  "s3",
 						Type:  "success",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
+				},
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s2",
+						Type:  "pending",
+						Phase: v1alpha1.WorkflowStepPhasePending,
 					},
 				},
 			},
@@ -2117,13 +2117,6 @@ var _ = Describe("Test Workflow", func() {
 			Steps: []v1alpha1.WorkflowStepStatus{
 				{
 					StepStatus: v1alpha1.StepStatus{
-						Name:  "s2",
-						Type:  "pending",
-						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
-					},
-				},
-				{
-					StepStatus: v1alpha1.StepStatus{
 						Name:  "s1",
 						Type:  "success",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
@@ -2133,6 +2126,13 @@ var _ = Describe("Test Workflow", func() {
 					StepStatus: v1alpha1.StepStatus{
 						Name:  "s3",
 						Type:  "success",
+						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					},
+				},
+				{
+					StepStatus: v1alpha1.StepStatus{
+						Name:  "s2",
+						Type:  "pending",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 					},
 				},

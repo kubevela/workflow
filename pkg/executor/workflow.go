@@ -473,7 +473,7 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) e
 		if !finish {
 			done = false
 			if pending, status := tRunner.Pending(wfCtx, e.stepStatus); pending {
-				if !pendingRunners {
+				if pendingRunners {
 					wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 					e.updateStepStatus(status)
 				}
