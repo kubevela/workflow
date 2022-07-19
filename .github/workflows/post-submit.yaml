@@ -49,7 +49,7 @@ jobs:
           IMG_TAG=latest-${{ matrix.arch }} \
           OS=linux \
           ARCH=${{ matrix.arch }} \
-            make image-apiserver
+            make docker-build
       - name: Push Image
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login --username ${{ secrets.DOCKER_USER }} --password-stdin
