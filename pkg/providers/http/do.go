@@ -67,6 +67,13 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 			Timeout:   time.Second * 3,
 		}
 	)
+	if timeout, err := v.GetString("timeout"); err == nil && timeout != "" {
+		duration, err := time.ParseDuration(timeout)
+		if err != nil {
+			return nil, err
+		}
+		client.Timeout = duration
+	}
 	if method, err = v.GetString("method"); err != nil {
 		return nil, err
 	}

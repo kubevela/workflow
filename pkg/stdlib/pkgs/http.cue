@@ -5,6 +5,7 @@
 	method: *"GET" | "POST" | "PUT" | "DELETE"
 	url:    string
 	request?: {
+		timeout?: string
 		body: string
 		header: [string]:  string
 		trailer: [string]: string
