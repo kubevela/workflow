@@ -51,6 +51,7 @@ func TestHttpDo(t *testing.T) {
 	baseTemplate := `
 		url: string
 		request?: close({
+			timeout?:string
 			body:    string
 			header:  [string]: string
 			trailer: [string]: string
@@ -64,11 +65,13 @@ func TestHttpDo(t *testing.T) {
 	testCases := map[string]struct {
 		request      string
 		expectedBody string
+		expectedErr  string
 	}{
 		"hello": {
 			request: baseTemplate + `
 method: "GET"
-url: "http://127.0.0.1:1229/hello"`,
+url: "http://127.0.0.1:1229/hello"
+timeout: "2s"`,
 			expectedBody: `hello`,
 		},
 
@@ -98,6 +101,27 @@ request:{
 }` + baseTemplate,
 			expectedBody: `{"name":"foo","score":100}`,
 		},
+		"timeout": {
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/timeout"
+timeout: "1s"`,
+			expectedErr: "context deadline exceeded",
+		},
+		"not-timeout": {
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/timeout"
+timeout: "3s"`,
+			expectedBody: `hello`,
+		},
+		"invalid-timeout": {
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/timeout"
+timeout: "test"`,
+			expectedErr: "invalid duration",
+		},
 	}
 
 	for tName, tCase := range testCases {
@@ -106,6 +130,11 @@ request:{
 		r.NoError(err, tName)
 		prd := &provider{}
 		err = prd.Do(ctx, nil, v, nil)
+		if tCase.expectedErr != "" {
+			r.Error(err)
+			r.Contains(err.Error(), tCase.expectedErr)
+			continue
+		}
 		r.NoError(err, tName)
 		body, err := v.LookupValue("response", "body")
 		r.NoError(err, tName)
@@ -125,6 +154,10 @@ func TestInstall(t *testing.T) {
 }
 
 func runMockServer(shutdown chan struct{}) {
+	http.HandleFunc("/timeout", func(w http.ResponseWriter, req *http.Request) {
+		time.Sleep(time.Second * 2)
+		_, _ = w.Write([]byte("hello"))
+	})
 	http.HandleFunc("/hello", func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte("hello"))
 	})
