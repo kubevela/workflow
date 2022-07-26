@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG     ?= oamdev/vela-workflow:latest
+IMG     ?= oamdev/vela-workflow
 IMG_TAG ?= latest
 OS      ?= linux
 ARCH    ?= amd64
