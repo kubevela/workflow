@@ -79,7 +79,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	docker build --build-arg=VERSION=$(VELA_VERSION) --build-arg=GITVERSION=$(GIT_COMMIT) -t $(IMG) .
+	docker build --build-arg=VERSION=$(VELA_VERSION) --build-arg=GITVERSION=$(GIT_COMMIT) --build-arg=OS=$(OS) --build-arg=ARCH=${ARCH} -t $(IMG) .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
