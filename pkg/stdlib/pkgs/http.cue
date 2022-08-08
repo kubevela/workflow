@@ -6,9 +6,9 @@
 	url:    string
 	request?: {
 		timeout?: string
-		body: string
-		header: [string]:  string
-		trailer: [string]: string
+		body?:    string
+		header?: [string]:  string
+		trailer?: [string]: string
 	}
 	tls_config?: secret: string
 	response: {
