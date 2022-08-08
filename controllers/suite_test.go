@@ -34,8 +34,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
-
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	//+kubebuilder:scaffold:imports
@@ -81,8 +79,6 @@ var _ = BeforeSuite(func() {
 	err = v1alpha1.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = v1beta1.SchemeBuilder.AddToScheme(testScheme)
-	Expect(err).NotTo(HaveOccurred())
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
