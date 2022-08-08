@@ -67,7 +67,7 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 			Timeout:   time.Second * 3,
 		}
 	)
-	if timeout, err := v.GetString("timeout"); err == nil && timeout != "" {
+	if timeout, err := v.GetString("request", "timeout"); err == nil && timeout != "" {
 		duration, err := time.ParseDuration(timeout)
 		if err != nil {
 			return nil, err
@@ -182,7 +182,7 @@ func (h *provider) getTransport(ctx monitorContext.Context, v *value.Value) (htt
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
-	m := obj.Lookup(label)
+	m := obj.Lookup("request", label)
 	if !m.Exists() {
 		return nil, nil
 	}

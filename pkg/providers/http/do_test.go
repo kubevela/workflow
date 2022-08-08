@@ -51,10 +51,10 @@ func TestHttpDo(t *testing.T) {
 	baseTemplate := `
 		url: string
 		request?: close({
-			timeout?:string
-			body:    string
-			header:  [string]: string
-			trailer: [string]: string
+			timeout?: string
+			body?:    string
+			header?:  [string]: string
+			trailer?: [string]: string
 		})
 		response: close({
 			body: string
@@ -71,7 +71,9 @@ func TestHttpDo(t *testing.T) {
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/hello"
-timeout: "2s"`,
+request: {
+	timeout: "2s"
+}`,
 			expectedBody: `hello`,
 		},
 
@@ -105,21 +107,27 @@ request:{
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/timeout"
-timeout: "1s"`,
+request: {
+	timeout: "1s"
+}`,
 			expectedErr: "context deadline exceeded",
 		},
 		"not-timeout": {
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/timeout"
-timeout: "3s"`,
+request: {
+	timeout: "3s"
+}`,
 			expectedBody: `hello`,
 		},
 		"invalid-timeout": {
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/timeout"
-timeout: "test"`,
+request: {
+	timeout: "test"
+}`,
 			expectedErr: "invalid duration",
 		},
 	}

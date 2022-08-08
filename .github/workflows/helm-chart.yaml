@@ -44,13 +44,13 @@ jobs:
 
       - name: Build & Pushing vela-workflow for ACR
         run: |
-          docker build --build-arg GOPROXY=https://proxy.golang.org -t kubevela-registry.cn-hangzhou.cr.aliyuncs.com/oamdev/vela-workflow:${{ steps.vars.outputs.TAG }} -f ./cmd/apiserver/Dockerfile .
+          docker build --build-arg GOPROXY=https://proxy.golang.org -t kubevela-registry.cn-hangzhou.cr.aliyuncs.com/oamdev/vela-workflow:${{ steps.vars.outputs.TAG }} -f ./Dockerfile .
           docker push kubevela-registry.cn-hangzhou.cr.aliyuncs.com/oamdev/vela-workflow:${{ steps.vars.outputs.TAG }}
       - uses: docker/build-push-action@v2
         name: Build & Pushing vela-workflow for Dockerhub and GHCR
         with:
           context: .
-          file: ./cmd/apiserver/Dockerfile
+          file: ./Dockerfile
           labels: |-
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
