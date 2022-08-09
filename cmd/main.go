@@ -19,10 +19,12 @@ package main
 import (
 	"context"
 	"errors"
+	goflag "flag"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +42,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/controllers"
 	ctrlClient "github.com/kubevela/workflow/pkg/client"
+	"github.com/kubevela/workflow/pkg/common"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/types"
@@ -59,21 +62,19 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
+	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock string
+	var enableLeaderElection, logDebug bool
 	var qps float64
-	var burst int
-	var webhookPort int
-	var leaderElectionResourceLock string
-	var leaseDuration time.Duration
-	var renewDeadline time.Duration
-	var retryPeriod time.Duration
-	var pprofAddr string
+	var logFileMaxSize uint64
+	var burst, webhookPort int
+	var leaseDuration, renewDeadline, retryPeriod time.Duration
 	var controllerArgs controllers.Args
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&logFilePath, "log-file-path", "", "The file to write logs to.")
+	flag.Uint64Var(&logFileMaxSize, "log-file-max-size", 1024, "Defines the maximum size a log file can grow to, Unit is megabytes.")
+	flag.BoolVar(&logDebug, "log-debug", false, "Enable debug logs for development purpose")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -94,7 +95,13 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 
+	// setup logging
+	klog.InitFlags(nil)
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+	if logDebug {
+		_ = flag.Set("v", strconv.Itoa(int(common.LogDebug)))
+	}
 
 	if pprofAddr != "" {
 		// Start pprof server if enabled
@@ -128,6 +135,12 @@ func main() {
 				panic(err)
 			}
 		}()
+	}
+
+	if logFilePath != "" {
+		_ = flag.Set("logtostderr", "false")
+		_ = flag.Set("log_file", logFilePath)
+		_ = flag.Set("log_file_max_size", strconv.FormatUint(logFileMaxSize, 10))
 	}
 
 	ctrl.SetLogger(klogr.New())
@@ -202,4 +215,9 @@ func main() {
 		klog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	if logFilePath != "" {
+		klog.Flush()
+	}
+	klog.Info("Safely stops Program...")
 }

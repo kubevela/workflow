@@ -114,6 +114,13 @@ spec:
             - "--webhook-port={{ .Values.webhookService.port }}"
             - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
             {{ end }}
+            {{ if ne .Values.logFilePath "" }}
+            - "--log-file-path={{ .Values.logFilePath }}"
+            - "--log-file-max-size={{ .Values.logFileMaxSize }}"
+            {{ end }}
+            {{ if .Values.logDebug }}
+            - "--log-debug=true"
+            {{ end }}
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
             - "--health-probe-bind-address=:{{ .Values.healthCheck.port }}"
