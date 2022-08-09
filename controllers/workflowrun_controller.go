@@ -71,6 +71,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	ctx, cancel := context.WithTimeout(ctx, ReconcileTimeout)
 	defer cancel()
 
+	ctx = types.SetNamespaceInCtx(ctx, req.Namespace)
+
 	logCtx := monitorContext.NewTraceContext(ctx, "").AddTag("workflowrun", req.String())
 	logCtx.Info("Start reconcile workflowrun")
 	defer logCtx.Commit("End reconcile workflowrun")

@@ -256,3 +256,13 @@ func IsStepFinish(phase v1alpha1.WorkflowStepPhase, reason string) bool {
 		return false
 	}
 }
+
+// SetNamespaceInCtx set namespace in context.
+func SetNamespaceInCtx(ctx context.Context, namespace string) context.Context {
+	if namespace == "" {
+		// compatible with some webhook handlers that maybe receive empty string as app namespace which means `default` namespace
+		namespace = "default"
+	}
+	ctx = context.WithValue(ctx, template.DefinitionNamespace, namespace)
+	return ctx
+}

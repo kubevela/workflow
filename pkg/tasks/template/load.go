@@ -22,10 +22,11 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
-	oamutil "github.com/oam-dev/kubevela/pkg/oam/util"
 )
 
 var (
@@ -35,6 +36,15 @@ var (
 
 const (
 	templateDir = "static"
+)
+
+type namespaceContextKey int
+
+const (
+	// DefinitionNamespace is context key to define workflow run namespace
+	DefinitionNamespace namespaceContextKey = iota
+	// SystemDefinitionNamespace is the system definition namespace
+	systemDefinitionNamespace string = "vela-system"
 )
 
 // Loader load task definition template.
@@ -70,17 +80,52 @@ func (loader *WorkflowStepLoader) LoadTemplate(ctx context.Context, name string)
 func NewWorkflowStepTemplateLoader(client client.Client) Loader {
 	return &WorkflowStepLoader{
 		loadDefinition: func(ctx context.Context, capName string) (string, error) {
-			d := new(v1beta1.WorkflowStepDefinition)
-			err := oamutil.GetCapabilityDefinition(ctx, client, d, capName)
-			if err != nil {
-				return "", errors.WithMessagef(err, "LoadTemplate [%s] ", capName)
-			}
-			schematic := d.Spec.Schematic
-			if schematic != nil && schematic.CUE != nil {
-				return schematic.CUE.Template, nil
-			}
-
-			return "", errors.New("custom workflowStep only support cue")
+			return getDefinitionTemplate(ctx, client, capName)
 		},
 	}
+}
+
+type def struct {
+	Spec struct {
+		Schematic struct {
+			CUE struct {
+				Template string `json:"template"`
+			} `json:"cue"`
+		} `json:"schematic"`
+	} `json:"spec,omitempty"`
+}
+
+func getDefinitionTemplate(ctx context.Context, cli client.Client, definitionName string) (string, error) {
+	const (
+		definitionAPIVersion       = "core.oam.dev/v1beta1"
+		kindWorkflowStepDefinition = "WorkflowStepDefinition"
+	)
+	definition := &unstructured.Unstructured{}
+	definition.SetAPIVersion(definitionAPIVersion)
+	definition.SetKind(kindWorkflowStepDefinition)
+	ns := getDefinitionNamespaceWithCtx(ctx)
+	if err := cli.Get(ctx, types.NamespacedName{Name: definitionName, Namespace: ns}, definition); err != nil {
+		if apierrors.IsNotFound(err) {
+			if err := cli.Get(ctx, types.NamespacedName{Name: definitionName, Namespace: systemDefinitionNamespace}, definition); err != nil {
+				return "", err
+			}
+		} else {
+			return "", err
+		}
+	}
+	d := new(def)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(definition.Object, d); err != nil {
+		return "", errors.Wrap(err, "invalid workflow step definition")
+	}
+	return d.Spec.Schematic.CUE.Template, nil
+}
+
+func getDefinitionNamespaceWithCtx(ctx context.Context) string {
+	var ns string
+	if run := ctx.Value(DefinitionNamespace); run == nil {
+		ns = systemDefinitionNamespace
+	} else {
+		ns = run.(string)
+	}
+	return ns
 }

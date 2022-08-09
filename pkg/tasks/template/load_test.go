@@ -24,28 +24,27 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
-
-	"github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 )
 
 func TestLoad(t *testing.T) {
 	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-			o, ok := obj.(*v1beta1.WorkflowStepDefinition)
+			o, ok := obj.(*unstructured.Unstructured)
 			if !ok {
 				return nil
 			}
-			def := &v1beta1.WorkflowStepDefinition{}
+			var d map[string]interface{}
 			js, err := yaml.YAMLToJSON([]byte(stepDefYaml))
 			if err != nil {
 				return err
 			}
-			if err := json.Unmarshal(js, def); err != nil {
+			if err := json.Unmarshal(js, &d); err != nil {
 				return err
 			}
-			*o = *def
+			*&o.Object = d
 			return nil
 		},
 	}

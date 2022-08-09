@@ -37,8 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
-	"github.com/oam-dev/kubevela/pkg/oam/util"
-
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/debug"
 	"github.com/kubevela/workflow/pkg/features"
@@ -843,9 +841,9 @@ var _ = Describe("Test Workflow", func() {
 
 		expDeployment := &appsv1.Deployment{}
 		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
-		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
@@ -853,11 +851,11 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
@@ -921,13 +919,13 @@ var _ = Describe("Test Workflow", func() {
 
 		expDeployment := &appsv1.Deployment{}
 		sub1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub1"}
-		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		sub3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub3"}
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
@@ -935,23 +933,23 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(BeNil())
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
@@ -1009,9 +1007,9 @@ var _ = Describe("Test Workflow", func() {
 
 		expDeployment := &appsv1.Deployment{}
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		time.Sleep(time.Second)
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
@@ -1019,11 +1017,11 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
@@ -1111,30 +1109,30 @@ var _ = Describe("Test Workflow", func() {
 
 		expDeployment := &appsv1.Deployment{}
 		sub1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub1"}
-		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		sub3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub3"}
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		time.Sleep(time.Second)
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
-		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(BeNil())
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(BeNil())
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
@@ -1189,9 +1187,9 @@ var _ = Describe("Test Workflow", func() {
 		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
 		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(BeNil())
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		time.Sleep(time.Second)
 
@@ -1201,10 +1199,10 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
@@ -1282,15 +1280,15 @@ var _ = Describe("Test Workflow", func() {
 
 		expDeployment := &appsv1.Deployment{}
 		sub1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub1"}
-		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		sub2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub2"}
 		Expect(k8sClient.Get(ctx, sub2Key, expDeployment)).Should(BeNil())
 		sub3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub3"}
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		time.Sleep(time.Second)
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
@@ -1299,22 +1297,22 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(util.NotFoundMatcher{})
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(BeNil())
 		expDeployment.Status.Replicas = 1
 		expDeployment.Status.ReadyReplicas = 1
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
-		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(util.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
