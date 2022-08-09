@@ -407,6 +407,9 @@ func (exec *executor) err(ctx wfContext.Context, wait bool, err error, reason st
 	exec.wfStatus.Message = err.Error()
 	if exec.wfStatus.Reason == "" {
 		exec.wfStatus.Reason = reason
+		if reason != types.StatusReasonExecute {
+			exec.terminated = true
+		}
 	}
 	exec.checkErrorTimes(ctx)
 }
