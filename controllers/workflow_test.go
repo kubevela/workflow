@@ -70,7 +70,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		},
 	}
-	testDefinitions := []string{wfStepApplyDefYaml, wfStepApplyObjectDefYaml}
+	testDefinitions := []string{wfStepApplyDefYaml, wfStepApplyObjectDefYaml, wfStepFailedRenderDefYaml}
 
 	BeforeEach(func() {
 		setupNamespace(ctx, namespace)
@@ -599,6 +599,39 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
+	})
+
+	It("test failed render", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-failed-render"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step1",
+					Type:       "failed-render",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step2",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		Expect(checkRun.Status.Steps[0].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonRendering))
+		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSkipped))
 	})
 
 	It("test workflow run with mode", func() {
@@ -1445,6 +1478,18 @@ spec:
   schematic:
     cue:
       template: "import (\n\t\"vela/op\"\n)\n\napply: op.#Apply & {\n\tvalue:   parameter.value\n\tcluster:
+        parameter.cluster\n}\nparameter: {\n\t// +usage=Specify the value of the object\n\tvalue:
+        {...}\n\t// +usage=Specify the cluster of the object\n\tcluster: *\"\" | string\n}\n"`
+
+	wfStepFailedRenderDefYaml = `apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: failed-render
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: "import (\n\t\"vela/op1\"\n)\n\napply: op.#Apply & {\n\tvalue:   parameter.value\n\tcluster:
         parameter.cluster\n}\nparameter: {\n\t// +usage=Specify the value of the object\n\tvalue:
         {...}\n\t// +usage=Specify the cluster of the object\n\tcluster: *\"\" | string\n}\n"`
 )

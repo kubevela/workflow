@@ -306,7 +306,7 @@ func (w *workflowExecutor) allDone(taskRunners []types.TaskRunner) (bool, bool) 
 		for _, ss := range status.Steps {
 			if ss.Name == t.Name() {
 				done = types.IsStepFinish(ss.Phase, ss.Reason)
-				success = done && (ss.Phase == v1alpha1.WorkflowStepPhaseSucceeded || ss.Phase == v1alpha1.WorkflowStepPhaseSkipped)
+				success = success && done && (ss.Phase == v1alpha1.WorkflowStepPhaseSucceeded || ss.Phase == v1alpha1.WorkflowStepPhaseSkipped)
 				break
 			}
 		}
