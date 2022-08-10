@@ -21,15 +21,18 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/parser"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPatch(t *testing.T) {
 
 	testCase := []struct {
-		base   string
-		patch  string
-		result string
+		base        string
+		patch       string
+		result      string
+		expectedErr string
 	}{
 		{
 			base:  `containers: [{name: "x1"},{name: "x2"},...]`,
@@ -44,15 +47,27 @@ func TestPatch(t *testing.T) {
 		},
 
 		{
-			base:   `containers: [{name: "x1"},{name: "x2"},...]`,
-			patch:  `containers: [{name: "x2"},{name: "x1"}]`,
-			result: "_|_\n",
+			base:  `containers: [{name: "x1"},{name: "x2"},...]`,
+			patch: `containers: [{name: "x2"},{name: "x1"}]`,
+			result: `containers: [{
+	name: _|_ // containers.0.name: conflicting values "x2" and "x1"
+}, {
+	name: _|_ // containers.1.name: conflicting values "x1" and "x2"
+}]
+`,
+			expectedErr: `conflicting values "x2" and "x1"`,
 		},
 
 		{
-			base:   `containers: [{name: _|_},{name: "x2"},...]`,
-			patch:  `containers: [{name: _|_},{name: "x2"}]`,
-			result: "_|_\n",
+			base:  `containers: [{name: _|_},{name: "x2"},...]`,
+			patch: `containers: [{name: _|_},{name: "x2"}]`,
+			result: `containers: [{
+	name: _|_ // explicit error (_|_ literal) in source (and 1 more errors)
+}, {
+	name: "x2"
+}]
+`,
+			expectedErr: "explicit error (_|_ literal) in source",
 		},
 
 		{
@@ -70,12 +85,16 @@ containers: [{
 		},
 
 		{
+			// lose close here
 			base: `containers: [close({namex: "x1"}),...]`,
 			patch: `
 // +patchKey=name
 containers: [{name: "x2"},{name: "x1"}]`,
-			result: `			// +patchKey=name
-containers: [_|_, // field "name" not allowed in closed struct{
+			result: `// +patchKey=name
+containers: [{
+	namex: "x1"
+	name:  "x2"
+}, {
 	name: "x1"
 }, ...]
 `,
@@ -103,13 +122,19 @@ containers: [{
 			base: `containers: [{name: "x1"},{name: "x2"},...]`,
 			patch: `
 // +patchKey=name
-containers: [{noname: "x3"}]`,
-			result: "_|_\n",
+containers: [{noname: "x3"},...]`,
+			result: `// +patchKey=name
+containers: [{
+	name:   "x1"
+	noname: "x3"
+}, {
+	name: "x2"
+}, ...]
+`,
 		},
 		{
 			base: `containers: [{name: "x1"},{name: "x2"},...]`,
-			patch: `
-// +patchKey=name
+			patch: `// +patchKey=name
 containers: [{noname: "x3"},{name: "x1"}]`,
 			result: `// +patchKey=name
 containers: [{
@@ -141,16 +166,17 @@ containers: [{
 			patch: `
 // +patchKey=name
 containers: [{name: "x2", envs: [close({name: "OPS", value: "OAM"})]}]`,
+			// TODO: fix losing close struct in cue
 			result: `// +patchKey=name
-containers: [close({
+containers: [{
 	name: "x1"
-}), close({
+}, {
 	name: "x2"
-	envs: [close({
+	envs: [{
 		name:  "OPS"
 		value: "OAM"
-	}), ...]
-}), ...]
+	}, ...]
+}, ...]
 `,
 		},
 
@@ -277,16 +303,17 @@ containers: [{
              },...]`,
 			result: `containers: [{
 	volumeMounts: [{
+		name: "k1"
 		path: "p1"
-		name: "k1"
 	}, {
+		name: "k1"
 		path: "p2"
-		name: "k1"
 	}, {
-		path: "p3"
 		name: "k2"
+		path: "p3"
 	}]
 }, ...]
+
 // +patchKey=name
 volumes: [{
 	name:  "x1"
@@ -356,12 +383,45 @@ containers: [{
 	}, ...]
 }, ...]
 `},
+		{
+			base: `containers: [{name: "x1"}]`,
+			patch: `
+containers: [{
+	// +patchKey=name
+	env: [{
+		name: "k"
+		value: "v"
+	}]
+}, ...]`,
+			result: `containers: [{
+	name: "x1"
+	// +patchKey=name
+	env: [{
+		name:  "k"
+		value: "v"
+	}]
+}, ...]
+`,
+		},
 	}
 
 	for i, tcase := range testCase {
-		r := require.New(t)
-		v, _ := StrategyUnify(tcase.base, tcase.patch)
-		r.Equal(v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			r := require.New(t)
+			ctx := cuecontext.New()
+			base := ctx.CompileString(tcase.base)
+			patch := ctx.CompileString(tcase.patch)
+			v, err := StrategyUnify(base, patch)
+			if tcase.expectedErr != "" {
+				r.Error(err)
+				r.Contains(err.Error(), tcase.expectedErr)
+				return
+			}
+			r.NoError(err)
+			s, err := toString(v)
+			r.NoError(err)
+			r.Equal(s, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
+		})
 	}
 }
 
@@ -390,6 +450,9 @@ spec: {
 	strategy: {
 		// +patchStrategy=retainKeys
 		type: "recreate"
+		rollingUpdate: {
+			maxSurge: "30%"
+		}
 	}
 }
 `},
@@ -413,6 +476,9 @@ spec: {
 	strategy: {
 		// +patchStrategy=retainKeys
 		type: "recreate"
+		rollingUpdate: {
+			maxSurge: "30%"
+		}
 	}
 }
 `},
@@ -443,7 +509,7 @@ volumes: [{
 	configMap: {
 		name: "conf-name"
 	}
-}]
+}, ...]
 `},
 
 		{
@@ -479,7 +545,7 @@ volumes: [{
 	configMap: {
 		name: "conf-name"
 	}
-}]
+}, ...]
 `},
 
 		{
@@ -511,8 +577,8 @@ containers: [{
 	envs: [{
 		name:  "e1"
 		value: "v2"
-	}]
-}]
+	}, ...]
+}, ...]
 `},
 
 		{
@@ -535,9 +601,9 @@ spec: {
 		envs:[{name: "e1",value: "v2"}]
 }]}
 `,
-			result: `// +patchKey=name
-// +patchStrategy=retainKeys
-spec: {
+			result: `spec: {
+	// +patchKey=name
+	// +patchStrategy=retainKeys
 	containers: [{
 		name: "c2"
 		envs: [{
@@ -575,8 +641,14 @@ metadata: {
 
 	for i, tcase := range testCase {
 		r := require.New(t)
-		v, _ := StrategyUnify(tcase.base, tcase.patch)
-		r.Equal(v, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, v))
+		ctx := cuecontext.New()
+		base := ctx.CompileString(tcase.base)
+		patch := ctx.CompileString(tcase.patch)
+		v, err := StrategyUnify(base, patch)
+		r.NoError(err)
+		s, err := toString(v)
+		r.NoError(err)
+		r.Equal(s, tcase.result, fmt.Sprintf("testPatch for case(no:%d) %s", i, s))
 	}
 }
 
@@ -593,15 +665,12 @@ func TestParseCommentTags(t *testing.T) {
 x: null
 `
 
-	var r cue.Runtime
-	inst, err := r.Compile("-", temp)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	ms := findCommentTag(inst.Lookup("x").Doc())
-	re := require.New(t)
-	re.Equal(ms, map[string]string{
+	r := require.New(t)
+	file, err := parser.ParseFile("-", temp, parser.ParseComments)
+	r.NoError(err)
+	v := cuecontext.New().BuildFile(file)
+	ms := findCommentTag(v.LookupPath(cue.ParsePath("x")).Doc())
+	r.Equal(ms, map[string]string{
 		"patchKey": "name",
 		"testKey1": "testValue1",
 		"testKey2": "testValue2",

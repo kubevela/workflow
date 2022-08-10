@@ -78,7 +78,7 @@ type WorkflowRunStatus struct {
 	EndTime   metav1.Time `json:"endTime,omitempty"`
 }
 
-// Workflow defines workflow steps and other attributes
+// WorkflowSpec defines workflow steps and other attributes
 type WorkflowSpec struct {
 	Steps []WorkflowStep `json:"steps,omitempty"`
 }
@@ -140,7 +140,7 @@ type WorkflowStepMeta struct {
 	Alias string `json:"alias,omitempty"`
 }
 
-// WorkflowSubStep defines how to execute a workflow subStep.
+// WorkflowStepBase defines the workflow step base
 type WorkflowStepBase struct {
 	// Name is the unique name of the workflow step.
 	Name string `json:"name"`

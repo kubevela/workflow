@@ -156,13 +156,21 @@ func (ctx *templateContext) BaseContextFile() (string, error) {
 	buff += fmt.Sprintf(model.ContextPublishVersion+": \"%s\"\n", ctx.publishVersion)
 
 	if ctx.base != nil {
-		buff += fmt.Sprintf(model.OutputFieldName+": %s\n", structMarshal(ctx.base.String()))
+		base, err := ctx.base.String()
+		if err != nil {
+			return "", err
+		}
+		buff += fmt.Sprintf(model.OutputFieldName+": %s\n", structMarshal(base))
 	}
 
 	if len(ctx.auxiliaries) > 0 {
 		var auxLines []string
 		for _, auxiliary := range ctx.auxiliaries {
-			auxLines = append(auxLines, fmt.Sprintf("\"%s\": %s", auxiliary.Name, structMarshal(auxiliary.Ins.String())))
+			aux, err := auxiliary.Ins.String()
+			if err != nil {
+				return "", err
+			}
+			auxLines = append(auxLines, fmt.Sprintf("\"%s\": %s", auxiliary.Name, structMarshal(aux)))
 		}
 		if len(auxLines) > 0 {
 			buff += fmt.Sprintf(model.OutputsFieldName+": {%s}\n", strings.Join(auxLines, "\n"))
@@ -214,14 +222,14 @@ func (ctx *templateContext) BaseContextFile() (string, error) {
 func (ctx *templateContext) ExtendedContextFile() (string, error) {
 	context, err := ctx.BaseContextFile()
 	if err != nil {
-		return "", fmt.Errorf("failed to convert data to workflow with marshal err %w", err)
+		return "", fmt.Errorf("failed to convert data to application with marshal err %w", err)
 	}
 	var bareSecret string
 	if len(ctx.requiredSecrets) > 0 {
 		for _, s := range ctx.requiredSecrets {
 			data, err := json.Marshal(s.Data)
 			if err != nil {
-				return "", fmt.Errorf("failed to convert data %v to workflow with marshal err %w", data, err)
+				return "", fmt.Errorf("failed to convert data %v to application with marshal err %w", data, err)
 			}
 			bareSecret += s.ContextName + ":" + string(data) + "\n"
 		}

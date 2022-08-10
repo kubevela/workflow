@@ -44,7 +44,7 @@ func TestLoad(t *testing.T) {
 			if err := json.Unmarshal(js, &d); err != nil {
 				return err
 			}
-			*&o.Object = d
+			o.Object = d
 			return nil
 		},
 	}

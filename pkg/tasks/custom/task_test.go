@@ -115,8 +115,8 @@ myIP: value: "1.1.1.1"
 		},
 		{
 			WorkflowStepBase: v1alpha1.WorkflowStepBase{
-				Name: "rendering",
-				Type: "renderFailed",
+				Name: "template",
+				Type: "templateError",
 			},
 		},
 		{
@@ -152,9 +152,9 @@ myIP: value: "1.1.1.1"
 			r.Equal(status.Message, "I am terminated")
 			continue
 		}
-		if step.Name == "rendering" {
+		if step.Name == "template" {
 			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)
-			r.Equal(status.Reason, types.StatusReasonRendering)
+			r.Equal(status.Reason, types.StatusReasonExecute)
 			continue
 		}
 		if step.Name == "execute" {
@@ -207,7 +207,7 @@ close({
 				Name: "input-err",
 				Type: "ok",
 				Properties: &runtime.RawExtension{Raw: []byte(`
-		{"score": {"y": 101}}
+{"score": {"x": 101}}
 		`)},
 				Inputs: v1alpha1.StepInputs{{
 					From:         "score",
@@ -262,10 +262,9 @@ close({
 		status, operation, err := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
 		case "input-err":
-			r.Equal(operation.Waiting, false)
-			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)
+			r.Equal(err.Error(), "do preStartHook: score.x: conflicting values 100 and 101")
 		case "input":
-			r.Equal(err.Error(), "do preStartHook: get input from [podIP]: var(path=podIP) not exist")
+			r.Equal(err.Error(), "do preStartHook: get input from [podIP]: failed to lookup value: var(path=podIP) not exist")
 		case "output-var-conflict":
 			r.Contains(status.Message, "conflict")
 			r.Equal(operation.Waiting, false)
@@ -410,7 +409,7 @@ apply: {
 
 #up: [process,{}]
 `,
-			expected: "ok",
+			expected: "okokok",
 			hasErr:   true,
 		},
 	}
@@ -679,6 +678,16 @@ func TestValidateIfValue(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "error if",
+			step: v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					If: `test == true`,
+				},
+			},
+			expectedErr: "invalid if value",
+			expected:    false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -747,7 +756,7 @@ name: context.name
 		return fmt.Sprintf(templ, "wait"), nil
 	case "terminate":
 		return fmt.Sprintf(templ, "terminate"), nil
-	case "renderFailed":
+	case "templateError":
 		return `
 output: xx
 `, nil

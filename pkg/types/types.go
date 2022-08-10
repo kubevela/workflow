@@ -101,7 +101,7 @@ type Operation struct {
 // TaskGenerator will generate taskRunner.
 type TaskGenerator func(wfStep v1alpha1.WorkflowStep, options *TaskGeneratorOptions) (TaskRunner, error)
 
-// GeneratorOptions is the options for generate task.
+// TaskGeneratorOptions is the options for generate task.
 type TaskGeneratorOptions struct {
 	ID                 string
 	PrePhase           v1alpha1.WorkflowStepPhase

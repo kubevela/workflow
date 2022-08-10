@@ -123,11 +123,7 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 			return err
 		}
 
-		patcher, err := model.NewOther(pv)
-		if err != nil {
-			return err
-		}
-		if err := base.Unify(patcher); err != nil {
+		if err := base.Unify(pv); err != nil {
 			return err
 		}
 		workload, err = base.Unstructured()

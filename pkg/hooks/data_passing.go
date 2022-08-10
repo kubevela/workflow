@@ -37,8 +37,10 @@ func Input(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.Workflo
 		if err != nil {
 			return errors.WithMessagef(err, "get input from [%s]", input.From)
 		}
-		if err := paramValue.FillValueByScript(inputValue, input.ParameterKey); err != nil {
-			return err
+		if input.ParameterKey != "" {
+			if err := paramValue.FillValueByScript(inputValue, input.ParameterKey); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

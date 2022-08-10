@@ -22,7 +22,7 @@ import (
 	"github.com/kubevela/workflow/pkg/types"
 )
 
-// Workflow is used to execute the workflow steps of Application.
+// WorkflowExecutor is used to execute the workflow steps
 type WorkflowExecutor interface {
 	// ExecuteSteps executes the steps of an Application with given steps of rendered resources.
 	// It returns done=true only if all steps are executed and succeeded.
