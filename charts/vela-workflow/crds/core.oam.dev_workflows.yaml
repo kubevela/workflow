@@ -87,8 +87,7 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 subSteps:
                   items:
-                    description: WorkflowSubStep defines how to execute a workflow
-                      subStep.
+                    description: WorkflowStepBase defines the workflow step base
                     properties:
                       dependsOn:
                         description: DependsOn is the dependency of the step

@@ -182,7 +182,7 @@ func (h *provider) getTransport(ctx monitorContext.Context, v *value.Value) (htt
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
-	m := obj.Lookup("request", label)
+	m := obj.LookupPath(value.FieldPath("request", label))
 	if !m.Exists() {
 		return nil, nil
 	}

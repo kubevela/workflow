@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -142,6 +141,12 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			var paramFile string
 
 			defer func() {
+				if r := recover(); r != nil {
+					exec.err(ctx, false, fmt.Errorf("invalid cue task for evaluation: %v", r), types.StatusReasonRendering)
+					stepStatus = exec.status()
+					operations = exec.operation()
+					return
+				}
 				if taskv == nil {
 					taskv, err = convertTemplate(ctx, t.pd, strings.Join([]string{templ, paramFile}, "\n"), wfStep.Name, exec.wfStatus.ID, options.PCtx)
 					if err != nil {
@@ -287,7 +292,14 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, pd *
 	statusTemplate += fmt.Sprintf("status: %s\n", status)
 	statusTemplate += contextTempl
 	statusTemplate += "\n" + inputsTempl
-	return value.NewValue(template+"\n"+statusTemplate, pd, "")
+	v, err := value.NewValue(template+"\n"+statusTemplate, pd, "")
+	if err != nil {
+		return nil, err
+	}
+	if v.Error() != nil {
+		return nil, v.Error()
+	}
+	return v, nil
 }
 
 func convertTemplate(ctx wfContext.Context, pd *packages.PackageDiscover, templ, step, id string, pCtx process.Context) (*value.Value, error) {
@@ -465,13 +477,6 @@ func (exec *executor) doSteps(ctx monitorContext.Context, wfCtx wfContext.Contex
 		return nil
 	}
 	return v.StepByFields(func(fieldName string, in *value.Value) (bool, error) {
-		if in.CueValue().IncompleteKind() == cue.BottomKind {
-			errInfo, err := sets.ToString(in.CueValue())
-			if err != nil {
-				errInfo = "value is _|_"
-			}
-			return true, errors.New(errInfo + "(bottom kind)")
-		}
 		if retErr := in.CueValue().Err(); retErr != nil {
 			errInfo, err := sets.ToString(in.CueValue())
 			if err == nil {
@@ -519,7 +524,7 @@ func isStepList(fieldName string) bool {
 }
 
 func debugLog(v *value.Value) bool {
-	debug, _ := v.CueValue().LookupDef("#debug").Bool()
+	debug, _ := v.CueValue().LookupPath(value.FieldPath("#debug")).Bool()
 	return debug
 }
 

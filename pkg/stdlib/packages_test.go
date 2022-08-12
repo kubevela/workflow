@@ -21,30 +21,34 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/build"
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/parser"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetPackages(t *testing.T) {
-	re := require.New(t)
+	r := require.New(t)
 	pkgs, err := GetPackages()
-	re.NoError(err)
-	var r cue.Runtime
+	r.NoError(err)
+	cuectx := cuecontext.New()
 	for path, content := range pkgs {
-		_, err := r.Compile(path, content)
-		re.NoError(err)
+		file, err := parser.ParseFile(path, content)
+		r.NoError(err)
+		_ = cuectx.BuildFile(file)
 	}
 
-	builder := &build.Instance{}
-	err = builder.AddFile("-", `
+	file, err := parser.ParseFile("-", `
 import "vela/custom"
 out: custom.context`)
-	re.NoError(err)
+	r.NoError(err)
+	builder := &build.Instance{}
+	err = builder.AddSyntax(file)
+	r.NoError(err)
 	err = AddImportsFor(builder, "context: id: \"xxx\"")
-	re.NoError(err)
+	r.NoError(err)
 
-	insts := cue.Build([]*build.Instance{builder})
-	re.Equal(len(insts), 1)
-	str, err := insts[0].Lookup("out", "id").String()
-	re.NoError(err)
-	re.Equal(str, "xxx")
+	inst := cuectx.BuildInstance(builder)
+	str, err := inst.LookupPath(cue.ParsePath("out.id")).String()
+	r.NoError(err)
+	r.Equal(str, "xxx")
 }

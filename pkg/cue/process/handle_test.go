@@ -19,33 +19,32 @@ package process
 import (
 	"testing"
 
-	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
 
 func TestContext(t *testing.T) {
 	baseTemplate := `
 image: "myserver"
 `
-	re := require.New(t)
-	var r cue.Runtime
-	inst, err := r.Compile("-", baseTemplate)
-	re.NoError(err)
-	base, err := model.NewBase(inst.Value())
-	re.NoError(err)
+
+	r := require.New(t)
+	inst := cuecontext.New().CompileString(baseTemplate)
+	base, err := model.NewBase(inst)
+	r.NoError(err)
 
 	serviceTemplate := `
 	apiVersion: "v1"
     kind:       "ConfigMap"
 `
 
-	svcInst, err := r.Compile("-", serviceTemplate)
-	re.NoError(err)
+	svcInst := cuecontext.New().CompileString(serviceTemplate)
 
-	svcIns, err := model.NewOther(svcInst.Value())
-	re.NoError(err)
+	svcIns, err := model.NewOther(svcInst)
+	r.NoError(err)
 
 	svcAux := Auxiliary{
 		Ins:  svcIns,
@@ -84,52 +83,51 @@ image: "myserver"
 		PublishVersion: "mypublishversion",
 	})
 	err = ctx.SetBase(base)
-	re.NoError(err)
+	r.NoError(err)
 	err = ctx.AppendAuxiliaries(svcAux)
-	re.NoError(err)
+	r.NoError(err)
 	err = ctx.AppendAuxiliaries(svcAuxWithAbnormalName)
-	re.NoError(err)
+	r.NoError(err)
 	ctx.SetParameters(targetParams)
 	ctx.PushData("arbitraryData", targetArbitraryData)
 
 	c, err := ctx.ExtendedContextFile()
-	re.NoError(err)
-	ctxInst, err := r.Compile("-", c)
-	re.NoError(err)
+	r.NoError(err)
+	ctxInst := cuecontext.New().CompileString(c)
 
-	gName, err := ctxInst.Lookup("context", model.ContextName).String()
-	re.NoError(err)
-	re.Equal("myrun", gName)
+	gName, err := ctxInst.LookupPath(value.FieldPath("context", model.ContextName)).String()
+	r.Equal(nil, err)
+	r.Equal("myrun", gName)
 
-	myWorkflowName, err := ctxInst.Lookup("context", model.ContextWorkflowName).String()
-	re.NoError(err)
-	re.Equal("myworkflow", myWorkflowName)
+	myWorkflowName, err := ctxInst.LookupPath(value.FieldPath("context", model.ContextWorkflowName)).String()
+	r.Equal(nil, err)
+	r.Equal("myworkflow", myWorkflowName)
 
-	myPublishVersion, err := ctxInst.Lookup("context", model.ContextPublishVersion).String()
-	re.NoError(err)
-	re.Equal("mypublishversion", myPublishVersion)
+	myPublishVersion, err := ctxInst.LookupPath(value.FieldPath("context", model.ContextPublishVersion)).String()
+	r.Equal(nil, err)
+	r.Equal("mypublishversion", myPublishVersion)
 
-	inputJs, err := ctxInst.Lookup("context", model.OutputFieldName).MarshalJSON()
-	re.NoError(err)
-	re.Equal(`{"image":"myserver"}`, string(inputJs))
+	inputJs, err := ctxInst.LookupPath(value.FieldPath("context", model.OutputFieldName)).MarshalJSON()
+	r.Equal(nil, err)
+	r.Equal(`{"image":"myserver"}`, string(inputJs))
 
-	outputsJs, err := ctxInst.Lookup("context", model.OutputsFieldName, "service").MarshalJSON()
-	re.NoError(err)
-	re.Equal("{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\"}", string(outputsJs))
+	outputsJs, err := ctxInst.LookupPath(value.FieldPath("context", model.OutputsFieldName, "service")).MarshalJSON()
+	r.Equal(nil, err)
+	r.Equal("{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\"}", string(outputsJs))
 
-	outputsJs, err = ctxInst.Lookup("context", model.OutputsFieldName, "service-1").MarshalJSON()
-	re.NoError(err)
-	re.Equal("{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\"}", string(outputsJs))
+	outputsJs, err = ctxInst.LookupPath(value.FieldPath("context", model.OutputsFieldName, "service-1")).MarshalJSON()
+	r.Equal(nil, err)
+	r.Equal("{\"apiVersion\":\"v1\",\"kind\":\"ConfigMap\"}", string(outputsJs))
 
-	ns, err := ctxInst.Lookup("context", model.ContextNamespace).String()
-	re.NoError(err)
-	re.Equal("myns", ns)
+	ns, err := ctxInst.LookupPath(value.FieldPath("context", model.ContextNamespace)).String()
+	r.Equal(nil, err)
+	r.Equal("myns", ns)
 
-	params, err := ctxInst.Lookup("context", model.ParameterFieldName).MarshalJSON()
-	re.NoError(err)
-	re.Equal("{\"parameter1\":\"string\",\"parameter2\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"parameter3\":[\"item1\",\"item2\"]}", string(params))
+	params, err := ctxInst.LookupPath(value.FieldPath("context", model.ParameterFieldName)).MarshalJSON()
+	r.Equal(nil, err)
+	r.Equal("{\"parameter1\":\"string\",\"parameter2\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"parameter3\":[\"item1\",\"item2\"]}", string(params))
 
-	arbitraryData, err := ctxInst.Lookup("context", "arbitraryData").MarshalJSON()
-	re.NoError(err)
-	re.Equal("{\"bool\":false,\"string\":\"mytxt\",\"int\":10,\"map\":{\"key\":\"value\"},\"slice\":[\"str1\",\"str2\",\"str3\"]}", string(arbitraryData))
+	arbitraryData, err := ctxInst.LookupPath(value.FieldPath("context", "arbitraryData")).MarshalJSON()
+	r.Equal(nil, err)
+	r.Equal("{\"bool\":false,\"int\":10,\"map\":{\"key\":\"value\"},\"slice\":[\"str1\",\"str2\",\"str3\"],\"string\":\"mytxt\"}", string(arbitraryData))
 }

@@ -94,6 +94,7 @@ var _ = Describe("Package discovery resources for definition from K8s APIServer"
 		}
 	})
 
+	// nolint:staticcheck
 	PIt("discovery built-in k8s resource with kube prefix", func() {
 
 		By("test ingress in kube package")
@@ -384,6 +385,7 @@ output: {
 
 	})
 
+	// nolint:staticcheck
 	PIt("discovery built-in k8s resource with third-party path", func() {
 
 		By("test ingress in kube package")

@@ -64,6 +64,7 @@ var (
 	ReconcileTimeout = time.Minute * 3
 )
 
+// Reconcile reconciles the WorkflowRun object
 //+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/finalizers,verbs=update

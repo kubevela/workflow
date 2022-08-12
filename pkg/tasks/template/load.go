@@ -57,7 +57,7 @@ type WorkflowStepLoader struct {
 	loadDefinition func(ctx context.Context, capName string) (string, error)
 }
 
-// LoadTaskTemplate gets the workflowStep definition.
+// LoadTemplate gets the workflow step definition.
 func (loader *WorkflowStepLoader) LoadTemplate(ctx context.Context, name string) (string, error) {
 	files, err := templateFS.ReadDir(templateDir)
 	if err != nil {

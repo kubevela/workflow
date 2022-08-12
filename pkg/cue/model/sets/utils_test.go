@@ -18,8 +18,8 @@ package sets
 import (
 	"testing"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
@@ -55,8 +55,8 @@ if true {
 }
 lacy: string
 `,
-			expected: `foo:  int
-lacy: string
+			expected: `lacy: string
+foo:  int
 `},
 		{
 			s: ` 
@@ -71,14 +71,12 @@ if foo > 5 {
 }
 `},
 	}
-	var r cue.Runtime
 	for _, tcase := range testCases {
-		re := require.New(t)
-		inst, err := r.Compile("-", tcase.s)
-		re.NoError(err)
-		str, err := ToString(inst.Value())
-		re.NoError(err)
-		re.Equal(str, tcase.expected)
+		r := require.New(t)
+		inst := cuecontext.New().CompileString(tcase.s)
+		str, err := ToString(inst)
+		r.NoError(err)
+		r.Equal(str, tcase.expected)
 	}
 }
 
@@ -122,20 +120,21 @@ abc
 `,
 			expected: `foo: int
 lacy: """
-        abc
-        123
-        """
+	abc
+	123
+	"""
 `},
 	}
 
-	var r cue.Runtime
+	ctx := cuecontext.New()
 	for _, tcase := range testCases {
-		re := require.New(t)
-		inst, err := r.Compile("-", tcase.s)
-		re.NoError(err)
+		r := require.New(t)
+		file, err := parser.ParseFile("-", tcase.s)
+		r.NoError(err)
+		inst := ctx.BuildFile(file)
 		str, err := ToString(inst.Value(), OptBytesToString)
-		re.NoError(err)
-		re.Equal(str, tcase.expected)
+		r.NoError(err)
+		r.Equal(str, tcase.expected)
 	}
 }
 
@@ -228,22 +227,22 @@ wait: {
 		},
 	}
 
-	var r cue.Runtime
+	ctx := cuecontext.New()
 	for _, tCase := range testCases {
-		re := require.New(t)
+		r := require.New(t)
 		f, err := parser.ParseFile("-", tCase.src)
-		re.NoError(err)
+		r.NoError(err)
 		err = PreprocessBuiltinFunc(f, "script", doScript)
-		re.NoError(err)
-		inst, err := r.CompileFile(f)
-		re.NoError(err)
+		r.NoError(err)
+		inst := ctx.BuildFile(f)
 		bt, _ := inst.Value().MarshalJSON()
-		re.Equal(string(bt), tCase.expectJson)
+		r.Equal(string(bt), tCase.expectJson)
 	}
 }
 
 func TestOpenBasicLit(t *testing.T) {
-	s, err := OpenBaiscLit(`
+	r := require.New(t)
+	f, err := OpenBaiscLit(cuecontext.New().CompileString(`
 a: 10
 a1: int
 b: "foo"
@@ -253,8 +252,10 @@ c1: bool
 arr: [1,2]
 top: _
 bottom: _|_
-`)
-	r := require.New(t)
+`))
+	r.NoError(err)
+	val := cuecontext.New().BuildFile(f)
+	s, err := toString(val)
 	r.NoError(err)
 	r.Equal(s, `a:      *10 | _
 a1:     int
@@ -264,17 +265,17 @@ c:      *true | _
 c1:     bool
 arr:    *[1, 2] | [...]
 top:    _
-bottom: _|_
+bottom: _|_ // explicit error (_|_ literal) in source
 `)
 }
 
 func TestListOpen(t *testing.T) {
+	r := require.New(t)
 	f, err := parser.ParseFile("-", `
 x: ["a","b"]
 y: [...string]
 z: []
 `)
-	r := require.New(t)
 	r.NoError(err)
 	ListOpen(f)
 

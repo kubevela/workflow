@@ -1489,7 +1489,5 @@ metadata:
 spec:
   schematic:
     cue:
-      template: "import (\n\t\"vela/op1\"\n)\n\napply: op.#Apply & {\n\tvalue:   parameter.value\n\tcluster:
-        parameter.cluster\n}\nparameter: {\n\t// +usage=Specify the value of the object\n\tvalue:
-        {...}\n\t// +usage=Specify the cluster of the object\n\tcluster: *\"\" | string\n}\n"`
+      template: ":"`
 )

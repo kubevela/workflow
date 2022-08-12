@@ -139,7 +139,6 @@ admissionWebhooks:
     enabled: false
   certManager:
     enabled: false
-    revisionHistoryLimit: 3
 
 ## @param kubeClient.qps The qps for reconcile clients, default is 50
 ## @param kubeClient.burst The burst for reconcile clients, default is 100

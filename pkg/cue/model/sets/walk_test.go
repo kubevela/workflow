@@ -19,8 +19,8 @@ package sets
 import (
 	"testing"
 
-	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/parser"
 	"github.com/stretchr/testify/require"
 )
@@ -86,17 +86,16 @@ func TestWalk(t *testing.T) {
 		    tags_str: strings.Compare(b,"c")
 		}
 	`,
+		`a: [1, 2, 3]`,
 	}
 
 	for _, src := range testCases {
-		var r cue.Runtime
-		re := require.New(t)
-		inst, err := r.Compile("-", src)
-		re.NoError(err)
+		r := require.New(t)
+		inst := cuecontext.New().CompileString(src)
 		nsrc, err := toString(inst.Value())
-		re.NoError(err)
+		r.NoError(err)
 		f, err := parser.ParseFile("-", nsrc)
-		re.NoError(err)
+		r.NoError(err)
 
 		newWalker(func(node ast.Node, ctx walkCtx) {
 			if len(ctx.Pos()) == 0 {
@@ -111,9 +110,9 @@ func TestWalk(t *testing.T) {
 			}
 
 			n, err := lookUp(f, ctx.Pos()...)
-			re.NoError(err)
+			r.NoError(err)
 
-			re.Equal(n, node, nsrc)
+			r.Equal(n, node, nsrc)
 		}).walk(f)
 	}
 
@@ -133,10 +132,8 @@ func TestRemoveTmpVar(t *testing.T) {
 }
 `
 	r := require.New(t)
-	var runtime cue.Runtime
-	inst, err := runtime.Compile("-", src)
-	r.NoError(err)
-	s, err := toString(inst.Value(), removeTmpVar)
+	v := cuecontext.New().CompileString(src)
+	s, err := toString(v, removeTmpVar)
 	r.NoError(err)
 	r.Equal(`spec: {
 	list: [{
