@@ -90,6 +90,8 @@ image: "myserver"
 	r.NoError(err)
 	ctx.SetParameters(targetParams)
 	ctx.PushData("arbitraryData", targetArbitraryData)
+	get := ctx.GetData("arbitraryData")
+	r.Equal(get, targetArbitraryData)
 
 	c, err := ctx.ExtendedContextFile()
 	r.NoError(err)
