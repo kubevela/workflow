@@ -65,8 +65,8 @@ func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options type
 func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) types.StepGeneratorOptions {
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
-		installBuiltinProviders(ctx, wr, options.Client, options.Providers)
 	}
+	installBuiltinProviders(ctx, wr, options.Client, options.Providers)
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(wr))
 	}
