@@ -41,10 +41,10 @@ const (
 )
 
 // Dispatcher is a client for apply resources.
-type Dispatcher func(ctx context.Context, cluster string, manifests ...*unstructured.Unstructured) error
+type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*unstructured.Unstructured) error
 
 // Deleter is a client for delete resources.
-type Deleter func(ctx context.Context, cluster string, manifest *unstructured.Unstructured) error
+type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
 
 type ContextHandler func(ctx context.Context, cluster string, userInfo user.Info) context.Context
 
@@ -64,7 +64,8 @@ type contextKey string
 
 const (
 	// ClusterContextKey is the name of cluster using in client http context
-	ClusterContextKey = contextKey("ClusterName")
+	ClusterContextKey              = contextKey("ClusterName")
+	WorkflowResourceCreator string = "workflow"
 )
 
 func contextHandler(ctx context.Context, cluster string, userInfo user.Info) context.Context {
@@ -80,7 +81,7 @@ type dispatcher struct {
 	owners []metav1.OwnerReference
 }
 
-func (d *dispatcher) apply(ctx context.Context, cluster string, workloads ...*unstructured.Unstructured) error {
+func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads ...*unstructured.Unstructured) error {
 	for _, workload := range workloads {
 		existing := new(unstructured.Unstructured)
 		existing.GetObjectKind().SetGroupVersionKind(workload.GetObjectKind().GroupVersionKind())
@@ -105,7 +106,7 @@ func (d *dispatcher) apply(ctx context.Context, cluster string, workloads ...*un
 	return nil
 }
 
-func (d *dispatcher) delete(ctx context.Context, cluster string, manifest *unstructured.Unstructured) error {
+func (d *dispatcher) delete(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error {
 	return d.cli.Delete(ctx, manifest)
 }
 
@@ -141,7 +142,7 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 		return err
 	}
 	deployCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Apply(deployCtx, cluster, workload); err != nil {
+	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workload); err != nil {
 		return err
 	}
 	return cue.FillUnstructuredObject(v, workload, "value")
@@ -175,7 +176,7 @@ func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.C
 		return err
 	}
 	deployCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Apply(deployCtx, cluster, workloads...); err != nil {
+	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workloads...); err != nil {
 		return err
 	}
 	return nil
@@ -263,7 +264,7 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 		return err
 	}
 	deleteCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Delete(deleteCtx, cluster, obj); err != nil {
+	if err := h.handlers.Delete(deleteCtx, cluster, WorkflowResourceCreator, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
 	return nil
