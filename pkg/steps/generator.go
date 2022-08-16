@@ -58,7 +58,7 @@ func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options type
 				opt.StepConvertor = convertor
 			}
 		}
-		task, err := generateTaskRunner(ctx, wr, step, taskDiscover, opt)
+		task, err := generateTaskRunner(ctx, wr, step, taskDiscover, opt, options)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +102,8 @@ func generateTaskRunner(ctx context.Context,
 	wr *v1alpha1.WorkflowRun,
 	step v1alpha1.WorkflowStep,
 	taskDiscover types.TaskDiscover,
-	options *types.TaskGeneratorOptions) (types.TaskRunner, error) {
+	options *types.TaskGeneratorOptions,
+	stepOptions types.StepGeneratorOptions) (types.TaskRunner, error) {
 	if step.Type == types.WorkflowStepTypeStepGroup {
 		var subTaskRunners []types.TaskRunner
 		for _, subStep := range step.SubSteps {
@@ -114,7 +115,12 @@ func generateTaskRunner(ctx context.Context,
 				PackageDiscover: options.PackageDiscover,
 				ProcessContext:  options.ProcessContext,
 			}
-			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, o)
+			for typ, convertor := range stepOptions.StepConvertor {
+				if subStep.Type == typ {
+					o.StepConvertor = convertor
+				}
+			}
+			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, o, stepOptions)
 			if err != nil {
 				return nil, err
 			}
