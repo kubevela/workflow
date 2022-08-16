@@ -48,12 +48,17 @@ func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options type
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
 	var tasks []types.TaskRunner
 	for _, step := range wr.Spec.WorkflowSpec.Steps {
-		options := &types.TaskGeneratorOptions{
+		opt := &types.TaskGeneratorOptions{
 			ID:              generateStepID(wr.Status, step.Name),
 			PackageDiscover: options.PackageDiscover,
 			ProcessContext:  options.ProcessCtx,
 		}
-		task, err := generateTaskRunner(ctx, wr, step, taskDiscover, options)
+		for typ, convertor := range options.StepConvertor {
+			if step.Type == typ {
+				opt.StepConvertor = convertor
+			}
+		}
+		task, err := generateTaskRunner(ctx, wr, step, taskDiscover, opt)
 		if err != nil {
 			return nil, err
 		}
