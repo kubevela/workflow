@@ -176,6 +176,13 @@ const (
 	WorkflowStepTypeStepGroup = "step-group"
 )
 
+const (
+	// LabelWorkflowRunName is the label key for workflow run name
+	LabelWorkflowRunName = "workflowrun.oam.dev/name"
+	// LabelWorkflowRunNamespace is the label key for workflow run namespace
+	LabelWorkflowRunNamespace = "workflowrun.oam.dev/namespace"
+)
+
 var (
 	// MaxWorkflowStepErrorRetryTimes is the max retry times of the failed workflow step.
 	MaxWorkflowStepErrorRetryTimes = 10
