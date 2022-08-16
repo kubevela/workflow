@@ -19,8 +19,6 @@ package steps
 import (
 	"context"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -86,15 +84,9 @@ func installBuiltinProviders(ctx monitorContext.Context, wr *v1alpha1.WorkflowRu
 	email.Install(providerHandlers)
 	util.Install(providerHandlers)
 	http.Install(providerHandlers, client, wr.Namespace)
-	kube.Install(providerHandlers, client, nil, []metav1.OwnerReference{
-		{
-			APIVersion:         v1alpha1.SchemeGroupVersion.String(),
-			Kind:               v1alpha1.WorkflowRunKind,
-			Name:               wr.Name,
-			UID:                wr.UID,
-			Controller:         pointer.BoolPtr(true),
-			BlockOwnerDeletion: pointer.BoolPtr(true),
-		},
+	kube.Install(providerHandlers, client, nil, map[string]string{
+		types.LabelWorkflowRunName:      wr.Name,
+		types.LabelWorkflowRunNamespace: wr.Namespace,
 	}, nil)
 }
 
