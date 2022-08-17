@@ -533,6 +533,7 @@ var _ = Describe("Test Workflow", func() {
 		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
 			tryReconcile(reconciler, wr.Name, wr.Namespace)
 			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
 			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
 			Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		}
@@ -552,11 +553,12 @@ var _ = Describe("Test Workflow", func() {
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 	})
 
-	It("test failed after retries in dag mode with running sped and suspend on failure", func() {
+	It("test failed after retries in dag mode with running step and suspend on failure", func() {
 		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
@@ -589,6 +591,7 @@ var _ = Describe("Test Workflow", func() {
 		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
 			tryReconcile(reconciler, wr.Name, wr.Namespace)
 			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
 			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
 			Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		}
@@ -596,6 +599,7 @@ var _ = Describe("Test Workflow", func() {
 		By("workflowrun should not be suspended after failed max reconciles because of running step")
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
@@ -1373,6 +1377,19 @@ var _ = Describe("Test Workflow", func() {
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "step2",
+					Type: "step-group",
+				},
+				SubSteps: []v1alpha1.WorkflowStepBase{
+					{
+						Name:       "step2-sub",
+						Type:       "test-apply",
+						Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					},
+				},
+			},
 		}
 		wr.Annotations = map[string]string{
 			wfTypes.AnnotationWorkflowRunDebug: "true",
@@ -1393,6 +1410,14 @@ var _ = Describe("Test Workflow", func() {
 		}
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
+		subKey := types.NamespacedName{Namespace: wr.Namespace, Name: "step2-sub"}
+		Expect(k8sClient.Get(ctx, subKey, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
 		By("Check WorkflowRun running successfully")
 		curRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, curRun)).Should(BeNil())
@@ -1402,6 +1427,10 @@ var _ = Describe("Test Workflow", func() {
 		debugCM := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{
 			Name:      debug.GenerateContextName(wr.Name, "step1"),
+			Namespace: wr.Namespace,
+		}, debugCM)).Should(BeNil())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      debug.GenerateContextName(wr.Name, "step2-sub"),
 			Namespace: wr.Namespace,
 		}, debugCM)).Should(BeNil())
 	})

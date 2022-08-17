@@ -238,8 +238,6 @@ const (
 	MessageTerminated = "The workflow terminates because of the failed steps"
 	// MessageSuspendFailedAfterRetries is the message of failed after retries
 	MessageSuspendFailedAfterRetries = "The workflow suspends automatically because the failed times of steps have reached the limit"
-	// MessageInitializingWorkflow is the message of initializing workflow
-	MessageInitializingWorkflow = "Initializing workflow"
 )
 
 const (

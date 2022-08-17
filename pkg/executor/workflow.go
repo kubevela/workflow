@@ -531,6 +531,7 @@ func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus
 	case wfStatus.Terminated && !feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
 		e.status.Message = types.MessageTerminated
 	default:
+		e.status.Message = ""
 	}
 }
 
