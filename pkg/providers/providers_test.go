@@ -14,16 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cue
+package providers
 
-// BaseTemplate include base info provided by KubeVela for CUE template
-const BaseTemplate = `
+import (
+	"testing"
 
-context: {
-  name: string
-  config?: [...{
-    name: string
-    value: string
-  }]
+	"github.com/stretchr/testify/require"
+
+	"github.com/kubevela/workflow/pkg/types"
+)
+
+func TestProvers(t *testing.T) {
+	p := NewProviders()
+	r := require.New(t)
+	p.Register("test", map[string]types.Handler{
+		"foo":   nil,
+		"crazy": nil,
+	})
+
+	_, found := p.GetHandler("test", "foo")
+	r.Equal(found, true)
+	_, found = p.GetHandler("test", "crazy")
+	r.Equal(found, true)
+	_, found = p.GetHandler("staging", "crazy")
+	r.Equal(found, false)
+	_, found = p.GetHandler("test", "fly")
+	r.Equal(found, false)
 }
-`
