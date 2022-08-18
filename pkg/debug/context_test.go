@@ -41,12 +41,25 @@ func TestSetContext(t *testing.T) {
 			"debug": "test",
 		},
 	})
+	// test update
 	debugCtx := NewContext(cli, &v1alpha1.WorkflowRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 		},
 	}, "step1")
 	v, err := value.NewValue(`
+test: test
+`, nil, "")
+	r.NoError(err)
+	err = debugCtx.Set(v)
+	r.NoError(err)
+	// test create
+	debugCtx = NewContext(cli, &v1alpha1.WorkflowRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+	}, "step2")
+	v, err = value.NewValue(`
 test: test
 `, nil, "")
 	r.NoError(err)
@@ -79,6 +92,9 @@ func newCliForTest(wfCm *corev1.ConfigMap) *test.MockClient {
 				}
 				*wfCm = *o
 			}
+			return nil
+		},
+		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
 		},
 	}
