@@ -38,6 +38,7 @@ import (
 )
 
 func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
+	ctx.V(options.LogLevel)
 	subCtx := ctx.Fork("generate-task-runners", monitorContext.DurationMetric(func(v float64) {
 		metrics.GenerateTaskRunnersDurationHistogram.WithLabelValues("workflowrun").Observe(v)
 	}))
