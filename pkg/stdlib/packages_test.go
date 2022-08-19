@@ -28,16 +28,14 @@ import (
 
 func TestGetPackages(t *testing.T) {
 	r := require.New(t)
-	pkgs, err := GetPackages()
+	pkg, err := GetPackages()
 	r.NoError(err)
 	cuectx := cuecontext.New()
-	for path, content := range pkgs {
-		file, err := parser.ParseFile(path, content)
-		r.NoError(err)
-		_ = cuectx.BuildFile(file)
-	}
+	file, err := parser.ParseFile(builtinPackageName, pkg)
+	r.NoError(err)
+	_ = cuectx.BuildFile(file)
 
-	file, err := parser.ParseFile("-", `
+	file, err = parser.ParseFile("-", `
 import "vela/custom"
 out: custom.context`)
 	r.NoError(err)
