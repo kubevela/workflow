@@ -95,7 +95,7 @@ func InitializeWorkflowRun(wr *v1alpha1.WorkflowRun) {
 }
 
 // ExecuteRunners execute workflow task runners in order.
-func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
+func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (v1alpha1.WorkflowRunPhase, error) {
 	InitializeWorkflowRun(w.wr)
 	status := &w.wr.Status
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
@@ -106,26 +106,26 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		StepStatusCache.Delete(cacheKey)
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
-		return types.WorkflowStateTerminated, nil
+		return v1alpha1.WorkflowRunTerminated, nil
 	}
 	if checkWorkflowSuspended(status) {
-		return types.WorkflowStateSuspended, nil
+		return v1alpha1.WorkflowRunSuspending, nil
 	}
 	if allTasksSucceeded {
-		return types.WorkflowStateSucceeded, nil
+		return v1alpha1.WorkflowRunSucceeded, nil
 	}
 
 	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
 		// handle cache resource
 		if len(status.Steps) < cacheValue.(int) {
-			return types.WorkflowStateSkipping, nil
+			return v1alpha1.WorkflowRunSkipped, nil
 		}
 	}
 
 	wfCtx, err := w.makeContext(w.wr.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
-		return types.WorkflowStateExecuting, err
+		return v1alpha1.WorkflowRunExecuting, err
 	}
 	w.wfCtx = wfCtx
 
@@ -135,7 +135,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if err != nil {
 		ctx.Error(err, "run steps")
 		StepStatusCache.Store(cacheKey, len(status.Steps))
-		return types.WorkflowStateExecuting, err
+		return v1alpha1.WorkflowRunExecuting, err
 	}
 
 	e.checkWorkflowStatusMessage(status)
@@ -145,17 +145,17 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		e.cleanBackoffTimesForTerminated()
 		if checkWorkflowTerminated(status, allTasksDone) {
 			wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-			return types.WorkflowStateTerminated, nil
+			return v1alpha1.WorkflowRunTerminated, nil
 		}
 	}
 	if status.Suspend {
 		wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-		return types.WorkflowStateSuspended, nil
+		return v1alpha1.WorkflowRunSuspending, nil
 	}
 	if allTasksSucceeded {
-		return types.WorkflowStateSucceeded, nil
+		return v1alpha1.WorkflowRunSucceeded, nil
 	}
-	return types.WorkflowStateExecuting, nil
+	return v1alpha1.WorkflowRunExecuting, nil
 }
 
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {
