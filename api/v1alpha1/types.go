@@ -103,6 +103,8 @@ const (
 	WorkflowRunTerminated WorkflowRunPhase = "terminated"
 	// WorkflowRunSucceeded means the workflow run is succeeded
 	WorkflowRunSucceeded WorkflowRunPhase = "succeeded"
+	// WorkflowRunSkipped means the workflow run is skipped
+	WorkflowRunSkipped WorkflowRunPhase = "skipped"
 )
 
 // +kubebuilder:object:root=true

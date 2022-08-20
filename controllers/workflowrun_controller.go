@@ -125,7 +125,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		logCtx.Error(err, "[generate runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))
-		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err), v1alpha1.WorkflowRunInitializing)
+		run.Status.Phase = v1alpha1.WorkflowRunInitializing
+		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 
 	executor := executor.New(run, r.Client)
@@ -133,31 +134,33 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		logCtx.Error(err, "[execute runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonExecute, errors.WithMessage(err, v1alpha1.MessageFailedExecute)))
-		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err), v1alpha1.WorkflowRunExecuting)
+		run.Status.Phase = v1alpha1.WorkflowRunExecuting
+		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 	isUpdate = isUpdate && run.Status.Message == ""
+	run.Status.Phase = state
 	switch state {
-	case types.WorkflowStateSuspended:
+	case v1alpha1.WorkflowRunSuspending:
 		logCtx.Info("Workflow return state=Suspend")
 		if duration := executor.GetSuspendBackoffWaitTime(); duration > 0 {
-			return ctrl.Result{RequeueAfter: duration}, r.patchStatus(logCtx, run, v1alpha1.WorkflowRunSuspending, isUpdate)
+			return ctrl.Result{RequeueAfter: duration}, r.patchStatus(logCtx, run, isUpdate)
 		}
-		return ctrl.Result{}, r.patchStatus(logCtx, run, v1alpha1.WorkflowRunSuspending, isUpdate)
-	case types.WorkflowStateTerminated:
+		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
+	case v1alpha1.WorkflowRunTerminated:
 		logCtx.Info("Workflow return state=Terminated")
 		r.doWorkflowFinish(run)
 		r.Recorder.Event(run, event.Normal(v1alpha1.ReasonExecute, v1alpha1.MessageTerminated))
-		return ctrl.Result{}, r.patchStatus(logCtx, run, v1alpha1.WorkflowRunTerminated, isUpdate)
-	case types.WorkflowStateExecuting:
+		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
+	case v1alpha1.WorkflowRunExecuting:
 		logCtx.Info("Workflow return state=Executing")
-		return ctrl.Result{RequeueAfter: executor.GetBackoffWaitTime()}, r.patchStatus(logCtx, run, v1alpha1.WorkflowRunExecuting, isUpdate)
-	case types.WorkflowStateSucceeded:
+		return ctrl.Result{RequeueAfter: executor.GetBackoffWaitTime()}, r.patchStatus(logCtx, run, isUpdate)
+	case v1alpha1.WorkflowRunSucceeded:
 		logCtx.Info("Workflow return state=Succeeded")
 		r.doWorkflowFinish(run)
 		run.Status.SetConditions(condition.ReadyCondition(v1alpha1.WorkflowRunConditionType))
 		r.Recorder.Event(run, event.Normal(v1alpha1.ReasonExecute, v1alpha1.MessageSuccessfully))
-		return ctrl.Result{}, r.patchStatus(logCtx, run, v1alpha1.WorkflowRunSucceeded, isUpdate)
-	case types.WorkflowStateSkipping:
+		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
+	case v1alpha1.WorkflowRunSkipped:
 		logCtx.Info("Skip this reconcile")
 		return ctrl.Result{}, nil
 	}
@@ -211,16 +214,15 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr *v1alpha1.WorkflowRun, condition condition.Condition, phase v1alpha1.WorkflowRunPhase) (ctrl.Result, error) {
+func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr *v1alpha1.WorkflowRun, condition condition.Condition) (ctrl.Result, error) {
 	wr.SetConditions(condition)
-	if err := r.patchStatus(ctx, wr, phase, false); err != nil {
+	if err := r.patchStatus(ctx, wr, false); err != nil {
 		return ctrl.Result{}, errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return ctrl.Result{}, fmt.Errorf("reconcile WorkflowRun error, msg: %s", condition.Message)
 }
 
-func (r *WorkflowRunReconciler) patchStatus(ctx context.Context, wr *v1alpha1.WorkflowRun, phase v1alpha1.WorkflowRunPhase, isUpdate bool) error {
-	wr.Status.Phase = phase
+func (r *WorkflowRunReconciler) patchStatus(ctx context.Context, wr *v1alpha1.WorkflowRun, isUpdate bool) error {
 	if isUpdate {
 		if err := r.Status().Update(ctx, wr); err != nil {
 			executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)

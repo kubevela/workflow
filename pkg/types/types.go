@@ -194,22 +194,6 @@ var (
 	MaxWorkflowFailedBackoffTime = 300
 )
 
-// WorkflowState is a string that mark the workflow state
-type WorkflowState string
-
-const (
-	// WorkflowStateTerminated means workflow is terminated manually, and it won't be started unless the spec changed.
-	WorkflowStateTerminated WorkflowState = "Terminated"
-	// WorkflowStateSuspended means workflow is suspended manually, and it can be resumed.
-	WorkflowStateSuspended WorkflowState = "Suspended"
-	// WorkflowStateSucceeded means workflow is running successfully, all steps finished.
-	WorkflowStateSucceeded WorkflowState = "Succeeded"
-	// WorkflowStateExecuting means workflow is still running or waiting some steps.
-	WorkflowStateExecuting WorkflowState = "Executing"
-	// WorkflowStateSkipping means it will skip this reconcile and let next reconcile to handle it.
-	WorkflowStateSkipping WorkflowState = "Skipping"
-)
-
 const (
 	// StatusReasonWait is the reason of the workflow progress condition which is Wait.
 	StatusReasonWait = "Wait"
