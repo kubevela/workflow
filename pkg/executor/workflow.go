@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -327,7 +328,19 @@ func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
 		return wfCtx, nil
 	}
 
-	wfCtx, err := wfContext.NewContext(w.cli, w.wr.Namespace, name, w.wr.GetUID())
+	owner := []metav1.OwnerReference{
+		{
+			APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			Kind:       v1alpha1.WorkflowRunKind,
+			Name:       w.wr.Name,
+			UID:        w.wr.GetUID(),
+			Controller: pointer.BoolPtr(true),
+		},
+	}
+	if w.wr.OwnerReferences != nil {
+		owner = w.wr.OwnerReferences
+	}
+	wfCtx, err := wfContext.NewContext(w.cli, w.wr.Namespace, name, owner)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new context")
 	}

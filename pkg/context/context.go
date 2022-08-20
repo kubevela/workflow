@@ -29,11 +29,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
@@ -329,8 +326,8 @@ func (comp *ComponentManifest) unmarshal(v string) error {
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, ns, app string, appUID types.UID) (Context, error) {
-	wfCtx, err := newContext(cli, ns, app, appUID)
+func NewContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (Context, error) {
+	wfCtx, err := newContext(cli, ns, app, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -343,22 +340,14 @@ func CleanupMemoryStore(app, ns string) {
 	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", app, ns))
 }
 
-func newContext(cli client.Client, ns, app string, appUID types.UID) (*WorkflowContext, error) {
+func newContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
 	var (
 		ctx   = context.Background()
 		store corev1.ConfigMap
 	)
 	store.Name = generateStoreName(app)
 	store.Namespace = ns
-	store.SetOwnerReferences([]metav1.OwnerReference{
-		{
-			APIVersion: v1alpha1.SchemeGroupVersion.String(),
-			Kind:       v1alpha1.WorkflowRunKind,
-			Name:       app,
-			UID:        appUID,
-			Controller: pointer.BoolPtr(true),
-		},
-	})
+	store.SetOwnerReferences(owner)
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
 	} else if err := cli.Get(ctx, client.ObjectKey{Name: store.Name, Namespace: store.Namespace}, &store); err != nil {
