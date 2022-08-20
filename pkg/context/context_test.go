@@ -225,7 +225,7 @@ func TestContext(t *testing.T) {
 	cli := newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(cli, "default", "app-v1", "testuid")
+	wfCtx, err := NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
@@ -239,7 +239,7 @@ func TestContext(t *testing.T) {
 	_, err = LoadContext(cli, "default", "app-v1")
 	r.Equal(err.Error(), `configMap "workflow-app-v1-context" not found`)
 
-	wfCtx, err = NewContext(cli, "default", "app-v1", "testuid")
+	wfCtx, err = NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
 	r.Equal(len(wfCtx.GetComponents()), 0)
 	_, err = wfCtx.GetComponent("server")
@@ -250,7 +250,7 @@ func TestGetStore(t *testing.T) {
 	cli := newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(cli, "default", "app-v1", "testuid")
+	wfCtx, err := NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
@@ -263,7 +263,7 @@ func TestMutableValue(t *testing.T) {
 	cli := newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(cli, "default", "app-v1", "testuid")
+	wfCtx, err := NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
@@ -281,7 +281,7 @@ func TestMemoryValue(t *testing.T) {
 	cli := newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(cli, "default", "app-v1", "testuid")
+	wfCtx, err := NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
