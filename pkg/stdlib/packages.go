@@ -83,7 +83,7 @@ func GetPackages() (string, error) {
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	inst.Imports = append(inst.Imports, builtinImport)
 	for _, a := range GeneralImports {
-		if a.PkgName == builtinPackageName {
+		if a.PkgName == filepath.Base(builtinPackageName) {
 			inst.Imports[len(inst.Imports)-1] = a
 			continue
 		}
