@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -477,6 +478,13 @@ func (exec *executor) doSteps(ctx monitorContext.Context, wfCtx wfContext.Contex
 		return nil
 	}
 	return v.StepByFields(func(fieldName string, in *value.Value) (bool, error) {
+		if in.CueValue().IncompleteKind() == cue.BottomKind {
+			errInfo, err := sets.ToString(in.CueValue())
+			if err != nil {
+				errInfo = "value is _|_"
+			}
+			return true, errors.New(errInfo + "(bottom kind)")
+		}
 		if retErr := in.CueValue().Err(); retErr != nil {
 			errInfo, err := sets.ToString(in.CueValue())
 			if err == nil {
