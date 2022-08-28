@@ -81,13 +81,16 @@ func GetPackages() (string, error) {
 
 // AddImportsFor install imports for build.Instance.
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
-	inst.Imports = append(inst.Imports, builtinImport)
-	for _, a := range GeneralImports {
+	inst.Imports = append(inst.Imports, GeneralImports...)
+	addDefault := true
+	for _, a := range inst.Imports {
 		if a.PkgName == filepath.Base(builtinPackageName) {
-			inst.Imports[len(inst.Imports)-1] = a
-			continue
+			addDefault = false
+			break
 		}
-		inst.Imports = append(inst.Imports, a)
+	}
+	if addDefault {
+		inst.Imports = append(inst.Imports, builtinImport)
 	}
 	if tagTempl != "" {
 		p := &build.Instance{
