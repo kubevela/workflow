@@ -93,7 +93,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -142,7 +142,7 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(wr, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -205,7 +205,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -271,11 +271,11 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -357,11 +357,11 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -450,11 +450,11 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -542,11 +542,11 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(wr, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus = wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -632,7 +632,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -716,7 +716,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -796,7 +796,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -859,7 +859,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -913,7 +913,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -966,7 +966,7 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(wr, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		workflowStatus = wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1038,7 +1038,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1135,7 +1135,7 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(wr, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		workflowStatus = wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1234,7 +1234,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		workflowStatus := wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1321,7 +1321,7 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(wr, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		workflowStatus = wr.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + wr.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1407,7 +1407,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1500,7 +1500,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1753,7 +1753,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		wfStatus := wr.Status
 		wfStatus.ContextBackend = nil
 		cleanStepTimeStamp(&wfStatus)
@@ -1778,7 +1778,7 @@ var _ = Describe("Test Workflow", func() {
 		// check suspend...
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		// check resume
 		wr.Status.Suspend = false
@@ -1787,7 +1787,7 @@ var _ = Describe("Test Workflow", func() {
 		wr.Labels = map[string]string{"for-test": "changed"}
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1815,7 +1815,7 @@ var _ = Describe("Test Workflow", func() {
 
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test for suspend with sub steps", func() {
@@ -1854,7 +1854,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1906,7 +1906,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1930,7 +1930,7 @@ var _ = Describe("Test Workflow", func() {
 
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 	})
 
 	It("test for terminate with sub steps", func() {
@@ -1964,7 +1964,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -1999,7 +1999,7 @@ var _ = Describe("Test Workflow", func() {
 
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 	})
 
 	It("test for error", func() {
@@ -2021,7 +2021,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).To(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -2042,7 +2042,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test for DAG", func() {
@@ -2074,7 +2074,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -2106,12 +2106,12 @@ var _ = Describe("Test Workflow", func() {
 
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 
 		pending = false
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		wr.Status.ContextBackend = nil
 		cleanStepTimeStamp(&wr.Status)
 		Expect(cmp.Diff(wr.Status, v1alpha1.WorkflowRunStatus{
@@ -2161,7 +2161,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(wr, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(wr.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
 		wfCtx, err := wfContext.LoadContext(k8sClient, wr.Namespace, wr.Name)
 		Expect(err).ToNot(HaveOccurred())
