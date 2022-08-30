@@ -106,26 +106,26 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		StepStatusCache.Delete(cacheKey)
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
-		return v1alpha1.WorkflowRunTerminated, nil
+		return v1alpha1.WorkflowStateTerminated, nil
 	}
 	if checkWorkflowSuspended(status) {
-		return v1alpha1.WorkflowRunSuspending, nil
+		return v1alpha1.WorkflowStateSuspending, nil
 	}
 	if allTasksSucceeded {
-		return v1alpha1.WorkflowRunSucceeded, nil
+		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 
 	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
 		// handle cache resource
 		if len(status.Steps) < cacheValue.(int) {
-			return v1alpha1.WorkflowRunSkipped, nil
+			return v1alpha1.WorkflowStateSkipped, nil
 		}
 	}
 
 	wfCtx, err := w.makeContext(w.wr.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
-		return v1alpha1.WorkflowRunExecuting, err
+		return v1alpha1.WorkflowStateExecuting, err
 	}
 	w.wfCtx = wfCtx
 
@@ -135,7 +135,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if err != nil {
 		ctx.Error(err, "run steps")
 		StepStatusCache.Store(cacheKey, len(status.Steps))
-		return v1alpha1.WorkflowRunExecuting, err
+		return v1alpha1.WorkflowStateExecuting, err
 	}
 
 	e.checkWorkflowStatusMessage(status)
@@ -145,17 +145,17 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		e.cleanBackoffTimesForTerminated()
 		if checkWorkflowTerminated(status, allTasksDone) {
 			wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-			return v1alpha1.WorkflowRunTerminated, nil
+			return v1alpha1.WorkflowStateTerminated, nil
 		}
 	}
 	if status.Suspend {
 		wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-		return v1alpha1.WorkflowRunSuspending, nil
+		return v1alpha1.WorkflowStateSuspending, nil
 	}
 	if allTasksSucceeded {
-		return v1alpha1.WorkflowRunSucceeded, nil
+		return v1alpha1.WorkflowStateSucceeded, nil
 	}
-	return v1alpha1.WorkflowRunExecuting, nil
+	return v1alpha1.WorkflowStateExecuting, nil
 }
 
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {

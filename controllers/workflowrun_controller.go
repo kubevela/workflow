@@ -125,7 +125,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		logCtx.Error(err, "[generate runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))
-		run.Status.Phase = v1alpha1.WorkflowRunInitializing
+		run.Status.Phase = v1alpha1.WorkflowStateInitializing
 		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 
@@ -134,33 +134,33 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		logCtx.Error(err, "[execute runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonExecute, errors.WithMessage(err, v1alpha1.MessageFailedExecute)))
-		run.Status.Phase = v1alpha1.WorkflowRunExecuting
+		run.Status.Phase = v1alpha1.WorkflowStateExecuting
 		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 	isUpdate = isUpdate && run.Status.Message == ""
 	run.Status.Phase = state
 	switch state {
-	case v1alpha1.WorkflowRunSuspending:
+	case v1alpha1.WorkflowStateSuspending:
 		logCtx.Info("Workflow return state=Suspend")
 		if duration := executor.GetSuspendBackoffWaitTime(); duration > 0 {
 			return ctrl.Result{RequeueAfter: duration}, r.patchStatus(logCtx, run, isUpdate)
 		}
 		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
-	case v1alpha1.WorkflowRunTerminated:
+	case v1alpha1.WorkflowStateTerminated:
 		logCtx.Info("Workflow return state=Terminated")
 		r.doWorkflowFinish(run)
 		r.Recorder.Event(run, event.Normal(v1alpha1.ReasonExecute, v1alpha1.MessageTerminated))
 		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
-	case v1alpha1.WorkflowRunExecuting:
+	case v1alpha1.WorkflowStateExecuting:
 		logCtx.Info("Workflow return state=Executing")
 		return ctrl.Result{RequeueAfter: executor.GetBackoffWaitTime()}, r.patchStatus(logCtx, run, isUpdate)
-	case v1alpha1.WorkflowRunSucceeded:
+	case v1alpha1.WorkflowStateSucceeded:
 		logCtx.Info("Workflow return state=Succeeded")
 		r.doWorkflowFinish(run)
 		run.Status.SetConditions(condition.ReadyCondition(v1alpha1.WorkflowRunConditionType))
 		r.Recorder.Event(run, event.Normal(v1alpha1.ReasonExecute, v1alpha1.MessageSuccessfully))
 		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
-	case v1alpha1.WorkflowRunSkipped:
+	case v1alpha1.WorkflowStateSkipped:
 		logCtx.Info("Skip this reconcile")
 		return ctrl.Result{}, nil
 	}
