@@ -1,0 +1,75 @@
+name: Run commands when issues are labeled or comments added
+on:
+  issues:
+    types: [labeled, opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  bot:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Actions
+        uses: actions/checkout@v2
+        with:
+          repository: "oam-dev/kubevela-github-actions"
+          path: ./actions
+          ref: v0.4.2
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '14'
+          cache: 'npm'
+          cache-dependency-path: ./actions/package-lock.json
+      - name: Install Dependencies
+        run: npm ci --production --prefix ./actions
+      - name: Run Commands
+        uses: ./actions/commands
+        with:
+          token: ${{secrets.VELA_BOT_TOKEN}}
+          configPath: issue-commands
+
+  backport:
+    runs-on: ubuntu-22.04
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/backport')
+    steps:
+      - name: Extract Command
+        id: command
+        uses: xt0rted/slash-command-action@v1
+        with:
+          repo-token: ${{ secrets.VELA_BOT_TOKEN }}
+          command: backport
+          reaction: "true"
+          reaction-type: "eyes"
+          allow-edits: "false"
+          permission-level: read
+      - name: Handle Command
+        uses: actions/github-script@v4
+        env:
+          VERSION: ${{ steps.command.outputs.command-arguments }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = process.env.VERSION
+            let label = "backport release-" + version
+            if (version.includes("release")) {
+              label = "backport " + version
+            }
+            // Add our backport label.
+            github.issues.addLabels({
+              // Every pull request is an issue, but not every issue is a pull request.
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: [label]
+            })
+            console.log("Added '" + label + "' label.")
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Open Backport PR
+        uses: zeebe-io/backport-action@v0.0.8
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_workspace: ${{ github.workspace }}
