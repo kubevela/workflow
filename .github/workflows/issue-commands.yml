@@ -26,7 +26,7 @@ jobs:
       - name: Run Commands
         uses: ./actions/commands
         with:
-          token: ${{secrets.VELA_BOT_TOKEN}}
+          token: ${{secrets.GITHUB_TOKEN}}
           configPath: issue-commands
 
   backport:
@@ -37,7 +37,7 @@ jobs:
         id: command
         uses: xt0rted/slash-command-action@v1
         with:
-          repo-token: ${{ secrets.VELA_BOT_TOKEN }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           command: backport
           reaction: "true"
           reaction-type: "eyes"
