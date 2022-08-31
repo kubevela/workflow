@@ -23,14 +23,15 @@ import (
 )
 
 const (
-	// Compatibility Features
-
 	// EnableSuspendOnFailure enable suspend on workflow failure
 	EnableSuspendOnFailure featuregate.Feature = "EnableSuspendOnFailure"
+	// EnablePersistWorkflowRecord enable persist workflow record
+	EnablePersistWorkflowRecord featuregate.Feature = "EnablePersistWorkflowRecord"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	EnableSuspendOnFailure: {Default: false, PreRelease: featuregate.Alpha},
+	EnableSuspendOnFailure:      {Default: false, PreRelease: featuregate.Alpha},
+	EnablePersistWorkflowRecord: {Default: true, PreRelease: featuregate.Alpha},
 }
 
 func init() {
