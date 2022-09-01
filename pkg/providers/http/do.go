@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -41,6 +43,19 @@ const (
 	// ProviderName is provider name for install.
 	ProviderName = "http"
 )
+
+var (
+	defaultClient *http.Client
+	rateLimiter   *ratelimiter.RateLimiter
+)
+
+func init() {
+	rateLimiter = ratelimiter.NewRateLimiter(128)
+	defaultClient = &http.Client{
+		Transport: http.DefaultTransport,
+		Timeout:   time.Second * 3,
+	}
+}
 
 type provider struct {
 	cli client.Client
@@ -62,23 +77,37 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 		method, u       string
 		header, trailer http.Header
 		r               io.Reader
-		client          = &http.Client{
-			Transport: http.DefaultTransport,
-			Timeout:   time.Second * 3,
-		}
 	)
+	initDefaultClient(defaultClient)
 	if timeout, err := v.GetString("request", "timeout"); err == nil && timeout != "" {
 		duration, err := time.ParseDuration(timeout)
 		if err != nil {
 			return nil, err
 		}
-		client.Timeout = duration
+		defaultClient.Timeout = duration
 	}
 	if method, err = v.GetString("method"); err != nil {
 		return nil, err
 	}
 	if u, err = v.GetString("url"); err != nil {
 		return nil, err
+	}
+	if rl, err := v.LookupValue("request", "ratelimiter"); err == nil {
+		limit, err := rl.GetInt64("limit")
+		if err != nil {
+			return nil, err
+		}
+		period, err := rl.GetString("period")
+		if err != nil {
+			return nil, err
+		}
+		duration, err := time.ParseDuration(period)
+		if err != nil {
+			return nil, err
+		}
+		if !rateLimiter.Allow(fmt.Sprintf("%s-%s", method, strings.Split(u, "?")[0]), int(limit), duration) {
+			return nil, errors.New("request exceeds the rate limiter")
+		}
 	}
 	if body, err := v.LookupValue("request", "body"); err == nil {
 		r, err = body.CueValue().Reader()
@@ -105,10 +134,10 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	req.Trailer = trailer
 
 	if tr, err := h.getTransport(ctx, v); err == nil && tr != nil {
-		client.Transport = tr
+		defaultClient.Transport = tr
 	}
 
-	resp, err := client.Do(req)
+	resp, err := defaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +208,11 @@ func (h *provider) getTransport(ctx monitorContext.Context, v *value.Value) (htt
 	}
 	tr.TLSClientConfig.Certificates = []tls.Certificate{cliCrt}
 	return tr, nil
+}
+
+func initDefaultClient(c *http.Client) {
+	c.Transport = http.DefaultTransport
+	c.Timeout = time.Second * 3
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
