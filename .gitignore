@@ -32,3 +32,4 @@ vendor/
 
 # Vscode files
 .vscode
+.history
