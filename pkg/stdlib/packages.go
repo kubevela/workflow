@@ -50,6 +50,7 @@ const (
 	builtinPackageName = "vela/op"
 )
 
+// SetupGeneralImports setup general imports
 func SetupGeneralImports(general []*build.Instance) {
 	GeneralImports = general
 }

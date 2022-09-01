@@ -60,7 +60,7 @@ type delegatingReader struct {
 	scheme                 *runtime.Scheme
 }
 
-func (d *delegatingReader) shouldBypassCache(ctx context.Context, obj runtime.Object) (bool, error) {
+func (d *delegatingReader) shouldBypassCache(obj runtime.Object) (bool, error) {
 	gvk, err := apiutil.GVKForObject(obj, d.scheme)
 	if err != nil {
 		return false, err
@@ -80,7 +80,7 @@ func (d *delegatingReader) shouldBypassCache(ctx context.Context, obj runtime.Ob
 
 // Get retrieves an obj for a given object key from the Kubernetes Cluster.
 func (d *delegatingReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-	if isUncached, err := d.shouldBypassCache(ctx, obj); err != nil {
+	if isUncached, err := d.shouldBypassCache(obj); err != nil {
 		return err
 	} else if isUncached {
 		return d.ClientReader.Get(ctx, key, obj)
@@ -90,7 +90,7 @@ func (d *delegatingReader) Get(ctx context.Context, key client.ObjectKey, obj cl
 
 // List retrieves list of objects for a given namespace and list options.
 func (d *delegatingReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	if isUncached, err := d.shouldBypassCache(ctx, list); err != nil {
+	if isUncached, err := d.shouldBypassCache(list); err != nil {
 		return err
 	} else if isUncached {
 		return d.ClientReader.List(ctx, list, opts...)

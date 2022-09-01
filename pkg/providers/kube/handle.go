@@ -46,6 +46,7 @@ type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*u
 // Deleter is a client for delete resources.
 type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
 
+// Handlers handles resources.
 type Handlers struct {
 	Apply  Dispatcher
 	Delete Deleter
@@ -62,7 +63,8 @@ type contextKey string
 
 const (
 	// ClusterContextKey is the name of cluster using in client http context
-	ClusterContextKey              = contextKey("ClusterName")
+	ClusterContextKey = contextKey("ClusterName")
+	// WorkflowResourceCreator is the creator name of workflow resource
 	WorkflowResourceCreator string = "workflow"
 )
 

@@ -44,6 +44,7 @@ spec:
           metadata:
             type: object
           spec:
+            description: WorkflowRunSpec is the spec for the WorkflowRun
             properties:
               mode:
                 description: WorkflowExecuteMode defines the mode of workflow execution

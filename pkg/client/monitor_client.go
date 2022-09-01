@@ -30,7 +30,7 @@ import (
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 )
 
-func monitor(ctx context.Context, verb string, obj runtime.Object) func() {
+func monitor(verb string, obj runtime.Object) func() {
 	o := obj.GetObjectKind().GroupVersionKind()
 	_, isUnstructured := obj.(*unstructured.Unstructured)
 	_, isUnstructuredList := obj.(*unstructured.UnstructuredList)
@@ -59,13 +59,13 @@ type monitorCache struct {
 }
 
 func (c *monitorCache) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-	cb := monitor(ctx, "GetCache", obj)
+	cb := monitor("GetCache", obj)
 	defer cb()
 	return c.Cache.Get(ctx, key, obj)
 }
 
 func (c *monitorCache) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	cb := monitor(ctx, "ListCache", list)
+	cb := monitor("ListCache", list)
 	defer cb()
 	return c.Cache.List(ctx, list, opts...)
 }
@@ -75,43 +75,43 @@ type monitorClient struct {
 }
 
 func (c *monitorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-	cb := monitor(ctx, "Get", obj)
+	cb := monitor("Get", obj)
 	defer cb()
 	return c.Client.Get(ctx, key, obj)
 }
 
 func (c *monitorClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	cb := monitor(ctx, "List", list)
+	cb := monitor("List", list)
 	defer cb()
 	return c.Client.List(ctx, list, opts...)
 }
 
 func (c *monitorClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	cb := monitor(ctx, "Create", obj)
+	cb := monitor("Create", obj)
 	defer cb()
 	return c.Client.Create(ctx, obj, opts...)
 }
 
 func (c *monitorClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	cb := monitor(ctx, "Delete", obj)
+	cb := monitor("Delete", obj)
 	defer cb()
 	return c.Client.Delete(ctx, obj, opts...)
 }
 
 func (c *monitorClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	cb := monitor(ctx, "Update", obj)
+	cb := monitor("Update", obj)
 	defer cb()
 	return c.Client.Update(ctx, obj, opts...)
 }
 
 func (c *monitorClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	cb := monitor(ctx, "Patch", obj)
+	cb := monitor("Patch", obj)
 	defer cb()
 	return c.Client.Patch(ctx, obj, patch, opts...)
 }
 
 func (c *monitorClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
-	cb := monitor(ctx, "DeleteAllOf", obj)
+	cb := monitor("DeleteAllOf", obj)
 	defer cb()
 	return c.Client.DeleteAllOf(ctx, obj, opts...)
 }
@@ -125,13 +125,13 @@ type monitorStatusWriter struct {
 }
 
 func (w *monitorStatusWriter) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	cb := monitor(ctx, "StatusUpdate", obj)
+	cb := monitor("StatusUpdate", obj)
 	defer cb()
 	return w.StatusWriter.Update(ctx, obj, opts...)
 }
 
 func (w *monitorStatusWriter) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	cb := monitor(ctx, "StatusPatch", obj)
+	cb := monitor("StatusPatch", obj)
 	defer cb()
 	return w.StatusWriter.Patch(ctx, obj, patch, opts...)
 }

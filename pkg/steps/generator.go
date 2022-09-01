@@ -37,6 +37,7 @@ import (
 	"github.com/kubevela/workflow/pkg/utils"
 )
 
+// Generate generates task runners
 func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
 	ctx.V(options.LogLevel)
 	subCtx := ctx.Fork("generate-task-runners", monitorContext.DurationMetric(func(v float64) {
@@ -70,7 +71,7 @@ func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowR
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
 	}
-	installBuiltinProviders(ctx, wr, options.Client, options.Providers)
+	installBuiltinProviders(wr, options.Client, options.Providers)
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(wr))
 	}
@@ -80,7 +81,7 @@ func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowR
 	return options
 }
 
-func installBuiltinProviders(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, client client.Client, providerHandlers types.Providers) {
+func installBuiltinProviders(wr *v1alpha1.WorkflowRun, client client.Client, providerHandlers types.Providers) {
 	workspace.Install(providerHandlers)
 	email.Install(providerHandlers)
 	util.Install(providerHandlers)

@@ -51,6 +51,7 @@ type WorkflowRunList struct {
 	Items           []WorkflowRun `json:"items"`
 }
 
+// WorkflowRunSpec is the spec for the WorkflowRun
 type WorkflowRunSpec struct {
 	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`
 	WorkflowSpec *WorkflowSpec        `json:"workflowSpec,omitempty"`
@@ -208,6 +209,7 @@ func (wr *WorkflowRun) GetCondition(t condition.ConditionType) condition.Conditi
 	return wr.Status.GetCondition(t)
 }
 
+// WorkflowRunConditionType is a valid condition type for a WorkflowRun
 const WorkflowRunConditionType string = "WorkflowRun"
 
 // WorkflowStepPhase describes the phase of a workflow step.

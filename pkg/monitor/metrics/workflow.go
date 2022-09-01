@@ -26,7 +26,7 @@ var histogramBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25,
 	1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60}
 
 var (
-	//	WorkflowRunReconcileTimeHistogram report the reconciling time cost of workflow run controller with state transition recorded
+	// WorkflowRunReconcileTimeHistogram report the reconciling time cost of workflow run controller with state transition recorded
 	WorkflowRunReconcileTimeHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "workflowrun_reconcile_time_seconds",
 		Help:        "workflow run reconcile duration distributions.",
@@ -34,7 +34,7 @@ var (
 		ConstLabels: prometheus.Labels{},
 	}, []string{"begin_phase", "end_phase"})
 
-	// GenerateTaskRunnerDurationHistogram report the generate task runners execution duration.
+	// GenerateTaskRunnersDurationHistogram report the generate task runners execution duration.
 	GenerateTaskRunnersDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "generate_task_runners_time_seconds",
 		Help:        "generate task runners duration distributions.",
@@ -68,7 +68,7 @@ var (
 		Help: "workflow step phase number",
 	}, []string{"step_type", "phase"})
 
-	// WorkflowStepDurationHistogram report the step execution duration.
+	// WorkflowRunStepDurationHistogram report the step execution duration.
 	WorkflowRunStepDurationHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "workflowrun_step_duration_ms",
 		Help:        "workflow run step latency distributions.",

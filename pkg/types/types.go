@@ -121,6 +121,7 @@ type Providers interface {
 	Register(provider string, m map[string]Handler)
 }
 
+// StepGeneratorOptions is the options for generate step.
 type StepGeneratorOptions struct {
 	Providers       Providers
 	PackageDiscover *packages.PackageDiscover
