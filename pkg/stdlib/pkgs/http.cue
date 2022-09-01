@@ -9,8 +9,8 @@
 		body?:    string
 		header?: [string]:  string
 		trailer?: [string]: string
-		ratelimit?: {
-			limit:  number
+		ratelimiter?: {
+			limit:  int
 			period: string
 		}
 	}
