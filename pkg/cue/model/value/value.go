@@ -595,7 +595,8 @@ func (iter *stepsIterator) assemble() {
 		}
 	}
 
-	suffixItems := append(addFields, iter.queue[iter.index:]...)
+	suffixItems := addFields
+	suffixItems = append(suffixItems, iter.queue[iter.index:]...)
 	sort.Sort(sortFields(suffixItems))
 	iter.queue = append(iter.queue[:iter.index], suffixItems...)
 }

@@ -70,6 +70,7 @@ func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
 	}
 }
 
+// InitializeWorkflowRun init workflow run
 func InitializeWorkflowRun(wr *v1alpha1.WorkflowRun) {
 	if wr.Status.StartTime.IsZero() && len(wr.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()

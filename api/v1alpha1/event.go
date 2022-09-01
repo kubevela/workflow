@@ -17,14 +17,19 @@ limitations under the License.
 package v1alpha1
 
 const (
-	ReasonExecute  = "Execute"
+	// ReasonExecute is the reason for executing a workflow
+	ReasonExecute = "Execute"
+	// ReasonGenerate is the reason for generating a workflow
 	ReasonGenerate = "Generate"
 )
 
 const (
+	// MessageSuccessfully is the message for successfully
 	MessageSuccessfully = "WorkflowRun finished successfully"
-	MessageTerminated   = "WorkflowRun finished with termination"
-
+	// MessageTerminated is the message for terminated
+	MessageTerminated = "WorkflowRun finished with termination"
+	// MessageFailedGenerate is the message for failed to generate
 	MessageFailedGenerate = "fail to generate workflow runners"
-	MessageFailedExecute  = "fail to execute"
+	// MessageFailedExecute is the message for failed to execute
+	MessageFailedExecute = "fail to execute"
 )

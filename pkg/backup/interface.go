@@ -6,12 +6,15 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
 
+// PersistType is the type of persister.
 type PersistType string
 
 const (
+	// PersistTypeSLS is the SLS persister.
 	PersistTypeSLS PersistType = "sls"
 )
 
+// NewPersister is a factory method for creating a persister.
 func NewPersister(persistType PersistType) persistWorkflowRecord {
 	switch persistType {
 	case PersistTypeSLS:

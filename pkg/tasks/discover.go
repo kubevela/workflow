@@ -32,6 +32,7 @@ type taskDiscover struct {
 	customTaskDiscover *custom.TaskLoader
 }
 
+// NewTaskDiscover new task discover
 func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOptions) types.TaskDiscover {
 	return &taskDiscover{
 		builtin: map[string]types.TaskGenerator{
