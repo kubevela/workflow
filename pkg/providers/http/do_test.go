@@ -158,11 +158,11 @@ request: {
 
 	// test ratelimiter
 	rateLimiter = ratelimiter.NewRateLimiter(1)
-	limiterTestCases := map[string]struct {
+	limiterTestCases := []struct {
 		request     string
 		expectedErr string
 	}{
-		"hello": {
+		{
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/hello"
@@ -172,7 +172,7 @@ request: {
 		period: "1m"
 	}
 }`},
-		"hello2": {
+		{
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/hello?query=1"
@@ -184,7 +184,7 @@ request: {
 }`,
 			expectedErr: "request exceeds the rate limiter",
 		},
-		"echo": {
+		{
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/echo"
@@ -195,7 +195,7 @@ request: {
 	}
 }`,
 		},
-		"hello3": {
+		{
 			request: baseTemplate + `
 method: "GET"
 url: "http://127.0.0.1:1229/hello?query=2"
