@@ -146,9 +146,10 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	b, err := io.ReadAll(resp.Body)
 	// parse response body and headers
 	return map[string]interface{}{
-		"body":    string(b),
-		"header":  resp.Header,
-		"trailer": resp.Trailer,
+		"body":       string(b),
+		"header":     resp.Header,
+		"trailer":    resp.Trailer,
+		"statusCode": resp.StatusCode,
 	}, err
 }
 
