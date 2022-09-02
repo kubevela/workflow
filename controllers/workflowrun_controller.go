@@ -38,9 +38,9 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/executor"
+	"github.com/kubevela/workflow/pkg/generator"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
-	"github.com/kubevela/workflow/pkg/steps"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -97,28 +97,16 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	switch {
-	case run.Spec.WorkflowSpec != nil && len(run.Spec.WorkflowSpec.Steps) > 0:
-	case run.Spec.WorkflowRef != "":
-		template := new(v1alpha1.Workflow)
-		if err := r.Get(ctx, client.ObjectKey{
-			Name:      run.Spec.WorkflowRef,
-			Namespace: run.Namespace,
-		}, template); err != nil {
-			logCtx.Error(err, "get workflow ref")
-			return ctrl.Result{}, err
-		}
-		if len(template.WorkflowSpec.Steps) > 0 {
-			run.Spec.WorkflowSpec = &template.WorkflowSpec
-		}
-	default:
-		return ctrl.Result{}, nil
+	instance, err := generator.GenerateWorkflowInstance(ctx, r.Client, run)
+	if err != nil {
+		logCtx.Error(err, "[generate workflow instance]")
+		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))
+		run.Status.Phase = v1alpha1.WorkflowStateInitializing
+		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
+	isUpdate := instance.Status.Message != ""
 
-	executor.InitializeWorkflowRun(run)
-	isUpdate := run.Status.Message != ""
-
-	runners, err := steps.Generate(logCtx, run, types.StepGeneratorOptions{
+	runners, err := generator.GenerateRunners(logCtx, instance, types.StepGeneratorOptions{
 		PackageDiscover: r.PackageDiscover,
 		Client:          r.Client,
 	})
@@ -129,7 +117,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 
-	executor := executor.New(run, r.Client)
+	executor := executor.New(instance, r.Client)
 	state, err := executor.ExecuteRunners(logCtx, runners)
 	if err != nil {
 		logCtx.Error(err, "[execute runners]")
@@ -137,7 +125,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		run.Status.Phase = v1alpha1.WorkflowStateExecuting
 		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
-	isUpdate = isUpdate && run.Status.Message == ""
+	isUpdate = isUpdate && instance.Status.Message == ""
+	run.Status = instance.Status
 	run.Status.Phase = state
 	switch state {
 	case v1alpha1.WorkflowStateSuspending:

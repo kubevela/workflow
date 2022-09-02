@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestSetContext(t *testing.T) {
@@ -42,8 +42,8 @@ func TestSetContext(t *testing.T) {
 		},
 	})
 	// test update
-	debugCtx := NewContext(cli, &v1alpha1.WorkflowRun{
-		ObjectMeta: metav1.ObjectMeta{
+	debugCtx := NewContext(cli, &types.WorkflowInstance{
+		WorkflowMeta: types.WorkflowMeta{
 			Name: "test",
 		},
 	}, "step1")
@@ -54,8 +54,8 @@ test: test
 	err = debugCtx.Set(v)
 	r.NoError(err)
 	// test create
-	debugCtx = NewContext(cli, &v1alpha1.WorkflowRun{
-		ObjectMeta: metav1.ObjectMeta{
+	debugCtx = NewContext(cli, &types.WorkflowInstance{
+		WorkflowMeta: types.WorkflowMeta{
 			Name: "test",
 		},
 	}, "step2")
