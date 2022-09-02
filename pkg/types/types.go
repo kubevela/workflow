@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"cuelang.org/go/cue"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +33,25 @@ import (
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
+
+// WorkflowInstance is the instance for workflow engine to execute
+type WorkflowInstance struct {
+	WorkflowMeta
+	OwnerInfo []metav1.OwnerReference
+	Debug     bool
+	Mode      *v1alpha1.WorkflowExecuteMode
+	Steps     []v1alpha1.WorkflowStep
+	Status    v1alpha1.WorkflowRunStatus
+}
+
+// WorkflowMeta is the meta information for workflow instance
+type WorkflowMeta struct {
+	Name                 string
+	Namespace            string
+	Annotations          map[string]string
+	Labels               map[string]string
+	ChildOwnerReferences []metav1.OwnerReference
+}
 
 // TaskRunner is a task runner
 type TaskRunner interface {

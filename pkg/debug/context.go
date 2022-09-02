@@ -22,13 +22,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
 // ContextImpl is workflow debug context interface
@@ -38,9 +36,9 @@ type ContextImpl interface {
 
 // Context is debug context.
 type Context struct {
-	cli  client.Client
-	wr   *v1alpha1.WorkflowRun
-	step string
+	cli      client.Client
+	instance *wfTypes.WorkflowInstance
+	step     string
 }
 
 // Set sets debug content into context
@@ -49,7 +47,7 @@ func (d *Context) Set(v *value.Value) error {
 	if err != nil {
 		return err
 	}
-	err = setStore(context.Background(), d.cli, d.wr, d.step, data)
+	err = setStore(context.Background(), d.cli, d.instance, d.step, data)
 	if err != nil {
 		return err
 	}
@@ -57,27 +55,19 @@ func (d *Context) Set(v *value.Value) error {
 	return nil
 }
 
-func setStore(ctx context.Context, cli client.Client, wr *v1alpha1.WorkflowRun, step, data string) error {
+func setStore(ctx context.Context, cli client.Client, instance *wfTypes.WorkflowInstance, step, data string) error {
 	cm := &corev1.ConfigMap{}
 	if err := cli.Get(ctx, types.NamespacedName{
-		Namespace: wr.Namespace,
-		Name:      GenerateContextName(wr.Name, step),
+		Namespace: instance.Namespace,
+		Name:      GenerateContextName(instance.Name, step),
 	}, cm); err != nil {
 		if errors.IsNotFound(err) {
-			cm.Name = GenerateContextName(wr.Name, step)
-			cm.Namespace = wr.Namespace
+			cm.Name = GenerateContextName(instance.Name, step)
+			cm.Namespace = instance.Namespace
 			cm.Data = map[string]string{
 				"debug": data,
 			}
-			cm.SetOwnerReferences([]metav1.OwnerReference{
-				{
-					APIVersion: v1alpha1.SchemeGroupVersion.String(),
-					Kind:       v1alpha1.WorkflowRunKind,
-					Name:       wr.Name,
-					UID:        wr.UID,
-					Controller: pointer.BoolPtr(true),
-				},
-			})
+			cm.SetOwnerReferences(instance.ChildOwnerReferences)
 			if err := cli.Create(ctx, cm); err != nil {
 				return err
 			}
@@ -96,11 +86,11 @@ func setStore(ctx context.Context, cli client.Client, wr *v1alpha1.WorkflowRun, 
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, wr *v1alpha1.WorkflowRun, step string) ContextImpl {
+func NewContext(cli client.Client, instance *wfTypes.WorkflowInstance, step string) ContextImpl {
 	return &Context{
-		cli:  cli,
-		wr:   wr,
-		step: step,
+		cli:      cli,
+		instance: instance,
+		step:     step,
 	}
 }
 
