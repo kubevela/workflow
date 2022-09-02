@@ -23,8 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -54,7 +52,6 @@ type Handlers struct {
 
 type provider struct {
 	labels   map[string]string
-	userInfo user.Info
 	handlers Handlers
 	cli      client.Client
 }
@@ -68,12 +65,8 @@ const (
 	WorkflowResourceCreator string = "workflow"
 )
 
-func handleContext(ctx context.Context, cluster string, userInfo user.Info) context.Context {
-	c := context.WithValue(ctx, ClusterContextKey, cluster)
-	if userInfo != nil {
-		c = request.WithUser(c, userInfo)
-	}
-	return c
+func handleContext(ctx context.Context, cluster string) context.Context {
+	return context.WithValue(ctx, ClusterContextKey, cluster)
 }
 
 type dispatcher struct {
@@ -140,7 +133,7 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 	if err != nil {
 		return err
 	}
-	deployCtx := handleContext(ctx, cluster, h.userInfo)
+	deployCtx := handleContext(ctx, cluster)
 	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workload); err != nil {
 		return err
 	}
@@ -174,7 +167,7 @@ func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.C
 	if err != nil {
 		return err
 	}
-	deployCtx := handleContext(ctx, cluster, h.userInfo)
+	deployCtx := handleContext(ctx, cluster)
 	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workloads...); err != nil {
 		return err
 	}
@@ -199,7 +192,7 @@ func (h *provider) Read(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 	if err != nil {
 		return err
 	}
-	readCtx := handleContext(ctx, cluster, h.userInfo)
+	readCtx := handleContext(ctx, cluster)
 	if err := h.cli.Get(readCtx, key, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
@@ -241,7 +234,7 @@ func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 		client.InNamespace(filter.Namespace),
 		client.MatchingLabels(filter.MatchingLabels),
 	}
-	readCtx := handleContext(ctx, cluster, h.userInfo)
+	readCtx := handleContext(ctx, cluster)
 	if err := h.cli.List(readCtx, list, listOpts...); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
@@ -262,7 +255,7 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 	if err != nil {
 		return err
 	}
-	deleteCtx := handleContext(ctx, cluster, h.userInfo)
+	deleteCtx := handleContext(ctx, cluster)
 	if err := h.handlers.Delete(deleteCtx, cluster, WorkflowResourceCreator, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
@@ -270,7 +263,7 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 }
 
 // Install register handlers to provider discover.
-func Install(p types.Providers, cli client.Client, userInfo user.Info, labels map[string]string, handlers *Handlers) {
+func Install(p types.Providers, cli client.Client, labels map[string]string, handlers *Handlers) {
 	if handlers == nil {
 		d := &dispatcher{
 			cli: cli,
@@ -281,7 +274,6 @@ func Install(p types.Providers, cli client.Client, userInfo user.Info, labels ma
 		}
 	}
 	prd := &provider{
-		userInfo: userInfo,
 		cli:      cli,
 		handlers: *handlers,
 		labels:   labels,

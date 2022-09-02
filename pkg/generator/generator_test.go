@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package steps
+package generator
 
 import (
 	"context"
@@ -82,8 +82,10 @@ var _ = Describe("Test workflow step runner generator", func() {
 				},
 			},
 		}
+		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
+		Expect(err).Should(BeNil())
 		ctx := monitorContext.NewTraceContext(ctx, "test-wr")
-		runners, err := Generate(ctx, wr, types.StepGeneratorOptions{Client: k8sClient})
+		runners, err := GenerateRunners(ctx, instance, types.StepGeneratorOptions{Client: k8sClient})
 		Expect(err).Should(BeNil())
 		Expect(len(runners)).Should(BeEquivalentTo(1))
 		Expect(runners[0].Name()).Should(BeEquivalentTo("step-1"))
@@ -123,7 +125,9 @@ var _ = Describe("Test workflow step runner generator", func() {
 			},
 		}
 		ctx := monitorContext.NewTraceContext(ctx, "test-wr-sub")
-		runners, err := Generate(ctx, wr, types.StepGeneratorOptions{Client: k8sClient})
+		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
+		Expect(err).Should(BeNil())
+		runners, err := GenerateRunners(ctx, instance, types.StepGeneratorOptions{Client: k8sClient})
 		Expect(err).Should(BeNil())
 		Expect(len(runners)).Should(BeEquivalentTo(1))
 		Expect(runners[0].Name()).Should(BeEquivalentTo("step-1"))
