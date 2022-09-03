@@ -65,12 +65,14 @@ func TestHttpDo(t *testing.T) {
 			body: string
 			header?:  [string]: [...string]
 			trailer?: [string]: [...string]
+			statusCode: int
 		})
 `
 	testCases := map[string]struct {
 		request      string
 		expectedBody string
 		expectedErr  string
+		statusCode   int
 	}{
 		"hello": {
 			request: baseTemplate + `
@@ -80,6 +82,7 @@ request: {
 	timeout: "2s"
 }`,
 			expectedBody: `hello`,
+			statusCode:   200,
 		},
 
 		"echo": {
@@ -91,6 +94,7 @@ request:{
    header: "Content-Type": "text/plain; charset=utf-8"
 }`,
 			expectedBody: `I am vela`,
+			statusCode:   200,
 		},
 		"json": {
 			request: `
@@ -107,6 +111,7 @@ request:{
    header: "Content-Type": "application/json; charset=utf-8"
 }` + baseTemplate,
 			expectedBody: `{"name":"foo","score":100}`,
+			statusCode:   200,
 		},
 		"timeout": {
 			request: baseTemplate + `
@@ -125,6 +130,7 @@ request: {
 	timeout: "3s"
 }`,
 			expectedBody: `hello`,
+			statusCode:   200,
 		},
 		"invalid-timeout": {
 			request: baseTemplate + `
@@ -134,6 +140,13 @@ request: {
 	timeout: "test"
 }`,
 			expectedErr: "invalid duration",
+		},
+		"notfound": {
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/notfound"
+`,
+			statusCode: 404,
 		},
 	}
 
@@ -154,6 +167,11 @@ request: {
 		ret, err := body.CueValue().String()
 		r.NoError(err)
 		r.Equal(ret, tCase.expectedBody, tName)
+		code, err := v.LookupValue("response", "statusCode")
+		r.NoError(err, tName)
+		sc, err := code.CueValue().Int64()
+		r.NoError(err)
+		r.Equal(tCase.statusCode, int(sc), tName)
 	}
 
 	// test ratelimiter
@@ -243,6 +261,9 @@ func runMockServer(shutdown chan struct{}) {
 	http.HandleFunc("/echo", func(w http.ResponseWriter, req *http.Request) {
 		bt, _ := io.ReadAll(req.Body)
 		_, _ = w.Write(bt)
+	})
+	http.HandleFunc("/notfound", func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(404)
 	})
 	srv := &http.Server{Addr: ":1229"}
 	go srv.ListenAndServe() //nolint

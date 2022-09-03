@@ -13,12 +13,15 @@
 			limit:  int
 			period: string
 		}
+		...
 	}
 	tls_config?: secret: string
 	response: {
 		body: string
 		header?: [string]: [...string]
 		trailer?: [string]: [...string]
+		statusCode: int
+		...
 	}
 	...
 }
