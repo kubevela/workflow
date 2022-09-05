@@ -25,6 +25,8 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/multicluster"
+
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue"
 	"github.com/kubevela/workflow/pkg/cue/model"
@@ -56,17 +58,13 @@ type provider struct {
 	cli      client.Client
 }
 
-type contextKey string
-
 const (
-	// ClusterContextKey is the name of cluster using in client http context
-	ClusterContextKey = contextKey("ClusterName")
 	// WorkflowResourceCreator is the creator name of workflow resource
 	WorkflowResourceCreator string = "workflow"
 )
 
 func handleContext(ctx context.Context, cluster string) context.Context {
-	return context.WithValue(ctx, ClusterContextKey, cluster)
+	return multicluster.WithCluster(ctx, cluster)
 }
 
 type dispatcher struct {

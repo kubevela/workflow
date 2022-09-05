@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/kubevela/pkg/multicluster"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -93,6 +94,7 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
+	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 
 	// setup logging
