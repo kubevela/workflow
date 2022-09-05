@@ -277,7 +277,7 @@ var _ = Describe("Test Workflow", func() {
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus := instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -363,7 +363,7 @@ var _ = Describe("Test Workflow", func() {
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus := instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -456,7 +456,7 @@ var _ = Describe("Test Workflow", func() {
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus := instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -548,7 +548,7 @@ var _ = Describe("Test Workflow", func() {
 		time.Sleep(1 * time.Second)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus = instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -634,7 +634,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		instance.Status.ContextBackend = nil
 		cleanStepTimeStamp(&instance.Status)
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
@@ -705,6 +705,10 @@ var _ = Describe("Test Workflow", func() {
 						Name: "s2-sub2",
 						Type: "failed-after-retries",
 					},
+					{
+						Name: "s2-sub3",
+						Type: "terminate",
+					},
 				},
 			},
 			{
@@ -718,7 +722,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		instance.Status.ContextBackend = nil
 		cleanStepTimeStamp(&instance.Status)
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
@@ -749,6 +753,11 @@ var _ = Describe("Test Workflow", func() {
 						Type:   "failed-after-retries",
 						Phase:  v1alpha1.WorkflowStepPhaseFailed,
 						Reason: types.StatusReasonFailedAfterRetries,
+					}, {
+						Name:   "s2-sub3",
+						Type:   "terminate",
+						Phase:  v1alpha1.WorkflowStepPhaseFailed,
+						Reason: types.StatusReasonTerminate,
 					},
 				},
 			}, {
@@ -1040,7 +1049,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(instance, k8sClient)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus := instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1137,7 +1146,7 @@ var _ = Describe("Test Workflow", func() {
 		wf = New(instance, k8sClient)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		workflowStatus = instance.Status
 		Expect(workflowStatus.ContextBackend.Name).Should(BeEquivalentTo("workflow-" + instance.Name + "-context"))
 		workflowStatus.ContextBackend = nil
@@ -1409,7 +1418,7 @@ var _ = Describe("Test Workflow", func() {
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		instance.Status.ContextBackend = nil
 		cleanStepTimeStamp(&instance.Status)
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
@@ -1923,9 +1932,10 @@ var _ = Describe("Test Workflow", func() {
 				},
 			}, {
 				StepStatus: v1alpha1.StepStatus{
-					Name:  "s2",
-					Type:  "terminate",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					Name:   "s2",
+					Type:   "terminate",
+					Phase:  v1alpha1.WorkflowStepPhaseFailed,
+					Reason: types.StatusReasonTerminate,
 				},
 			}},
 		})).Should(BeEquivalentTo(""))
@@ -1981,9 +1991,10 @@ var _ = Describe("Test Workflow", func() {
 				},
 			}, {
 				StepStatus: v1alpha1.StepStatus{
-					Name:  "s2",
-					Type:  "step-group",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					Name:   "s2",
+					Type:   "step-group",
+					Phase:  v1alpha1.WorkflowStepPhaseFailed,
+					Reason: types.StatusReasonTerminate,
 				},
 				SubStepsStatus: []v1alpha1.StepStatus{
 					{
@@ -1991,9 +2002,10 @@ var _ = Describe("Test Workflow", func() {
 						Type:  "success",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 					}, {
-						Name:  "s2-sub2",
-						Type:  "terminate",
-						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+						Name:   "s2-sub2",
+						Type:   "terminate",
+						Phase:  v1alpha1.WorkflowStepPhaseFailed,
+						Reason: types.StatusReasonTerminate,
 					},
 				},
 			}},
@@ -2229,9 +2241,10 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 	case "terminate":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
 			return v1alpha1.StepStatus{
-					Name:  step.Name,
-					Type:  "terminate",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					Name:   step.Name,
+					Type:   "terminate",
+					Phase:  v1alpha1.WorkflowStepPhaseFailed,
+					Reason: types.StatusReasonTerminate,
 				}, &types.Operation{
 					Terminated: true,
 				}, nil
