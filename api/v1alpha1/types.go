@@ -101,6 +101,8 @@ const (
 	WorkflowStateSuspending WorkflowRunPhase = "suspending"
 	// WorkflowStateTerminated means the workflow run is terminated
 	WorkflowStateTerminated WorkflowRunPhase = "terminated"
+	// WorkflowStateFailed means the workflow run is failed
+	WorkflowStateFailed WorkflowRunPhase = "failed"
 	// WorkflowStateSucceeded means the workflow run is succeeded
 	WorkflowStateSucceeded WorkflowRunPhase = "succeeded"
 	// WorkflowStateSkipped means the workflow run is skipped
