@@ -19,10 +19,11 @@ package util
 import (
 	"encoding/json"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 

@@ -23,8 +23,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/pkg/cue/model/value"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/providers"
 )
 

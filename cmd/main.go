@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
-	"github.com/kubevela/pkg/multicluster"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,9 +39,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	velaclient "github.com/kubevela/pkg/controller/client"
+	"github.com/kubevela/pkg/multicluster"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/controllers"
-	ctrlClient "github.com/kubevela/workflow/pkg/client"
 	"github.com/kubevela/workflow/pkg/common"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
@@ -169,7 +170,7 @@ func main() {
 		LeaseDuration:              &leaseDuration,
 		RenewDeadline:              &renewDeadline,
 		RetryPeriod:                &retryPeriod,
-		NewClient:                  ctrlClient.DefaultNewControllerClient,
+		NewClient:                  velaclient.DefaultNewControllerClient,
 	})
 	if err != nil {
 		klog.Error(err, "unable to start manager")

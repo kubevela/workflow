@@ -61,11 +61,6 @@ jobs:
         run: |
           sudo apt-get install -y golang-ginkgo-dev
 
-      - name: Setup Kind Cluster
-        uses: engineerd/setup-kind@v0.5.0
-        with:
-          version: ${{ env.KIND_VERSION }}
-
       - name: install Kubebuilder
         uses: RyanSiu1995/kubebuilder-action@v1.2
         with:
