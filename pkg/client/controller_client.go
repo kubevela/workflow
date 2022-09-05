@@ -19,6 +19,7 @@ package client
 import (
 	"strings"
 
+	"github.com/kubevela/pkg/multicluster"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
@@ -34,7 +35,7 @@ var (
 
 // DefaultNewControllerClient function for creating controller client
 func DefaultNewControllerClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (c client.Client, err error) {
-	rawClient, err := client.New(config, options)
+	rawClient, err := multicluster.NewDefaultClient(config, options)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get raw client")
 	}
