@@ -136,6 +136,11 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{RequeueAfter: duration}, r.patchStatus(logCtx, run, isUpdate)
 		}
 		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
+	case v1alpha1.WorkflowStateFailed:
+		logCtx.Info("Workflow return state=Failed")
+		r.doWorkflowFinish(run)
+		r.Recorder.Event(run, event.Normal(v1alpha1.ReasonExecute, v1alpha1.MessageFailed))
+		return ctrl.Result{}, r.patchStatus(logCtx, run, isUpdate)
 	case v1alpha1.WorkflowStateTerminated:
 		logCtx.Info("Workflow return state=Terminated")
 		r.doWorkflowFinish(run)

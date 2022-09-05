@@ -107,7 +107,10 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		StepStatusCache.Delete(cacheKey)
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
-		return v1alpha1.WorkflowStateTerminated, nil
+		if isTerminatedManually(status) {
+			return v1alpha1.WorkflowStateTerminated, nil
+		}
+		return v1alpha1.WorkflowStateFailed, nil
 	}
 	if checkWorkflowSuspended(status) {
 		return v1alpha1.WorkflowStateSuspending, nil
@@ -146,7 +149,10 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		e.cleanBackoffTimesForTerminated()
 		if checkWorkflowTerminated(status, allTasksDone) {
 			wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
-			return v1alpha1.WorkflowStateTerminated, nil
+			if isTerminatedManually(status) {
+				return v1alpha1.WorkflowStateTerminated, nil
+			}
+			return v1alpha1.WorkflowStateFailed, nil
 		}
 	}
 	if status.Suspend {
@@ -157,6 +163,20 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 	return v1alpha1.WorkflowStateExecuting, nil
+}
+
+func isTerminatedManually(status *v1alpha1.WorkflowRunStatus) bool {
+	manually := false
+	for _, step := range status.Steps {
+		if step.Phase == v1alpha1.WorkflowStepPhaseFailed {
+			if step.Reason == types.StatusReasonTerminate {
+				manually = true
+			} else {
+				return false
+			}
+		}
+	}
+	return manually
 }
 
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {
