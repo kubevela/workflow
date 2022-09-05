@@ -24,13 +24,14 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
 

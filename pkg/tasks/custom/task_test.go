@@ -30,11 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/types"
 )

@@ -35,8 +35,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/pkg/cue/model/value"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/http/testdata"

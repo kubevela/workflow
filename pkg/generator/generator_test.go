@@ -26,8 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 

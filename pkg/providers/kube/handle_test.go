@@ -41,10 +41,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	"sigs.k8s.io/yaml"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/packages"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

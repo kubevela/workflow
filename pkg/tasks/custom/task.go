@@ -25,6 +25,8 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
@@ -33,7 +35,6 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/hooks"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 

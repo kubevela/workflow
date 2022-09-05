@@ -18,8 +18,9 @@ package executor
 import (
 	"time"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 

@@ -21,7 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"

@@ -24,10 +24,12 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
+	"github.com/kubevela/pkg/util/rand"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/executor"
-	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/email"
@@ -38,7 +40,6 @@ import (
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
-	"github.com/kubevela/workflow/pkg/utils"
 )
 
 // GenerateRunners generates task runners
@@ -199,7 +200,7 @@ func generateStepID(status v1alpha1.WorkflowRunStatus, name string) string {
 		}
 	}
 
-	return utils.RandomString(10)
+	return rand.RandomString(10)
 }
 
 func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName string) string {
@@ -213,7 +214,7 @@ func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName s
 		}
 	}
 
-	return utils.RandomString(10)
+	return rand.RandomString(10)
 }
 
 func generateContextDataFromWorkflowRun(instance *types.WorkflowInstance) process.ContextData {
