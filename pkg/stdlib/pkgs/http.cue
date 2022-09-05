@@ -9,6 +9,11 @@
 		body?:    string
 		header?: [string]:  string
 		trailer?: [string]: string
+		ratelimiter?: {
+			limit:  int
+			period: string
+		}
+		...
 	}
 	tls_config?: secret: string
 	response: {

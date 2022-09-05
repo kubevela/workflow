@@ -38,6 +38,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/providers"
+	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/http/testdata"
 )
 
@@ -55,6 +56,10 @@ func TestHttpDo(t *testing.T) {
 			body?:    string
 			header?:  [string]: string
 			trailer?: [string]: string
+			ratelimiter?: {
+				limit: int
+				period: string
+			}
 		})
 		response: close({
 			body: string
@@ -149,6 +154,72 @@ request: {
 		ret, err := body.CueValue().String()
 		r.NoError(err)
 		r.Equal(ret, tCase.expectedBody, tName)
+	}
+
+	// test ratelimiter
+	rateLimiter = ratelimiter.NewRateLimiter(1)
+	limiterTestCases := []struct {
+		request     string
+		expectedErr string
+	}{
+		{
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/hello"
+request: {
+	ratelimiter: {
+		limit: 1
+		period: "1m"
+	}
+}`},
+		{
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/hello?query=1"
+request: {
+	ratelimiter: {
+		limit: 1
+		period: "1m"
+	}
+}`,
+			expectedErr: "request exceeds the rate limiter",
+		},
+		{
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/echo"
+request: {
+	ratelimiter: {
+		limit: 1
+		period: "1m"
+	}
+}`,
+		},
+		{
+			request: baseTemplate + `
+method: "GET"
+url: "http://127.0.0.1:1229/hello?query=2"
+request: {
+	ratelimiter: {
+		limit: 1
+		period: "1m"
+	}
+}`,
+		},
+	}
+
+	for tName, tCase := range limiterTestCases {
+		r := require.New(t)
+		v, err := value.NewValue(tCase.request, nil, "")
+		r.NoError(err, tName)
+		prd := &provider{}
+		err = prd.Do(ctx, nil, v, nil)
+		if tCase.expectedErr != "" {
+			r.Error(err)
+			r.Contains(err.Error(), tCase.expectedErr)
+			continue
+		}
+		r.NoError(err, tName)
 	}
 }
 
