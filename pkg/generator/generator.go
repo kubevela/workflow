@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package steps
+package generator
 
 import (
 	"context"
+	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/executor"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
@@ -39,21 +41,28 @@ import (
 	"github.com/kubevela/workflow/pkg/utils"
 )
 
-func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
+// GenerateRunners generates task runners
+func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) ([]types.TaskRunner, error) {
+	ctx.V(options.LogLevel)
 	subCtx := ctx.Fork("generate-task-runners", monitorContext.DurationMetric(func(v float64) {
 		metrics.GenerateTaskRunnersDurationHistogram.WithLabelValues("workflowrun").Observe(v)
 	}))
 	defer subCtx.Commit("finish generate task runners")
-	options = initStepGeneratorOptions(ctx, wr, options)
+	options = initStepGeneratorOptions(ctx, instance, options)
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
 	var tasks []types.TaskRunner
-	for _, step := range wr.Spec.WorkflowSpec.Steps {
-		options := &types.TaskGeneratorOptions{
-			ID:              generateStepID(wr.Status, step.Name),
+	for _, step := range instance.Steps {
+		opt := &types.TaskGeneratorOptions{
+			ID:              generateStepID(instance.Status, step.Name),
 			PackageDiscover: options.PackageDiscover,
 			ProcessContext:  options.ProcessCtx,
 		}
-		task, err := generateTaskRunner(ctx, wr, step, taskDiscover, options)
+		for typ, convertor := range options.StepConvertor {
+			if step.Type == typ {
+				opt.StepConvertor = convertor
+			}
+		}
+		task, err := generateTaskRunner(ctx, instance, step, taskDiscover, opt, options)
 		if err != nil {
 			return nil, err
 		}
@@ -62,13 +71,62 @@ func Generate(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options type
 	return tasks, nil
 }
 
-func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, options types.StepGeneratorOptions) types.StepGeneratorOptions {
+// GenerateWorkflowInstance generates a workflow instance
+func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) (*types.WorkflowInstance, error) {
+	var steps []v1alpha1.WorkflowStep
+	switch {
+	case run.Spec.WorkflowSpec != nil:
+		steps = run.Spec.WorkflowSpec.Steps
+	case run.Spec.WorkflowRef != "":
+		template := new(v1alpha1.Workflow)
+		if err := cli.Get(ctx, client.ObjectKey{
+			Name:      run.Spec.WorkflowRef,
+			Namespace: run.Namespace,
+		}, template); err != nil {
+			return nil, err
+		}
+		steps = template.WorkflowSpec.Steps
+	default:
+		return nil, errors.New("failed to generate workflow instance")
+	}
+
+	debug := false
+	if run.Annotations != nil && run.Annotations[types.AnnotationWorkflowRunDebug] == "true" {
+		debug = true
+	}
+
+	instance := &types.WorkflowInstance{
+		WorkflowMeta: types.WorkflowMeta{
+			Name:        run.Name,
+			Namespace:   run.Namespace,
+			Annotations: run.Annotations,
+			Labels:      run.Labels,
+			ChildOwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: v1alpha1.SchemeGroupVersion.String(),
+					Kind:       v1alpha1.WorkflowRunKind,
+					Name:       run.Name,
+					UID:        run.UID,
+					Controller: pointer.BoolPtr(true),
+				},
+			},
+		},
+		Debug:  debug,
+		Mode:   run.Spec.Mode,
+		Steps:  steps,
+		Status: run.Status,
+	}
+	executor.InitializeWorkflowInstance(instance)
+	return instance, nil
+}
+
+func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
-		installBuiltinProviders(ctx, wr, options.Client, options.Providers)
 	}
+	installBuiltinProviders(instance, options.Client, options.Providers)
 	if options.ProcessCtx == nil {
-		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(wr))
+		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
 	}
 	if options.TemplateLoader == nil {
 		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
@@ -76,28 +134,23 @@ func initStepGeneratorOptions(ctx monitorContext.Context, wr *v1alpha1.WorkflowR
 	return options
 }
 
-func installBuiltinProviders(ctx monitorContext.Context, wr *v1alpha1.WorkflowRun, client client.Client, providerHandlers types.Providers) {
+func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers) {
 	workspace.Install(providerHandlers)
 	email.Install(providerHandlers)
 	util.Install(providerHandlers)
-	http.Install(providerHandlers, client, wr.Namespace)
-	kube.Install(providerHandlers, client, nil, []metav1.OwnerReference{
-		{
-			APIVersion:         v1alpha1.SchemeGroupVersion.String(),
-			Kind:               v1alpha1.WorkflowRunKind,
-			Name:               wr.Name,
-			UID:                wr.UID,
-			Controller:         pointer.BoolPtr(true),
-			BlockOwnerDeletion: pointer.BoolPtr(true),
-		},
+	http.Install(providerHandlers, client, instance.Namespace)
+	kube.Install(providerHandlers, client, map[string]string{
+		types.LabelWorkflowRunName:      instance.Name,
+		types.LabelWorkflowRunNamespace: instance.Namespace,
 	}, nil)
 }
 
 func generateTaskRunner(ctx context.Context,
-	wr *v1alpha1.WorkflowRun,
+	instance *types.WorkflowInstance,
 	step v1alpha1.WorkflowStep,
 	taskDiscover types.TaskDiscover,
-	options *types.TaskGeneratorOptions) (types.TaskRunner, error) {
+	options *types.TaskGeneratorOptions,
+	stepOptions types.StepGeneratorOptions) (types.TaskRunner, error) {
 	if step.Type == types.WorkflowStepTypeStepGroup {
 		var subTaskRunners []types.TaskRunner
 		for _, subStep := range step.SubSteps {
@@ -105,11 +158,21 @@ func generateTaskRunner(ctx context.Context,
 				WorkflowStepBase: subStep,
 			}
 			o := &types.TaskGeneratorOptions{
-				ID:              generateSubStepID(wr.Status, subStep.Name, step.Name),
+				ID:              generateSubStepID(instance.Status, subStep.Name, step.Name),
 				PackageDiscover: options.PackageDiscover,
 				ProcessContext:  options.ProcessContext,
 			}
-			subTask, err := generateTaskRunner(ctx, wr, workflowStep, taskDiscover, o)
+			for typ, convertor := range stepOptions.StepConvertor {
+				if subStep.Type == typ {
+					o.StepConvertor = convertor
+				}
+			}
+			for typ, convertor := range stepOptions.StepConvertor {
+				if subStep.Type == typ {
+					o.StepConvertor = convertor
+				}
+			}
+			subTask, err := generateTaskRunner(ctx, instance, workflowStep, taskDiscover, o, stepOptions)
 			if err != nil {
 				return nil, err
 			}
@@ -117,8 +180,8 @@ func generateTaskRunner(ctx context.Context,
 		}
 		options.SubTaskRunners = subTaskRunners
 		options.SubStepExecuteMode = v1alpha1.WorkflowModeDAG
-		if wr.Spec.Mode != nil {
-			options.SubStepExecuteMode = wr.Spec.Mode.SubSteps
+		if instance.Mode != nil {
+			options.SubStepExecuteMode = instance.Mode.SubSteps
 		}
 	}
 
@@ -158,13 +221,10 @@ func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName s
 	return utils.RandomString(10)
 }
 
-func generateContextDataFromWorkflowRun(wr *v1alpha1.WorkflowRun) process.ContextData {
+func generateContextDataFromWorkflowRun(instance *types.WorkflowInstance) process.ContextData {
 	data := process.ContextData{
-		Name:      wr.Name,
-		Namespace: wr.Namespace,
-	}
-	if wr.Spec.WorkflowRef != "" {
-		data.WorkflowName = wr.Spec.WorkflowRef
+		Name:      instance.Name,
+		Namespace: instance.Namespace,
 	}
 	return data
 }

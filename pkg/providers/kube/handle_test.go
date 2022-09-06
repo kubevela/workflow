@@ -92,9 +92,8 @@ var _ = BeforeSuite(func(done Done) {
 	p = &provider{
 		cli: k8sClient,
 		handlers: Handlers{
-			ContextHandler: contextHandler,
-			Apply:          d.apply,
-			Delete:         d.delete,
+			Apply:  d.apply,
+			Delete: d.delete,
 		},
 	}
 	close(done)

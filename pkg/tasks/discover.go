@@ -38,7 +38,7 @@ func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOpti
 			types.WorkflowStepTypeSuspend:   builtin.Suspend,
 			types.WorkflowStepTypeStepGroup: builtin.StepGroup,
 		},
-		customTaskDiscover: custom.NewTaskLoader(options.TemplateLoader.LoadTemplate, options.PackageDiscover, options.Providers, 0, options.ProcessCtx),
+		customTaskDiscover: custom.NewTaskLoader(options.TemplateLoader.LoadTemplate, options.PackageDiscover, options.Providers, options.LogLevel, options.ProcessCtx),
 	}
 }
 

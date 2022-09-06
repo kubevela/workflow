@@ -23,8 +23,11 @@ const (
 
 const (
 	MessageSuccessfully = "WorkflowRun finished successfully"
-	MessageTerminated   = "WorkflowRun finished with termination"
-
+	// MessageTerminated is the message for terminated
+	MessageTerminated = "WorkflowRun finished with termination"
+	// MessageFailed is the message for failed
+	MessageFailed = "WorkflowRun finished with failure"
+	// MessageFailedGenerate is the message for failed to generate
 	MessageFailedGenerate = "fail to generate workflow runners"
 	MessageFailedExecute  = "fail to execute"
 )

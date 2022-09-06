@@ -93,16 +93,20 @@ type WorkflowExecuteMode struct {
 type WorkflowRunPhase string
 
 const (
-	// WorkflowRunInitializing means the workflow run is initializing
-	WorkflowRunInitializing WorkflowRunPhase = "initializing"
-	// WorkflowRunExecuting means the workflow run is executing
-	WorkflowRunExecuting WorkflowRunPhase = "executing"
-	// WorkflowRunSuspending means the workflow run is suspending
-	WorkflowRunSuspending WorkflowRunPhase = "suspending"
-	// 	WorkflowRunTerminated means the workflow run is terminated
-	WorkflowRunTerminated WorkflowRunPhase = "terminated"
-	// WorkflowRunSucceeded means the workflow run is succeeded
-	WorkflowRunSucceeded WorkflowRunPhase = "succeeded"
+	// WorkflowStateInitializing means the workflow run is initializing
+	WorkflowStateInitializing WorkflowRunPhase = "initializing"
+	// WorkflowStateExecuting means the workflow run is executing
+	WorkflowStateExecuting WorkflowRunPhase = "executing"
+	// WorkflowStateSuspending means the workflow run is suspending
+	WorkflowStateSuspending WorkflowRunPhase = "suspending"
+	// WorkflowStateTerminated means the workflow run is terminated
+	WorkflowStateTerminated WorkflowRunPhase = "terminated"
+	// WorkflowStateFailed means the workflow run is failed
+	WorkflowStateFailed WorkflowRunPhase = "failed"
+	// WorkflowStateSucceeded means the workflow run is succeeded
+	WorkflowStateSucceeded WorkflowRunPhase = "succeeded"
+	// WorkflowStateSkipped means the workflow run is skipped
+	WorkflowStateSkipped WorkflowRunPhase = "skipped"
 )
 
 // +kubebuilder:object:root=true

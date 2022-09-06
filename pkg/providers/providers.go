@@ -23,8 +23,9 @@ import (
 )
 
 type providers struct {
-	l sync.RWMutex
-	m map[string]map[string]types.Handler
+	l     sync.RWMutex
+	m     map[string]map[string]types.Handler
+	force bool
 }
 
 // GetHandler get handler by provider name and handle name.
@@ -43,7 +44,13 @@ func (p *providers) GetHandler(providerName, handleName string) (types.Handler, 
 func (p *providers) Register(provider string, m map[string]types.Handler) {
 	p.l.Lock()
 	defer p.l.Unlock()
-	p.m[provider] = m
+	if p.force {
+		p.m[provider] = m
+		return
+	}
+	if _, ok := p.m[provider]; !ok {
+		p.m[provider] = m
+	}
 }
 
 // NewProviders will create provider discover.

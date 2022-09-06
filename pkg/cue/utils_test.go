@@ -25,6 +25,37 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
 
+func TestIntifyValues(t *testing.T) {
+	testcases := map[string]struct {
+		input  interface{}
+		output interface{}
+	}{
+		"default case": {
+			input:  "string",
+			output: "string",
+		},
+		"float64": {
+			input:  float64(1),
+			output: 1,
+		},
+		"array": {
+			input:  []interface{}{float64(1), float64(2)},
+			output: []interface{}{1, 2},
+		},
+		"map": {
+			input:  map[string]interface{}{"a": float64(1), "b": float64(2)},
+			output: map[string]interface{}{"a": 1, "b": 2},
+		},
+	}
+	for name, testcase := range testcases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			result := IntifyValues(testcase.input)
+			r.Equal(testcase.output, result)
+		})
+	}
+}
+
 func TestFillUnstructuredObject(t *testing.T) {
 	testcases := map[string]struct {
 		obj  *unstructured.Unstructured

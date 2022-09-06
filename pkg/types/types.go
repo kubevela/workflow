@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"cuelang.org/go/cue"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +33,25 @@ import (
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
+
+// WorkflowInstance is the instance for workflow engine to execute
+type WorkflowInstance struct {
+	WorkflowMeta
+	OwnerInfo []metav1.OwnerReference
+	Debug     bool
+	Mode      *v1alpha1.WorkflowExecuteMode
+	Steps     []v1alpha1.WorkflowStep
+	Status    v1alpha1.WorkflowRunStatus
+}
+
+// WorkflowMeta is the meta information for workflow instance
+type WorkflowMeta struct {
+	Name                 string
+	Namespace            string
+	Annotations          map[string]string
+	Labels               map[string]string
+	ChildOwnerReferences []metav1.OwnerReference
+}
 
 // TaskRunner is a task runner
 type TaskRunner interface {
@@ -127,6 +147,8 @@ type StepGeneratorOptions struct {
 	ProcessCtx      process.Context
 	TemplateLoader  template.Loader
 	Client          client.Client
+	StepConvertor   map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	LogLevel        int
 }
 
 // Action is that workflow provider can do.
@@ -176,6 +198,13 @@ const (
 	WorkflowStepTypeStepGroup = "step-group"
 )
 
+const (
+	// LabelWorkflowRunName is the label key for workflow run name
+	LabelWorkflowRunName = "workflowrun.oam.dev/name"
+	// LabelWorkflowRunNamespace is the label key for workflow run namespace
+	LabelWorkflowRunNamespace = "workflowrun.oam.dev/namespace"
+)
+
 var (
 	// MaxWorkflowStepErrorRetryTimes is the max retry times of the failed workflow step.
 	MaxWorkflowStepErrorRetryTimes = 10
@@ -183,22 +212,6 @@ var (
 	MaxWorkflowWaitBackoffTime = 60
 	// MaxWorkflowFailedBackoffTime is the max time to wait before reconcile failed workflow again
 	MaxWorkflowFailedBackoffTime = 300
-)
-
-// WorkflowState is a string that mark the workflow state
-type WorkflowState string
-
-const (
-	// WorkflowStateTerminated means workflow is terminated manually, and it won't be started unless the spec changed.
-	WorkflowStateTerminated WorkflowState = "Terminated"
-	// WorkflowStateSuspended means workflow is suspended manually, and it can be resumed.
-	WorkflowStateSuspended WorkflowState = "Suspended"
-	// WorkflowStateSucceeded means workflow is running successfully, all steps finished.
-	WorkflowStateSucceeded WorkflowState = "Succeeded"
-	// WorkflowStateExecuting means workflow is still running or waiting some steps.
-	WorkflowStateExecuting WorkflowState = "Executing"
-	// WorkflowStateSkipping means it will skip this reconcile and let next reconcile to handle it.
-	WorkflowStateSkipping WorkflowState = "Skipping"
 )
 
 const (
@@ -231,8 +244,6 @@ const (
 	MessageTerminated = "The workflow terminates because of the failed steps"
 	// MessageSuspendFailedAfterRetries is the message of failed after retries
 	MessageSuspendFailedAfterRetries = "The workflow suspends automatically because the failed times of steps have reached the limit"
-	// MessageInitializingWorkflow is the message of initializing workflow
-	MessageInitializingWorkflow = "Initializing workflow"
 )
 
 const (

@@ -56,75 +56,79 @@ const (
 )
 
 type workflowExecutor struct {
-	wr    *v1alpha1.WorkflowRun
-	cli   client.Client
-	wfCtx wfContext.Context
+	instance *types.WorkflowInstance
+	cli      client.Client
+	wfCtx    wfContext.Context
 }
 
 // New returns a Workflow Executor implementation.
-func New(wr *v1alpha1.WorkflowRun, cli client.Client) WorkflowExecutor {
+func New(instance *types.WorkflowInstance, cli client.Client) WorkflowExecutor {
 	return &workflowExecutor{
-		wr:  wr,
-		cli: cli,
+		instance: instance,
+		cli:      cli,
 	}
 }
 
-func InitializeWorkflowRun(wr *v1alpha1.WorkflowRun) {
-	if wr.Status.StartTime.IsZero() && len(wr.Status.Steps) == 0 {
+// InitializeWorkflowInstance init workflow instance
+func InitializeWorkflowInstance(instance *types.WorkflowInstance) {
+	if instance.Status.StartTime.IsZero() && len(instance.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
 		mode := v1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeStep,
 			SubSteps: v1alpha1.WorkflowModeDAG,
 		}
-		if wr.Spec.Mode != nil {
-			if wr.Spec.Mode.Steps != "" {
-				mode.Steps = wr.Spec.Mode.Steps
+		if instance.Mode != nil {
+			if instance.Mode.Steps != "" {
+				mode.Steps = instance.Mode.Steps
 			}
-			if wr.Spec.Mode.SubSteps != "" {
-				mode.SubSteps = wr.Spec.Mode.SubSteps
+			if instance.Mode.SubSteps != "" {
+				mode.SubSteps = instance.Mode.SubSteps
 			}
 		}
-		wr.Status = v1alpha1.WorkflowRunStatus{
+		instance.Status = v1alpha1.WorkflowRunStatus{
 			Mode:      mode,
 			StartTime: metav1.Now(),
 		}
-		StepStatusCache.Delete(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace))
-		wfContext.CleanupMemoryStore(wr.Name, wr.Namespace)
+		StepStatusCache.Delete(fmt.Sprintf("%s-%s", instance.Name, instance.Namespace))
+		wfContext.CleanupMemoryStore(instance.Name, instance.Namespace)
 	}
 }
 
 // ExecuteRunners execute workflow task runners in order.
-func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (types.WorkflowState, error) {
-	InitializeWorkflowRun(w.wr)
-	status := &w.wr.Status
+func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (v1alpha1.WorkflowRunPhase, error) {
+	InitializeWorkflowInstance(w.instance)
+	status := &w.instance.Status
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
-	cacheKey := fmt.Sprintf("%s-%s", w.wr.Name, w.wr.Namespace)
+	cacheKey := fmt.Sprintf("%s-%s", w.instance.Name, w.instance.Namespace)
 
 	allTasksDone, allTasksSucceeded := w.allDone(taskRunners)
 	if status.Finished {
 		StepStatusCache.Delete(cacheKey)
 	}
 	if checkWorkflowTerminated(status, allTasksDone) {
-		return types.WorkflowStateTerminated, nil
+		if isTerminatedManually(status) {
+			return v1alpha1.WorkflowStateTerminated, nil
+		}
+		return v1alpha1.WorkflowStateFailed, nil
 	}
 	if checkWorkflowSuspended(status) {
-		return types.WorkflowStateSuspended, nil
+		return v1alpha1.WorkflowStateSuspending, nil
 	}
 	if allTasksSucceeded {
-		return types.WorkflowStateSucceeded, nil
+		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 
 	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
 		// handle cache resource
 		if len(status.Steps) < cacheValue.(int) {
-			return types.WorkflowStateSkipping, nil
+			return v1alpha1.WorkflowStateSkipped, nil
 		}
 	}
 
-	wfCtx, err := w.makeContext(w.wr.Name)
+	wfCtx, err := w.makeContext(w.instance.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
-		return types.WorkflowStateExecuting, err
+		return v1alpha1.WorkflowStateExecuting, err
 	}
 	w.wfCtx = wfCtx
 
@@ -134,7 +138,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if err != nil {
 		ctx.Error(err, "run steps")
 		StepStatusCache.Store(cacheKey, len(status.Steps))
-		return types.WorkflowStateExecuting, err
+		return v1alpha1.WorkflowStateExecuting, err
 	}
 
 	e.checkWorkflowStatusMessage(status)
@@ -143,18 +147,35 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if status.Terminated {
 		e.cleanBackoffTimesForTerminated()
 		if checkWorkflowTerminated(status, allTasksDone) {
-			wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-			return types.WorkflowStateTerminated, nil
+			wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
+			if isTerminatedManually(status) {
+				return v1alpha1.WorkflowStateTerminated, nil
+			}
+			return v1alpha1.WorkflowStateFailed, nil
 		}
 	}
 	if status.Suspend {
-		wfContext.CleanupMemoryStore(e.wr.Name, e.wr.Namespace)
-		return types.WorkflowStateSuspended, nil
+		wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
+		return v1alpha1.WorkflowStateSuspending, nil
 	}
 	if allTasksSucceeded {
-		return types.WorkflowStateSucceeded, nil
+		return v1alpha1.WorkflowStateSucceeded, nil
 	}
-	return types.WorkflowStateExecuting, nil
+	return v1alpha1.WorkflowStateExecuting, nil
+}
+
+func isTerminatedManually(status *v1alpha1.WorkflowRunStatus) bool {
+	manually := false
+	for _, step := range status.Steps {
+		if step.Phase == v1alpha1.WorkflowStepPhaseFailed {
+			if step.Reason == types.StatusReasonTerminate {
+				manually = true
+			} else {
+				return false
+			}
+		}
+	}
+	return manually
 }
 
 func checkWorkflowTerminated(status *v1alpha1.WorkflowRunStatus, allTasksDone bool) bool {
@@ -183,27 +204,21 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 	stepStatus := make(map[string]v1alpha1.StepStatus)
 	setStepStatus(stepStatus, wfStatus.Steps)
 	stepDependsOn := make(map[string][]string)
-	if w.wr.Spec.WorkflowSpec != nil {
-		for _, step := range w.wr.Spec.WorkflowSpec.Steps {
+	for _, step := range w.instance.Steps {
+		hooks.SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, stepStatus[step.Name])
+		stepDependsOn[step.Name] = append(stepDependsOn[step.Name], step.DependsOn...)
+		for _, sub := range step.SubSteps {
 			hooks.SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, stepStatus[step.Name])
-			stepDependsOn[step.Name] = append(stepDependsOn[step.Name], step.DependsOn...)
-			for _, sub := range step.SubSteps {
-				hooks.SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, stepStatus[step.Name])
-				stepDependsOn[sub.Name] = append(stepDependsOn[sub.Name], sub.DependsOn...)
-			}
+			stepDependsOn[sub.Name] = append(stepDependsOn[sub.Name], sub.DependsOn...)
 		}
-	}
-	debug := false
-	if w.wr.Annotations != nil && w.wr.Annotations[types.AnnotationWorkflowRunDebug] == "true" {
-		debug = true
 	}
 	return &engine{
 		status:        wfStatus,
 		monitorCtx:    ctx,
-		wr:            w.wr,
+		instance:      w.instance,
 		wfCtx:         wfCtx,
 		cli:           w.cli,
-		debug:         debug,
+		debug:         w.instance.Debug,
 		stepStatus:    stepStatus,
 		stepDependsOn: stepDependsOn,
 		stepTimeout:   make(map[string]time.Time),
@@ -220,14 +235,14 @@ func setStepStatus(statusMap map[string]v1alpha1.StepStatus, status []v1alpha1.W
 }
 
 func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
-	if w.wr.Spec.WorkflowSpec.Steps == nil || len(w.wr.Spec.WorkflowSpec.Steps) == 0 {
+	if len(w.instance.Steps) == 0 {
 		return 0
 	}
 	stepStatus := make(map[string]v1alpha1.StepStatus)
-	setStepStatus(stepStatus, w.wr.Status.Steps)
+	setStepStatus(stepStatus, w.instance.Status.Steps)
 	max := time.Duration(1<<63 - 1)
 	min := max
-	for _, step := range w.wr.Spec.WorkflowSpec.Steps {
+	for _, step := range w.instance.Steps {
 		if step.Type == types.WorkflowStepTypeSuspend || step.Type == types.WorkflowStepTypeStepGroup {
 			min = handleSuspendBackoffTime(step, stepStatus[step.Name], min)
 		}
@@ -281,7 +296,7 @@ func handleSuspendBackoffTime(step v1alpha1.WorkflowStep, status v1alpha1.StepSt
 func (w *workflowExecutor) GetBackoffWaitTime() time.Duration {
 	nextTime, ok := w.wfCtx.GetValueInMemory(types.ContextKeyNextExecuteTime)
 	if !ok {
-		if w.wr.Status.Suspend {
+		if w.instance.Status.Suspend {
 			return 0
 		}
 		return time.Second
@@ -300,7 +315,7 @@ func (w *workflowExecutor) GetBackoffWaitTime() time.Duration {
 
 func (w *workflowExecutor) allDone(taskRunners []types.TaskRunner) (bool, bool) {
 	success := true
-	status := w.wr.Status
+	status := w.instance.Status
 	for _, t := range taskRunners {
 		done := false
 		for _, ss := range status.Steps {
@@ -318,16 +333,16 @@ func (w *workflowExecutor) allDone(taskRunners []types.TaskRunner) (bool, bool) 
 }
 
 func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
-	status := &w.wr.Status
+	status := &w.instance.Status
 	if status.ContextBackend != nil {
-		wfCtx, err := wfContext.LoadContext(w.cli, w.wr.Namespace, name)
+		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, name)
 		if err != nil {
 			return nil, errors.WithMessage(err, "load context")
 		}
 		return wfCtx, nil
 	}
 
-	wfCtx, err := wfContext.NewContext(w.cli, w.wr.Namespace, name, w.wr.GetUID())
+	wfCtx, err := wfContext.NewContext(w.cli, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new context")
 	}
@@ -343,10 +358,12 @@ func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
 }
 
 func (w *workflowExecutor) setMetadataToContext(wfCtx wfContext.Context) error {
-	copierMeta := w.wr.ObjectMeta.DeepCopy()
-	copierMeta.ManagedFields = nil
-	copierMeta.Finalizers = nil
-	copierMeta.OwnerReferences = nil
+	copierMeta := types.WorkflowMeta{
+		Name:        w.instance.Name,
+		Namespace:   w.instance.Namespace,
+		Annotations: w.instance.Annotations,
+		Labels:      w.instance.Labels,
+	}
 	b, err := json.Marshal(copierMeta)
 	if err != nil {
 		return err
@@ -442,7 +459,7 @@ func (e *engine) setNextExecuteTime() {
 	backoff := e.getBackoffWaitTime()
 	lastExecuteTime, ok := e.wfCtx.GetValueInMemory(types.ContextKeyLastExecuteTime)
 	if !ok {
-		e.monitorCtx.Error(fmt.Errorf("failed to get last execute time"), "workflow run", e.wr.Name)
+		e.monitorCtx.Error(fmt.Errorf("failed to get last execute time"), "workflow run", e.instance.Name)
 	}
 
 	last, ok := lastExecuteTime.(int64)
@@ -531,6 +548,7 @@ func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus
 	case wfStatus.Terminated && !feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
 		e.status.Message = types.MessageTerminated
 	default:
+		e.status.Message = ""
 	}
 }
 
@@ -646,7 +664,7 @@ func (e *engine) generateRunOptions(dependsOnPhase v1alpha1.WorkflowStepPhase) *
 	}
 	if e.debug {
 		options.Debug = func(step string, v *value.Value) error {
-			debugContext := debug.NewContext(e.cli, e.wr, step)
+			debugContext := debug.NewContext(e.cli, e.instance, step)
 			if err := debugContext.Set(v); err != nil {
 				return err
 			}
@@ -663,7 +681,7 @@ type engine struct {
 	status             *v1alpha1.WorkflowRunStatus
 	monitorCtx         monitorContext.Context
 	wfCtx              wfContext.Context
-	wr                 *v1alpha1.WorkflowRun
+	instance           *types.WorkflowInstance
 	cli                client.Client
 	parentRunner       string
 	stepStatus         map[string]v1alpha1.StepStatus

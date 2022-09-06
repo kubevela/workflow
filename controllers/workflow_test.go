@@ -121,7 +121,7 @@ var _ = Describe("Test Workflow", func() {
 		}, wrObj)).Should(BeNil())
 
 		Expect(wrObj.Status.Suspend).Should(BeTrue())
-		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 	})
 
 	It("get failed to generate", func() {
@@ -174,7 +174,7 @@ var _ = Describe("Test Workflow", func() {
 		}, wrObj)).Should(BeNil())
 
 		Expect(wrObj.Status.Suspend).Should(BeTrue())
-		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		Expect(wrObj.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
 		Expect(wrObj.Status.Steps[0].ID).ShouldNot(BeEquivalentTo(""))
 		// resume
@@ -194,7 +194,7 @@ var _ = Describe("Test Workflow", func() {
 			Namespace: wr.Namespace,
 		}, wrObj)).Should(BeNil())
 		Expect(wrObj.Status.Suspend).Should(BeFalse())
-		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test workflow terminate a suspend workflow", func() {
@@ -224,7 +224,7 @@ var _ = Describe("Test Workflow", func() {
 		}, wrObj)).Should(BeNil())
 
 		Expect(wrObj.Status.Suspend).Should(BeTrue())
-		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		// terminate the workflow
 		wrObj.Status.Terminated = true
@@ -242,7 +242,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(wrObj.Status.Suspend).Should(BeFalse())
 		Expect(wrObj.Status.Terminated).Should(BeTrue())
-		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 	})
 
 	It("test input/output in step mode", func() {
@@ -283,7 +283,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		expDeployment := &appsv1.Deployment{}
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
 		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
@@ -309,7 +309,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeStep))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test input/output in dag mode", func() {
@@ -354,7 +354,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		expDeployment := &appsv1.Deployment{}
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
 		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
@@ -379,7 +379,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test depends on in step mode", func() {
@@ -433,7 +433,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeStep))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test depends on in dag mode", func() {
@@ -490,7 +490,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test failed after retries in step mode with suspend on failure", func() {
@@ -533,14 +533,15 @@ var _ = Describe("Test Workflow", func() {
 		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
 			tryReconcile(reconciler, wr.Name, wr.Namespace)
 			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 			Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		}
 
 		By("workflowrun should be suspended after failed max reconciles")
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 		Expect(checkRun.Status.Message).Should(BeEquivalentTo(wfTypes.MessageSuspendFailedAfterRetries))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
@@ -552,11 +553,12 @@ var _ = Describe("Test Workflow", func() {
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 	})
 
-	It("test failed after retries in dag mode with running sped and suspend on failure", func() {
+	It("test failed after retries in dag mode with running step and suspend on failure", func() {
 		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
@@ -589,14 +591,16 @@ var _ = Describe("Test Workflow", func() {
 		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
 			tryReconcile(reconciler, wr.Name, wr.Namespace)
 			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 			Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		}
 
 		By("workflowrun should not be suspended after failed max reconciles because of running step")
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
 	})
@@ -628,7 +632,7 @@ var _ = Describe("Test Workflow", func() {
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		Expect(checkRun.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 		Expect(checkRun.Status.Steps[0].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonRendering))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSkipped))
@@ -701,7 +705,7 @@ var _ = Describe("Test Workflow", func() {
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(v1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeDAG,
 			SubSteps: v1alpha1.WorkflowModeStep,
@@ -775,7 +779,7 @@ var _ = Describe("Test Workflow", func() {
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSucceeded))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
 	It("test failed step's outputs", func() {
@@ -834,7 +838,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test if always", func() {
@@ -892,7 +896,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test if always in sub steps", func() {
@@ -986,7 +990,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test if expressions", func() {
@@ -1036,7 +1040,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		expDeployment := &appsv1.Deployment{}
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
@@ -1057,7 +1061,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test if expressions in sub steps", func() {
@@ -1138,7 +1142,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		expDeployment := &appsv1.Deployment{}
 		sub1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "sub1"}
@@ -1154,7 +1158,7 @@ var _ = Describe("Test Workflow", func() {
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunExecuting))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(k8sClient.Get(ctx, sub1Key, expDeployment)).Should(utils.NotFoundMatcher{})
 		Expect(k8sClient.Get(ctx, sub3Key, expDeployment)).Should(BeNil())
 		expDeployment.Status.Replicas = 1
@@ -1174,13 +1178,13 @@ var _ = Describe("Test Workflow", func() {
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		time.Sleep(time.Second)
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test timeout", func() {
@@ -1242,7 +1246,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Steps[0].Reason).Should(Equal(wfTypes.StatusReasonTimeout))
 		Expect(checkRun.Status.Steps[1].Phase).Should(Equal(v1alpha1.WorkflowStepPhaseSucceeded))
 		Expect(checkRun.Status.Steps[2].Reason).Should(Equal(wfTypes.StatusReasonSkip))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 	})
 
 	It("test timeout in sub steps", func() {
@@ -1349,7 +1353,7 @@ var _ = Describe("Test Workflow", func() {
 
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunSuspending))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		time.Sleep(time.Second)
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
@@ -1359,7 +1363,48 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Steps[1].Phase).Should(Equal(v1alpha1.WorkflowStepPhaseSucceeded))
 		Expect(checkRun.Status.Steps[2].Reason).Should(Equal(wfTypes.StatusReasonSkip))
 		Expect(checkRun.Status.Steps[3].Reason).Should(Equal(wfTypes.StatusReasonTimeout))
-		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowRunTerminated))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
+	})
+
+	It("test terminate manually", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-terminate-manually"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "step1",
+					Type: "suspend",
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step2",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(context.Background(), wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		expDeployment := &appsv1.Deployment{}
+		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+
+		// terminate manually
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		terminateWorkflowRun(ctx, checkRun, 0)
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Steps[1].Phase).Should(Equal(v1alpha1.WorkflowStepPhaseSkipped))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
 	})
 
 	It("test debug", func() {
@@ -1371,6 +1416,19 @@ var _ = Describe("Test Workflow", func() {
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "step2",
+					Type: "step-group",
+				},
+				SubSteps: []v1alpha1.WorkflowStepBase{
+					{
+						Name:       "step2-sub",
+						Type:       "test-apply",
+						Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					},
 				},
 			},
 		}
@@ -1393,15 +1451,27 @@ var _ = Describe("Test Workflow", func() {
 		}
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
+		subKey := types.NamespacedName{Namespace: wr.Namespace, Name: "step2-sub"}
+		Expect(k8sClient.Get(ctx, subKey, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
 		By("Check WorkflowRun running successfully")
 		curRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, curRun)).Should(BeNil())
-		Expect(curRun.Status.Phase).Should(Equal(v1alpha1.WorkflowRunSucceeded))
+		Expect(curRun.Status.Phase).Should(Equal(v1alpha1.WorkflowStateSucceeded))
 
 		By("Check debug Config Map is created")
 		debugCM := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{
 			Name:      debug.GenerateContextName(wr.Name, "step1"),
+			Namespace: wr.Namespace,
+		}, debugCM)).Should(BeNil())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{
+			Name:      debug.GenerateContextName(wr.Name, "step2-sub"),
 			Namespace: wr.Namespace,
 		}, debugCM)).Should(BeNil())
 	})
@@ -1445,6 +1515,14 @@ func setupTestDefinitions(ctx context.Context, defs []string, ns string) {
 		u.SetNamespace("vela-system")
 		Expect(k8sClient.Create(ctx, u)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 	}
+}
+
+func terminateWorkflowRun(ctx context.Context, run *v1alpha1.WorkflowRun, index int) {
+	run.Status.Suspend = false
+	run.Status.Terminated = true
+	run.Status.Steps[index].Phase = v1alpha1.WorkflowStepPhaseFailed
+	run.Status.Steps[index].Reason = wfTypes.StatusReasonTerminate
+	Expect(k8sClient.Status().Update(ctx, run)).Should(BeNil())
 }
 
 const (

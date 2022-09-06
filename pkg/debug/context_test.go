@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestSetContext(t *testing.T) {
@@ -41,12 +41,25 @@ func TestSetContext(t *testing.T) {
 			"debug": "test",
 		},
 	})
-	debugCtx := NewContext(cli, &v1alpha1.WorkflowRun{
-		ObjectMeta: metav1.ObjectMeta{
+	// test update
+	debugCtx := NewContext(cli, &types.WorkflowInstance{
+		WorkflowMeta: types.WorkflowMeta{
 			Name: "test",
 		},
 	}, "step1")
 	v, err := value.NewValue(`
+test: test
+`, nil, "")
+	r.NoError(err)
+	err = debugCtx.Set(v)
+	r.NoError(err)
+	// test create
+	debugCtx = NewContext(cli, &types.WorkflowInstance{
+		WorkflowMeta: types.WorkflowMeta{
+			Name: "test",
+		},
+	}, "step2")
+	v, err = value.NewValue(`
 test: test
 `, nil, "")
 	r.NoError(err)
@@ -79,6 +92,9 @@ func newCliForTest(wfCm *corev1.ConfigMap) *test.MockClient {
 				}
 				*wfCm = *o
 			}
+			return nil
+		},
+		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
 		},
 	}

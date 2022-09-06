@@ -18,15 +18,15 @@ package executor
 import (
 	"time"
 
+	"github.com/kubevela/workflow/api/v1alpha1"
 	monitorContext "github.com/kubevela/workflow/pkg/monitor/context"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
 // Workflow is used to execute the workflow steps of Application.
 type WorkflowExecutor interface {
-	// ExecuteSteps executes the steps of an Application with given steps of rendered resources.
-	// It returns done=true only if all steps are executed and succeeded.
-	ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (state types.WorkflowState, err error)
+	// ExecuteSteps executes the steps
+	ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (state v1alpha1.WorkflowRunPhase, err error)
 
 	// GetBackoffWaitTime returns the wait time for next retry.
 	GetBackoffWaitTime() time.Duration

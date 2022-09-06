@@ -23,8 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ktypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -41,21 +39,18 @@ const (
 )
 
 // Dispatcher is a client for apply resources.
-type Dispatcher func(ctx context.Context, cluster string, manifests ...*unstructured.Unstructured) error
+type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*unstructured.Unstructured) error
 
 // Deleter is a client for delete resources.
-type Deleter func(ctx context.Context, cluster string, manifest *unstructured.Unstructured) error
-
-type ContextHandler func(ctx context.Context, cluster string, userInfo user.Info) context.Context
+type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
 
 type Handlers struct {
-	Apply          Dispatcher
-	Delete         Deleter
-	ContextHandler ContextHandler
+	Apply  Dispatcher
+	Delete Deleter
 }
 
 type provider struct {
-	userInfo user.Info
+	labels   map[string]string
 	handlers Handlers
 	cli      client.Client
 }
@@ -64,23 +59,19 @@ type contextKey string
 
 const (
 	// ClusterContextKey is the name of cluster using in client http context
-	ClusterContextKey = contextKey("ClusterName")
+	ClusterContextKey              = contextKey("ClusterName")
+	WorkflowResourceCreator string = "workflow"
 )
 
-func contextHandler(ctx context.Context, cluster string, userInfo user.Info) context.Context {
-	c := context.WithValue(ctx, ClusterContextKey, cluster)
-	if userInfo != nil {
-		c = request.WithUser(c, userInfo)
-	}
-	return c
+func handleContext(ctx context.Context, cluster string) context.Context {
+	return context.WithValue(ctx, ClusterContextKey, cluster)
 }
 
 type dispatcher struct {
-	cli    client.Client
-	owners []metav1.OwnerReference
+	cli client.Client
 }
 
-func (d *dispatcher) apply(ctx context.Context, cluster string, workloads ...*unstructured.Unstructured) error {
+func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads ...*unstructured.Unstructured) error {
 	for _, workload := range workloads {
 		existing := new(unstructured.Unstructured)
 		existing.GetObjectKind().SetGroupVersionKind(workload.GetObjectKind().GroupVersionKind())
@@ -89,7 +80,6 @@ func (d *dispatcher) apply(ctx context.Context, cluster string, workloads ...*un
 			Name:      workload.GetName(),
 		}, existing); err != nil {
 			if errors.IsNotFound(err) {
-				workload.SetOwnerReferences(d.owners)
 				if err := d.cli.Create(ctx, workload); err != nil {
 					return err
 				}
@@ -105,7 +95,7 @@ func (d *dispatcher) apply(ctx context.Context, cluster string, workloads ...*un
 	return nil
 }
 
-func (d *dispatcher) delete(ctx context.Context, cluster string, manifest *unstructured.Unstructured) error {
+func (d *dispatcher) delete(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error {
 	return d.cli.Delete(ctx, manifest)
 }
 
@@ -140,12 +130,13 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 	if workload.GetNamespace() == "" {
 		workload.SetNamespace("default")
 	}
+	workload.SetLabels(h.labels)
 	cluster, err := v.GetString("cluster")
 	if err != nil {
 		return err
 	}
-	deployCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Apply(deployCtx, cluster, workload); err != nil {
+	deployCtx := handleContext(ctx, cluster)
+	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workload); err != nil {
 		return err
 	}
 	return cue.FillUnstructuredObject(v, workload, "value")
@@ -178,8 +169,8 @@ func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.C
 	if err != nil {
 		return err
 	}
-	deployCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Apply(deployCtx, cluster, workloads...); err != nil {
+	deployCtx := handleContext(ctx, cluster)
+	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workloads...); err != nil {
 		return err
 	}
 	return nil
@@ -203,7 +194,7 @@ func (h *provider) Read(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 	if err != nil {
 		return err
 	}
-	readCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
+	readCtx := handleContext(ctx, cluster)
 	if err := h.cli.Get(readCtx, key, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
@@ -245,7 +236,7 @@ func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 		client.InNamespace(filter.Namespace),
 		client.MatchingLabels(filter.MatchingLabels),
 	}
-	readCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
+	readCtx := handleContext(ctx, cluster)
 	if err := h.cli.List(readCtx, list, listOpts...); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
@@ -266,30 +257,28 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 	if err != nil {
 		return err
 	}
-	deleteCtx := h.handlers.ContextHandler(ctx, cluster, h.userInfo)
-	if err := h.handlers.Delete(deleteCtx, cluster, obj); err != nil {
+	deleteCtx := handleContext(ctx, cluster)
+	if err := h.handlers.Delete(deleteCtx, cluster, WorkflowResourceCreator, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
 	return nil
 }
 
 // Install register handlers to provider discover.
-func Install(p types.Providers, cli client.Client, userInfo user.Info, owners []metav1.OwnerReference, handlers *Handlers) {
+func Install(p types.Providers, cli client.Client, labels map[string]string, handlers *Handlers) {
 	if handlers == nil {
 		d := &dispatcher{
-			cli:    cli,
-			owners: owners,
+			cli: cli,
 		}
 		handlers = &Handlers{
-			ContextHandler: contextHandler,
-			Apply:          d.apply,
-			Delete:         d.delete,
+			Apply:  d.apply,
+			Delete: d.delete,
 		}
 	}
 	prd := &provider{
-		userInfo: userInfo,
 		cli:      cli,
 		handlers: *handlers,
+		labels:   labels,
 	}
 	p.Register(ProviderName, map[string]types.Handler{
 		"apply":             prd.Apply,
