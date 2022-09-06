@@ -161,7 +161,7 @@ func generateTaskRunner(ctx context.Context,
 				ID:              generateSubStepID(instance.Status, subStep.Name, step.Name),
 				PackageDiscover: options.PackageDiscover,
 				ProcessContext:  options.ProcessContext,
-			})
+			}
 			for typ, convertor := range stepOptions.StepConvertor {
 				if subStep.Type == typ {
 					o.StepConvertor = convertor
