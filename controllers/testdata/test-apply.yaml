@@ -1,0 +1,19 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: test-apply
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: "import (\t\"vela/op\"\n)\n\noutput: op.#Apply & {\n\tvalue: {\n\t\tapiVersion:
+        \"apps/v1\"\n\t\tkind:       \"Deployment\"\n\t\tmetadata: {\n\t\t\tname:
+        \     context.stepName\n\t\t\tnamespace: context.namespace\n\t\t}\n\t\tspec:
+        {\n\t\t\tselector: matchLabels: wr: context.stepName\n\t\t\ttemplate: {\n\t\t\t\tmetadata:
+        labels: wr: context.stepName\n\t\t\t\tspec: containers: [{\n\t\t\t\t\tname:
+        \ context.stepName\n\t\t\t\t\timage: parameter.image\n\t\t\t\t\tif parameter[\"cmd\"]
+        != _|_ {\n\t\t\t\t\t\tcommand: parameter.cmd\n\t\t\t\t\t}\n\t\t\t\t\tif parameter[\"message\"]
+        != _|_ {\n\t\t\t\t\t\tenv: [{\n\t\t\t\t\t\t\tname:  \"MESSAGE\"\n\t\t\t\t\t\t\tvalue:
+        parameter.message\n\t\t\t\t\t\t}]\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n}\nwait:
+        op.#ConditionalWait & {\n\tcontinue: output.value.status.readyReplicas ==
+        1\n}\nparameter: {\n\timage:    string\n\tcmd?:     [...string]\n\tmessage?: string\n}\n"

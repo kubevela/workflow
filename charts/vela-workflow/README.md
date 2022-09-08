@@ -45,6 +45,18 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step          | `10`    |
 
 
+### KubeVela workflow backup parameters
+
+| Name                    | Description                                    | Value                      |
+| ----------------------- | ---------------------------------------------- | -------------------------- |
+| `backup.enabled`        | Enable backup workflow record                  | `false`                    |
+| `backup.strategy`       | The backup strategy for workflow record        | `BackupFinishedRecord`     |
+| `backup.ignoreStrategy` | The ignore strategy for backup                 | `IgnoreLatestFailedRecord` |
+| `backup.cleanOnBackup`  | Enable auto clean after backup workflow record | `false`                    |
+| `backup.groupByLabel`   | The label used to group workflow record        | `""`                       |
+| `backup.persistType`    | The persist type for workflow record           | `""`                       |
+
+
 ### KubeVela Workflow controller parameters
 
 | Name                        | Description                          | Value                  |

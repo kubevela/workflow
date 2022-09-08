@@ -85,9 +85,9 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}, run); err != nil {
 		if !kerrors.IsNotFound(err) {
 			logCtx.Error(err, "get workflowrun")
-		} else {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			return ctrl.Result{}, err
 		}
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	timeReporter := timeReconcile(run)
@@ -173,11 +173,8 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// filter the changes in workflow status
 			// let workflow handle its reconcile
 			UpdateFunc: func(e ctrlEvent.UpdateEvent) bool {
-				new, isNewRun := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
-				old, isOldRun := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
-				if !isNewRun || !isOldRun {
-					return false
-				}
+				new := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				old := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
 
 				// if the workflow is finished, skip the reconcile
 				if new.Status.Finished {
