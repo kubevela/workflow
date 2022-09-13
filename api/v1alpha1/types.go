@@ -51,6 +51,24 @@ type WorkflowRunList struct {
 	Items           []WorkflowRun `json:"items"`
 }
 
+func (w WorkflowRunList) Len() int {
+	return len(w.Items)
+}
+
+func (w WorkflowRunList) Swap(i, j int) {
+	w.Items[i], w.Items[j] = w.Items[j], w.Items[i]
+}
+
+func (w WorkflowRunList) Less(i, j int) bool {
+	if !w.Items[i].Status.Finished && !w.Items[j].Status.Finished {
+		return w.Items[i].CreationTimestamp.After(w.Items[j].CreationTimestamp.Time)
+	}
+	if !w.Items[i].Status.EndTime.IsZero() && !w.Items[j].Status.EndTime.IsZero() {
+		return w.Items[i].Status.EndTime.After(w.Items[j].Status.EndTime.Time)
+	}
+	return !w.Items[i].Status.EndTime.IsZero()
+}
+
 // WorkflowRunSpec is the spec for the WorkflowRun
 type WorkflowRunSpec struct {
 	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`

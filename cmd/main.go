@@ -46,6 +46,7 @@ import (
 	"github.com/kubevela/workflow/controllers"
 	"github.com/kubevela/workflow/pkg/common"
 	"github.com/kubevela/workflow/pkg/cue/packages"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/version"
@@ -65,7 +66,8 @@ func init() {
 
 func main() {
 	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock string
-	var enableLeaderElection, logDebug bool
+	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel string
+	var enableLeaderElection, logDebug, backupCleanOnBackup bool
 	var qps float64
 	var logFileMaxSize uint64
 	var burst, webhookPort int
@@ -95,6 +97,11 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
+	flag.StringVar(&backupStrategy, "backup-strategy", "RemainLatestFailedRecord", "Set the strategy for backup workflow records, default is RemainLatestFailedRecord")
+	flag.StringVar(&backupIgnoreStrategy, "backup-ignore-strategy", "IgnoreLatestFailedRecord", "Set the strategy for ignore backup workflow records, default is IgnoreLatestFailedRecord")
+	flag.StringVar(&backupPersistType, "backup-persist-type", "", "Set the persist type for backup workflow records, default is empty")
+	flag.StringVar(&groupByLabel, "backup-group-by-label", "", "Set the label for group by, default is empty")
+	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 
@@ -194,6 +201,23 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		klog.Error(err, "unable to create controller", "controller", "WorkflowRun")
 		os.Exit(1)
+	}
+
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableBackupWorkflowRecord) {
+		if err = (&controllers.BackupReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			BackupArgs: controllers.BackupArgs{
+				BackupStrategy: backupStrategy,
+				IgnoreStrategy: backupIgnoreStrategy,
+				CleanOnBackup:  backupCleanOnBackup,
+				GroupByLabel:   groupByLabel,
+			},
+			Args: controllerArgs,
+		}).SetupWithManager(mgr); err != nil {
+			klog.Error(err, "unable to create controller", "controller", "backup")
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 

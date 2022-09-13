@@ -25,6 +25,21 @@ workflow:
   step:
     errorRetryTimes: 10
 
+## @section KubeVela workflow backup parameters
+
+## @param backup.enabled Enable backup workflow record
+## @param backup.strategy The backup strategy for workflow record
+## @param backup.ignoreStrategy The ignore strategy for backup
+## @param backup.cleanOnBackup Enable auto clean after backup workflow record
+## @param backup.groupByLabel The label used to group workflow record
+## @param backup.persistType The persist type for workflow record
+backup:
+  enabled: false
+  strategy: BackupFinishedRecord
+  ignoreStrategy: IgnoreLatestFailedRecord
+  cleanOnBackup: false
+  groupByLabel: ""
+  persistType: ""
 
 ## @section KubeVela Workflow controller parameters
 

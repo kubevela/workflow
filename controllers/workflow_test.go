@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"path/filepath"
+	sysruntime "runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,14 +30,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/yaml"
+
+	"github.com/kubevela/pkg/util/test/definition"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/debug"
@@ -70,7 +72,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		},
 	}
-	testDefinitions := []string{wfStepApplyDefYaml, wfStepApplyObjectDefYaml, wfStepFailedRenderDefYaml}
+	testDefinitions := []string{"test-apply", "apply-object", "failed-render"}
 
 	BeforeEach(func() {
 		setupNamespace(ctx, namespace)
@@ -1505,15 +1507,12 @@ func setupNamespace(ctx context.Context, namespace string) {
 	Expect(k8sClient.Create(ctx, ns)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 }
 
-func setupTestDefinitions(ctx context.Context, defs []string, ns string) {
-	setupNamespace(ctx, "vela-system")
+func setupTestDefinitions(ctx context.Context, defs []string, namespace string) {
+	_, file, _, _ := sysruntime.Caller(0)
 	for _, def := range defs {
-		defJson, err := yaml.YAMLToJSON([]byte(def))
-		Expect(err).Should(BeNil())
-		u := &unstructured.Unstructured{}
-		Expect(json.Unmarshal(defJson, u)).Should(BeNil())
-		u.SetNamespace("vela-system")
-		Expect(k8sClient.Create(ctx, u)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
+		Expect(definition.InstallDefinitionFromYAML(ctx, k8sClient, filepath.Join(filepath.Dir(filepath.Dir(file)), fmt.Sprintf("./controllers/testdata/%s.yaml", def)), func(s string) string {
+			return strings.ReplaceAll(s, "vela-system", namespace)
+		})).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 	}
 }
 
@@ -1524,48 +1523,3 @@ func terminateWorkflowRun(ctx context.Context, run *v1alpha1.WorkflowRun, index 
 	run.Status.Steps[index].Reason = wfTypes.StatusReasonTerminate
 	Expect(k8sClient.Status().Update(ctx, run)).Should(BeNil())
 }
-
-const (
-	wfStepApplyDefYaml = `apiVersion: core.oam.dev/v1beta1
-kind: WorkflowStepDefinition
-metadata:
-  name: test-apply
-  namespace: vela-system
-spec:
-  schematic:
-    cue:
-      template: "import (\n\t\"vela/op\"\n)\n\noutput: op.#Apply & {\n\tvalue: {\n\t\tapiVersion:
-        \"apps/v1\"\n\t\tkind:       \"Deployment\"\n\t\tmetadata: {\n\t\t\tname:
-        \     context.stepName\n\t\t\tnamespace: context.namespace\n\t\t}\n\t\tspec:
-        {\n\t\t\tselector: matchLabels: wr: context.stepName\n\t\t\ttemplate: {\n\t\t\t\tmetadata:
-        labels: wr: context.stepName\n\t\t\t\tspec: containers: [{\n\t\t\t\t\tname:
-        \ context.stepName\n\t\t\t\t\timage: parameter.image\n\t\t\t\t\tif parameter[\"cmd\"]
-        != _|_ {\n\t\t\t\t\t\tcommand: parameter.cmd\n\t\t\t\t\t}\n\t\t\t\t\tif parameter[\"message\"]
-        != _|_ {\n\t\t\t\t\t\tenv: [{\n\t\t\t\t\t\t\tname:  \"MESSAGE\"\n\t\t\t\t\t\t\tvalue:
-        parameter.message\n\t\t\t\t\t\t}]\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n}\nwait:
-        op.#ConditionalWait & {\n\tcontinue: output.value.status.readyReplicas ==
-        1\n}\nparameter: {\n\timage:    string\n\tcmd?:     [...string]\n\tmessage?: string\n}\n"
-`
-
-	wfStepApplyObjectDefYaml = `apiVersion: core.oam.dev/v1beta1
-kind: WorkflowStepDefinition
-metadata:
-  name: apply-object
-  namespace: vela-system
-spec:
-  schematic:
-    cue:
-      template: "import (\n\t\"vela/op\"\n)\n\napply: op.#Apply & {\n\tvalue:   parameter.value\n\tcluster:
-        parameter.cluster\n}\nparameter: {\n\t// +usage=Specify the value of the object\n\tvalue:
-        {...}\n\t// +usage=Specify the cluster of the object\n\tcluster: *\"\" | string\n}\n"`
-
-	wfStepFailedRenderDefYaml = `apiVersion: core.oam.dev/v1beta1
-kind: WorkflowStepDefinition
-metadata:
-  name: failed-render
-  namespace: vela-system
-spec:
-  schematic:
-    cue:
-      template: ":"`
-)

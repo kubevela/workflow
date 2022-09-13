@@ -1,0 +1,9 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: failed-render
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: ":"

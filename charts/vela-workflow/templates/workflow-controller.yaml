@@ -131,6 +131,14 @@ spec:
             - "--max-workflow-failed-backoff-time={{ .Values.workflow.backoff.maxTime.failedState }}"
             - "--max-workflow-step-error-retry-times={{ .Values.workflow.step.errorRetryTimes }}"
             - "--feature-gates=EnableSuspendOnFailure={{- .Values.workflow.enableSuspendOnFailure | toString -}}"
+            - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
+            {{ if .Values.backup.enable }}
+            - "--backup-strategy={{ .Values.backup.strategy }}"
+            - "--backup-ignore-strategy={{ .Values.backup.ignoreStrategy }}"
+            - "--backup-group-by-label={{ .Values.backup.groupByLabel }}"
+            - "--backup-clean-on-backup={{ .Values.backup.cleanOnBackup }}"
+            - "--backup-persist-type={{ .Values.backup.persisType }}"
+            {{ end }}
           image: {{ .Values.imageRegistry }}{{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ quote .Values.image.pullPolicy }}
           resources:
