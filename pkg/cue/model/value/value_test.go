@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"cuelang.org/go/cue"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
 
 	"github.com/pkg/errors"
@@ -409,6 +410,57 @@ func TestStepByList(t *testing.T) {
 		return false, nil
 	})
 	r.Error(err)
+}
+
+func TestFieldPath(t *testing.T) {
+	testCases := []struct {
+		paths    []string
+		expected cue.Path
+	}{
+		{
+			paths:    []string{""},
+			expected: cue.ParsePath(""),
+		},
+		{
+			paths:    []string{`a.b`},
+			expected: cue.ParsePath("a.b"),
+		},
+		{
+			paths:    []string{`a[0]`},
+			expected: cue.ParsePath("a[0]"),
+		},
+		{
+			paths:    []string{`_a`},
+			expected: cue.ParsePath("_a"),
+		},
+		{
+			paths:    []string{`#a`},
+			expected: cue.ParsePath("#a"),
+		},
+		{
+			paths:    []string{`a`},
+			expected: cue.ParsePath(`"a"`),
+		},
+		{
+			paths:    []string{`"1"`},
+			expected: cue.MakePath(cue.Str("1")),
+		},
+		{
+			paths:    []string{`1`},
+			expected: cue.MakePath(cue.Str("1")),
+		},
+		{
+			paths:    []string{`1`, `"#a"`, `b`},
+			expected: cue.ParsePath(`"1".#a["b"]`),
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			r := require.New(t)
+			fp := FieldPath(tc.paths...)
+			r.Equal(tc.expected, fp)
+		})
+	}
 }
 
 func TestValue(t *testing.T) {

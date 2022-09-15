@@ -783,13 +783,14 @@ func makePath(paths ...string) string {
 		return mergedPath
 	}
 	mergedPath = paths[0]
-	if mergedPath == "" || (len(paths) == 1 && (strings.Contains(mergedPath, ".") || strings.Contains(mergedPath, "["))) {
-		return paths[0]
+	if mergedPath == "" || (len(paths) == 1 && (strings.Contains(mergedPath, ".") || strings.Contains(mergedPath, "[") || isNumber(mergedPath))) {
+		return unquoteString(paths[0])
 	}
 	if !strings.HasPrefix(mergedPath, "_") && !strings.HasPrefix(mergedPath, "#") {
-		mergedPath = fmt.Sprintf("\"%s\"", mergedPath)
+		mergedPath = fmt.Sprintf("\"%s\"", unquoteString(mergedPath))
 	}
 	for _, p := range paths[1:] {
+		p = unquoteString(p)
 		if !strings.HasPrefix(p, "#") {
 			mergedPath += fmt.Sprintf("[\"%s\"]", p)
 		} else {
@@ -797,6 +798,13 @@ func makePath(paths ...string) string {
 		}
 	}
 	return mergedPath
+}
+
+func unquoteString(s string) string {
+	if unquote, err := strconv.Unquote(s); err == nil {
+		return unquote
+	}
+	return s
 }
 
 func isNumber(s string) bool {
