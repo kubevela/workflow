@@ -562,6 +562,7 @@ func (iter *stepsIterator) next() bool {
 	return iter.index <= len(iter.queue)-1
 }
 
+// nolint:staticcheck
 func (iter *stepsIterator) assemble() {
 	st, err := iter.target.v.Struct()
 	if err != nil {
@@ -578,7 +579,7 @@ func (iter *stepsIterator) assemble() {
 		if st.Field(i).Value.IncompleteKind() == cue.TopKind {
 			continue
 		}
-		name := st.Field(i).Name
+		name := st.Field(i).Selector
 		attr := st.Field(i).Value.Attribute("step")
 		no, err := attr.Int(0)
 		if err != nil {

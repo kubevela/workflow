@@ -398,8 +398,8 @@ process: {
 
 if process.err {
   err: {
-     #provider: "test"
-	 #do: "error"
+    #provider: "test"
+	  #do: "error"
   }
 }
 
@@ -410,18 +410,18 @@ apply: {
 
 #up: [process,{}]
 `,
-			expected: "okokok",
+			expected: "ok",
 			hasErr:   true,
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		echo = ""
 		v, err := value.NewValue(tc.base, nil, "", value.TagFieldOrder)
 		r.NoError(err)
 		err = exec.doSteps(nil, wfCtx, v)
 		r.Equal(err != nil, tc.hasErr)
-		r.Equal(echo, tc.expected)
+		r.Equal(tc.expected, echo, i)
 	}
 
 }
