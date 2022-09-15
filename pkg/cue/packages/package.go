@@ -232,14 +232,15 @@ func (pd *PackageDiscover) addKubeCUEPackagesFromCluster(apiSchema string) error
 	dgvkMapper := make(map[string]domainGroupVersionKind)
 	pathValue := oaInst.LookupPath(cue.ParsePath("paths"))
 	if pathValue.Exists() {
-		if st, err := pathValue.Struct(); err == nil {
-			iter := st.Fields()
-			for iter.Next() {
-				gvk := iter.Value().LookupPath(cue.ParsePath("post[\"x-kubernetes-group-version-kind\"]"))
-				if gvk.Exists() {
-					if v, err := getDGVK(gvk); err == nil {
-						dgvkMapper[v.reverseString()] = v
-					}
+		iter, err := pathValue.Fields()
+		if err != nil {
+			return err
+		}
+		for iter.Next() {
+			gvk := iter.Value().LookupPath(cue.ParsePath("post[\"x-kubernetes-group-version-kind\"]"))
+			if gvk.Exists() {
+				if v, err := getDGVK(gvk); err == nil {
+					dgvkMapper[v.reverseString()] = v
 				}
 			}
 		}

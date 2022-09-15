@@ -208,8 +208,6 @@ step3: "3"
 }
 
 func TestStepWithTag(t *testing.T) {
-	// TODO(@FogDong): add if condition test cases back.
-	// refer to issue: https://github.com/cue-lang/cue/issues/1826
 	testCases := []struct {
 		base     string
 		expected string
@@ -219,6 +217,9 @@ step1: {}
 step2: {prefix: step1.value}
 step3: {prefix: step2.value}
 step4: {prefix: step3.value}
+if step4.value > 100 {
+	step5: {}
+}
 step5: {
 	value:  *100|int
 }
@@ -244,7 +245,9 @@ step5: {
 `}, {base: `
 step1: {}
 step2: {prefix: step1.value}
-step2_3: {prefix: step2.value}
+if step2.value > 100 {
+	step2_3: {prefix: step2.value}
+}
 step3: {prefix: step2.value}
 step4: {prefix: step3.value}
 `,
@@ -255,14 +258,14 @@ step2: {
 	prefix: 100
 	value:  101
 } @step(2)
-step2_3: {
-	prefix: 101
-	value:  102
-} @step(3)
 step3: {
 	prefix: 101
 	value:  103
 } @step(4)
+step2_3: {
+	prefix: 101
+	value:  102
+} @step(3)
 step4: {
 	prefix: 103
 	value:  104
@@ -271,7 +274,9 @@ step4: {
 step2: {prefix: step1.value} @step(2)
 step1: {} @step(1)
 step3: {prefix: step2.value} @step(4)
-step2_3: {prefix: step2.value} @step(3)
+if step2.value > 100 {
+	step2_3: {prefix: step2.value} @step(3)
+}
 `,
 			expected: `step2: {
 	prefix: 100
@@ -280,20 +285,22 @@ step2_3: {prefix: step2.value} @step(3)
 step1: {
 	value: 100
 } @step(1)
-step3: {
-	prefix: 101
-	value:  103
-} @step(4)
 step2_3: {
 	prefix: 101
 	value:  102
 } @step(3)
+step3: {
+	prefix: 101
+	value:  103
+} @step(4)
 `},
 
 		{base: `
 step2: {prefix: step1.value} 
 step1: {} @step(-1)
-step2_3: {prefix: step2.value}
+if step2.value > 100 {
+	step2_3: {prefix: step2.value}
+}
 step3: {prefix: step2.value}
 `,
 			expected: `step2: {
