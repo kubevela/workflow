@@ -10,7 +10,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/go-version v1.3.0
-	github.com/kubevela/pkg v0.0.0-20220908032550-a8e915458e61
+	github.com/kubevela/pkg v0.0.0-20220919085530-d9d2daa3e4da
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.2
 	github.com/pkg/errors v0.9.1

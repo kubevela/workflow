@@ -27,6 +27,8 @@ import (
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/multicluster"
+	"github.com/kubevela/pkg/util/k8s"
+	"github.com/kubevela/pkg/util/k8s/patch"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue"
@@ -38,6 +40,10 @@ import (
 const (
 	// ProviderName is provider name for install.
 	ProviderName = "kube"
+	// AnnoWorkflowLastAppliedConfig is the annotation for last applied config
+	AnnoWorkflowLastAppliedConfig = "workflow.oam.dev/last-applied-configuration"
+	// AnnoWorkflowLastAppliedTime is annotation for last applied time
+	AnnoWorkflowLastAppliedTime = "workflow.oam.dev/last-applied-time"
 )
 
 // Dispatcher is a client for apply resources.
@@ -80,6 +86,14 @@ func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads
 			Name:      workload.GetName(),
 		}, existing); err != nil {
 			if errors.IsNotFound(err) {
+				// TODO: make the annotation optional
+				b, err := workload.MarshalJSON()
+				if err != nil {
+					return err
+				}
+				if err := k8s.AddAnnotation(workload, AnnoWorkflowLastAppliedConfig, string(b)); err != nil {
+					return err
+				}
 				if err := d.cli.Create(ctx, workload); err != nil {
 					return err
 				}
@@ -87,7 +101,15 @@ func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads
 				return err
 			}
 		} else {
-			if err := d.cli.Patch(ctx, workload, client.Merge); err != nil {
+			patcher, err := patch.ThreeWayMergePatch(existing, workload, &patch.PatchAction{
+				UpdateAnno:            true,
+				AnnoLastAppliedConfig: AnnoWorkflowLastAppliedConfig,
+				AnnoLastAppliedTime:   AnnoWorkflowLastAppliedTime,
+			})
+			if err != nil {
+				return err
+			}
+			if err := d.cli.Patch(ctx, workload, patcher); err != nil {
 				return err
 			}
 		}

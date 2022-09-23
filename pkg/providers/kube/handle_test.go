@@ -127,6 +127,17 @@ cluster: ""
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		err = p.Apply(mCtx, ctx, v, nil)
 		Expect(err).ToNot(HaveOccurred())
+		// test patch
+		v, err = value.NewValue(fmt.Sprintf(`
+		value:{
+			%s
+			metadata: name: "app"
+		}
+		cluster: ""
+		`, s), nil, "")
+		Expect(err).ToNot(HaveOccurred())
+		err = p.Apply(mCtx, ctx, v, nil)
+		Expect(err).ToNot(HaveOccurred())
 		workload, err := component.Workload.Unstructured()
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
@@ -309,6 +320,34 @@ cluster: ""
 		}, &corev1.Pod{})
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).Should(Equal(true))
+	})
+
+	It("apply parallel", func() {
+		ctx, err := newWorkflowContextForTest()
+		Expect(err).ToNot(HaveOccurred())
+
+		component, err := ctx.GetComponent("server")
+		Expect(err).ToNot(HaveOccurred())
+
+		s, err := component.Workload.String()
+		Expect(err).ToNot(HaveOccurred())
+		v, err := value.NewValue(fmt.Sprintf(`
+value:[
+  {
+		%s
+		metadata: name: "app1"
+	},
+	{
+		%s
+		metadata: name: "app1"
+	}
+]
+cluster: ""
+`, s, s), nil, "")
+		Expect(err).ToNot(HaveOccurred())
+		mCtx := monitorContext.NewTraceContext(context.Background(), "")
+		err = p.ApplyInParallel(mCtx, ctx, v, nil)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("test error case", func() {
