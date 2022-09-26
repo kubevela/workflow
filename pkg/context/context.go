@@ -236,16 +236,18 @@ func (wf *WorkflowContext) LoadFromConfigMap(cm corev1.ConfigMap) error {
 	data := cm.Data
 	componentsJs := map[string]string{}
 
-	if err := json.Unmarshal([]byte(data[ConfigMapKeyComponents]), &componentsJs); err != nil {
-		return errors.WithMessage(err, "decode components")
-	}
-	wf.components = map[string]*ComponentManifest{}
-	for name, compJs := range componentsJs {
-		cm := new(ComponentManifest)
-		if err := cm.unmarshal(compJs); err != nil {
-			return errors.WithMessagef(err, "unmarshal component(%s) manifest", name)
+	if data[ConfigMapKeyComponents] != "" {
+		if err := json.Unmarshal([]byte(data[ConfigMapKeyComponents]), &componentsJs); err != nil {
+			return errors.WithMessage(err, "decode components")
 		}
-		wf.components[name] = cm
+		wf.components = map[string]*ComponentManifest{}
+		for name, compJs := range componentsJs {
+			cm := new(ComponentManifest)
+			if err := cm.unmarshal(compJs); err != nil {
+				return errors.WithMessagef(err, "unmarshal component(%s) manifest", name)
+			}
+			wf.components[name] = cm
+		}
 	}
 	var err error
 	wf.vars, err = value.NewValue(data[ConfigMapKeyVars], nil, "")
@@ -326,8 +328,8 @@ func (comp *ComponentManifest) unmarshal(v string) error {
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (Context, error) {
-	wfCtx, err := newContext(cli, ns, app, owner)
+func NewContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (Context, error) {
+	wfCtx, err := newContext(cli, ns, name, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -336,16 +338,16 @@ func NewContext(cli client.Client, ns, app string, owner []metav1.OwnerReference
 }
 
 // CleanupMemoryStore cleans up memory store.
-func CleanupMemoryStore(app, ns string) {
-	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", app, ns))
+func CleanupMemoryStore(name, ns string) {
+	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", name, ns))
 }
 
-func newContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
+func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
 	var (
 		ctx   = context.Background()
 		store corev1.ConfigMap
 	)
-	store.Name = generateStoreName(app)
+	store.Name = GenerateStoreName(name)
 	store.Namespace = ns
 	store.SetOwnerReferences(owner)
 	if EnableInMemoryContext {
@@ -362,7 +364,7 @@ func newContext(cli client.Client, ns, app string, owner []metav1.OwnerReference
 	store.Annotations = map[string]string{
 		AnnotationStartTimestamp: time.Now().String(),
 	}
-	memCache := getMemoryStore(fmt.Sprintf("%s-%s", app, ns))
+	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
 		cli:         cli,
 		store:       &store,
@@ -391,19 +393,19 @@ func getMemoryStore(key string) *sync.Map {
 }
 
 // LoadContext load workflow context from store.
-func LoadContext(cli client.Client, ns, app string) (Context, error) {
+func LoadContext(cli client.Client, ns, name string) (Context, error) {
 	var store corev1.ConfigMap
-	store.Name = generateStoreName(app)
+	store.Name = GenerateStoreName(name)
 	store.Namespace = ns
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
 	} else if err := cli.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
-		Name:      generateStoreName(app),
+		Name:      GenerateStoreName(name),
 	}, &store); err != nil {
 		return nil, err
 	}
-	memCache := getMemoryStore(fmt.Sprintf("%s-%s", app, ns))
+	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	ctx := &WorkflowContext{
 		cli:         cli,
 		store:       &store,
@@ -415,7 +417,7 @@ func LoadContext(cli client.Client, ns, app string) (Context, error) {
 	return ctx, nil
 }
 
-// generateStoreName generates the config map name of workflow context.
-func generateStoreName(app string) string {
-	return fmt.Sprintf("workflow-%s-context", app)
+// GenerateStoreName generates the config map name of workflow context.
+func GenerateStoreName(name string) string {
+	return fmt.Sprintf("workflow-%s-context", name)
 }
