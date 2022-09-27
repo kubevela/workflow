@@ -33,6 +33,8 @@ workflow:
 ## @param backup.cleanOnBackup Enable auto clean after backup workflow record
 ## @param backup.groupByLabel The label used to group workflow record
 ## @param backup.persistType The persist type for workflow record
+## @param backup.configSecretName The secret name of backup config
+## @param backup.configSecretNamespace The secret name of backup config namespace
 backup:
   enabled: false
   strategy: BackupFinishedRecord
@@ -40,6 +42,8 @@ backup:
   cleanOnBackup: false
   groupByLabel: ""
   persistType: ""
+  configSecretName: "backup-config"
+  configSecretNamespace: "vela-system"
 
 ## @section KubeVela Workflow controller parameters
 

@@ -138,6 +138,8 @@ spec:
             - "--backup-group-by-label={{ .Values.backup.groupByLabel }}"
             - "--backup-clean-on-backup={{ .Values.backup.cleanOnBackup }}"
             - "--backup-persist-type={{ .Values.backup.persisType }}"
+            - "--backup-config-secret-name={{ .Values.backup.configSecretName }}"
+            - "--backup-config-secret-namespace={{ .Values.backup.configSecretNamespace }}"
             {{ end }}
           image: {{ .Values.imageRegistry }}{{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ quote .Values.image.pullPolicy }}
