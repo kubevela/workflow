@@ -31,14 +31,7 @@ import (
 func TestGetWorkflowContextData(t *testing.T) {
 	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
 	ctx := context.Background()
-	r := require.New(t)
-
-	// test not found
-	_, err := GetDataFromContext(ctx, cli, "not-found", "default")
-	r.Error(err)
-
-	// test found
-	err = cli.Create(ctx, &corev1.ConfigMap{
+	err := cli.Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "workflow-test-context",
 			Namespace: "default",
@@ -47,17 +40,46 @@ func TestGetWorkflowContextData(t *testing.T) {
 			"vars": `{"test-test": "test"}`,
 		},
 	})
+	r := require.New(t)
 	r.NoError(err)
-	v, err := GetDataFromContext(ctx, cli, "test", "default")
-	r.NoError(err)
-	s, err := sets.ToString(v.CueValue())
-	r.NoError(err)
-	r.Equal(s, "\"test-test\": \"test\"\n")
 
-	// test found with path
-	v, err = GetDataFromContext(ctx, cli, "test", "default", "test-test")
-	r.NoError(err)
-	s, err = sets.ToString(v.CueValue())
-	r.NoError(err)
-	r.Equal(s, "\"test\"\n")
+	testCases := map[string]struct {
+		name        string
+		paths       string
+		expected    string
+		expectedErr string
+	}{
+		"not found": {
+			name:        "not-found",
+			expectedErr: "not found",
+		},
+		"found": {
+			name:     "test",
+			expected: "\"test-test\": \"test\"\n",
+		},
+		"found with path": {
+			name:     "test",
+			paths:    "test-test",
+			expected: "\"test\"\n",
+		},
+		"path not found": {
+			name:        "test",
+			paths:       "not-found",
+			expectedErr: "not exist",
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			v, err := GetDataFromContext(ctx, cli, tc.name, "default", tc.paths)
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
+			s, err := sets.ToString(v.CueValue())
+			r.NoError(err)
+			r.Equal(tc.expected, s)
+		})
+	}
 }

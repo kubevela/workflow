@@ -31,5 +31,12 @@ func GetDataFromContext(ctx context.Context, cli client.Client, name, ns string,
 	if err != nil {
 		return nil, err
 	}
-	return wfCtx.GetVar(paths...)
+	v, err := wfCtx.GetVar(paths...)
+	if err != nil {
+		return nil, err
+	}
+	if v.Error() != nil {
+		return nil, v.Error()
+	}
+	return v, nil
 }
