@@ -160,27 +160,26 @@ func GetSuspendStepDurationWaiting(step v1alpha1.WorkflowStep) (time.Duration, e
 }
 
 func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, pd *packages.PackageDiscover, id string, pCtx process.Context) {
-	status := *stepStatus
 	if len(step.Outputs) > 0 {
 		contextValue, err := custom.MakeValueForContext(ctx, pd, step.Name, id, pCtx)
 		if err != nil {
-			status.Phase = v1alpha1.WorkflowStepPhaseFailed
-			if status.Reason == "" {
-				status.Reason = types.StatusReasonOutput
+			stepStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
+			if stepStatus.Reason == "" {
+				stepStatus.Reason = types.StatusReasonOutput
 			}
 			operations.Terminated = true
-			status.Message = fmt.Sprintf("make context value error: %s", err.Error())
+			stepStatus.Message = fmt.Sprintf("make context value error: %s", err.Error())
 			return
 		}
 
 		for _, hook := range postStopHooks {
-			if err := hook(ctx, contextValue, step, status, nil); err != nil {
-				status.Phase = v1alpha1.WorkflowStepPhaseFailed
-				if status.Reason == "" {
-					status.Reason = types.StatusReasonOutput
+			if err := hook(ctx, contextValue, step, *stepStatus, nil); err != nil {
+				stepStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
+				if stepStatus.Reason == "" {
+					stepStatus.Reason = types.StatusReasonOutput
 				}
 				operations.Terminated = true
-				status.Message = fmt.Sprintf("output error: %s", err.Error())
+				stepStatus.Message = fmt.Sprintf("output error: %s", err.Error())
 				return
 			}
 		}
