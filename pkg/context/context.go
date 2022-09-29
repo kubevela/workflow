@@ -233,6 +233,9 @@ func (wf *WorkflowContext) sync() error {
 
 // LoadFromConfigMap recover workflow context from configMap.
 func (wf *WorkflowContext) LoadFromConfigMap(cm corev1.ConfigMap) error {
+	if wf.store == nil {
+		wf.store = &cm
+	}
 	data := cm.Data
 	componentsJs := map[string]string{}
 
