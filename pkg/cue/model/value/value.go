@@ -459,6 +459,9 @@ func (val *Value) LookupByScript(script string) (*Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	if newV.Error() != nil {
+		return nil, newV.Error()
+	}
 
 	return newV.LookupValue(outputKey)
 }

@@ -18,14 +18,21 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
+	wfContext "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/providers"
 )
 
@@ -195,31 +202,121 @@ func TestConvertString(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	r := require.New(t)
-	v, err := value.NewValue(`
-data: "test"
-`, nil, "")
-	r.NoError(err)
+	wfCtx := newWorkflowContextForTest(t)
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepName, "test-step")
+	prd := &provider{pCtx: pCtx}
 	logCtx := monitorContext.NewTraceContext(context.Background(), "")
-	prd := &provider{}
-	err = prd.Log(logCtx, nil, v, nil)
-	r.NoError(err)
 
-	v, err = value.NewValue(`
+	testCases := []struct {
+		value       string
+		expected    string
+		expectedErr string
+	}{
+		{
+			value:    `data: "test"`,
+			expected: `{"test-step":{"data":true}}`,
+		},
+		{
+			value: `
 data: {
 	message: "test"
+}`,
+			expected: `{"test-step":{"data":true}}`,
+		},
+		{
+			value:    `test: ""`,
+			expected: `{"test-step":{"data":true}}`,
+		},
+		{
+			value: `
+source: {
+	url: "https://kubevela.io"
 }
-	`, nil, "")
-	r.NoError(err)
-	err = prd.Log(logCtx, nil, v, nil)
-	r.NoError(err)
+`,
+			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io"}}}`,
+		},
+		{
+			value: `
+source: {
+	resources: [{
+		labelSelector: {"test": "test"}
+	}]
+}
+`,
+			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io","resources":[{"labelSelector":{"test":"test"}}]}}}`,
+		},
+		{
+			value: `
+source: {
+	resources: [{
+		name: "test"
+		namespace: "test"
+		cluster: "test"
+	}]
+}
+`,
+			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io","resources":[{"name":"test","namespace":"test","cluster":"test"}]}}}`,
+		},
+		{
+			value: `
+source: {
+	url: "https://kubevela.com"
+}
+`,
+			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.com","resources":[{"name":"test","namespace":"test","cluster":"test"}]}}}`,
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			r := require.New(t)
+			v, err := value.NewValue(tc.value, nil, "")
+			r.NoError(err)
+			err = prd.Log(logCtx, wfCtx, v, nil)
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
+			if tc.expected != "" {
+				config := wfCtx.GetMutableValue("logConfig")
+				r.Equal(tc.expected, config)
+			}
+		})
+	}
 }
 
 func TestInstall(t *testing.T) {
 	p := providers.NewProviders()
-	Install(p)
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepName, "test-step")
+	Install(p, pCtx)
 	h, ok := p.GetHandler("util", "string")
 	r := require.New(t)
 	r.Equal(ok, true)
 	r.Equal(h != nil, true)
 }
+
+func newWorkflowContextForTest(t *testing.T) wfContext.Context {
+	cm := corev1.ConfigMap{}
+	r := require.New(t)
+	testCaseJson, err := yaml.YAMLToJSON([]byte(testCaseYaml))
+	r.NoError(err)
+	err = json.Unmarshal(testCaseJson, &cm)
+	r.NoError(err)
+
+	wfCtx := new(wfContext.WorkflowContext)
+	err = wfCtx.LoadFromConfigMap(cm)
+	r.NoError(err)
+	return wfCtx
+}
+
+var (
+	testCaseYaml = `apiVersion: v1
+data:
+  logConfig: ""
+kind: ConfigMap
+metadata:
+  name: app-v1
+`
+)

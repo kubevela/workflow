@@ -125,20 +125,20 @@ func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.Workfl
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
 	}
-	installBuiltinProviders(instance, options.Client, options.Providers)
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
 	}
+	installBuiltinProviders(instance, options.Client, options.Providers, options.ProcessCtx)
 	if options.TemplateLoader == nil {
 		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
 	}
 	return options
 }
 
-func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers) {
+func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers, pCtx process.Context) {
 	workspace.Install(providerHandlers)
 	email.Install(providerHandlers)
-	util.Install(providerHandlers)
+	util.Install(providerHandlers, pCtx)
 	http.Install(providerHandlers, client, instance.Namespace)
 	kube.Install(providerHandlers, client, map[string]string{
 		types.LabelWorkflowRunName:      instance.Name,
