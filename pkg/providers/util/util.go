@@ -32,8 +32,6 @@ import (
 const (
 	// ProviderName is provider name for install.
 	ProviderName = "util"
-	// KeyLogConfig is key for log config.
-	KeyLogConfig = "logConfig"
 )
 
 type provider struct {
@@ -77,26 +75,11 @@ func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v
 	return v.FillObject(string(s), "str")
 }
 
-type resource struct {
-	Name          string            `json:"name,omitempty"`
-	Namespace     string            `json:"namespace,omitempty"`
-	Cluster       string            `json:"cluster,omitempty"`
-	LabelSelector map[string]string `json:"labelSelector,omitempty"`
-}
-type logSource struct {
-	URL       string     `json:"url,omitempty"`
-	Resources []resource `json:"resources,omitempty"`
-}
-type logConfig struct {
-	Data   bool       `json:"data,omitempty"`
-	Source *logSource `json:"source,omitempty"`
-}
-
 // Log print cue value in log
 func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	stepName := fmt.Sprint(p.pCtx.GetData(model.ContextStepName))
-	config := make(map[string]logConfig)
-	c := wfCtx.GetMutableValue(KeyLogConfig)
+	config := make(map[string]types.LogConfig)
+	c := wfCtx.GetMutableValue(types.ContextKeyLogConfig)
 	if c != "" {
 		if err := json.Unmarshal([]byte(c), &config); err != nil {
 			return err
@@ -120,11 +103,11 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 	if err != nil {
 		return err
 	}
-	wfCtx.SetMutableValue(string(b), KeyLogConfig)
+	wfCtx.SetMutableValue(string(b), types.ContextKeyLogConfig)
 	return nil
 }
 
-func printDataInLog(ctx monitorContext.Context, data *value.Value, stepConfig *logConfig) error {
+func printDataInLog(ctx monitorContext.Context, data *value.Value, stepConfig *types.LogConfig) error {
 	stepConfig.Data = true
 	logCtx := ctx.Fork("cue logs")
 	if s, err := data.GetString(); err == nil {
@@ -143,9 +126,9 @@ func printDataInLog(ctx monitorContext.Context, data *value.Value, stepConfig *l
 	return nil
 }
 
-func setSourceInLog(source *value.Value, stepConfig *logConfig) error {
+func setSourceInLog(source *value.Value, stepConfig *types.LogConfig) error {
 	if stepConfig.Source == nil {
-		stepConfig.Source = &logSource{}
+		stepConfig.Source = &types.LogSource{}
 	}
 	if v, err := source.LookupValue("url"); err == nil {
 		url, err := v.GetString()
@@ -159,7 +142,7 @@ func setSourceInLog(source *value.Value, stepConfig *logConfig) error {
 		if err != nil {
 			return err
 		}
-		resources := []resource{}
+		resources := []types.Resource{}
 		if err := json.Unmarshal(b, &resources); err != nil {
 			return err
 		}

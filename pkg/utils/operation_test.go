@@ -18,6 +18,8 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
@@ -80,6 +82,87 @@ func TestGetWorkflowContextData(t *testing.T) {
 			s, err := sets.ToString(v.CueValue())
 			r.NoError(err)
 			r.Equal(tc.expected, s)
+		})
+	}
+}
+
+func TestGetStepLogConfig(t *testing.T) {
+	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+	ctx := context.Background()
+
+	testCases := map[string]struct {
+		name        string
+		step        string
+		config      string
+		expected    string
+		expectedErr string
+	}{
+		"not found": {
+			name:        "not-found",
+			config:      "not-found",
+			expectedErr: "not found",
+		},
+		"no data": {
+			name:        "test",
+			step:        "step-test",
+			config:      "",
+			expectedErr: "no log config found",
+		},
+		"failed to marshal": {
+			name:        "test",
+			step:        "step-test",
+			config:      "test",
+			expectedErr: "invalid character",
+		},
+		"invalid config": {
+			name:        "test",
+			step:        "step-test",
+			config:      `{"test": "test"}`,
+			expectedErr: "cannot unmarshal string into Go value of type types.LogConfig",
+		},
+		"no config for step": {
+			name:        "test",
+			step:        "step-test",
+			config:      `{"no-step": {}}`,
+			expectedErr: "no log config found for step step-test",
+		},
+		"success": {
+			name:     "test",
+			step:     "step-test",
+			config:   `{"step-test": {"data":true}}`,
+			expected: `{"data":true}`,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			cm := &corev1.ConfigMap{}
+			if tc.config != "not-found" {
+				cm = &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("workflow-%s-context", tc.name),
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"logConfig": tc.config,
+					},
+				}
+				err := cli.Create(ctx, cm)
+				r.NoError(err)
+				defer func() {
+					err = cli.Delete(ctx, cm)
+					r.NoError(err)
+				}()
+			}
+			v, err := GetLogConfigFromStep(ctx, cli, tc.name, "default", tc.step)
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
+			b, err := json.Marshal(v)
+			r.NoError(err)
+			r.Equal(tc.expected, string(b))
 		})
 	}
 }
