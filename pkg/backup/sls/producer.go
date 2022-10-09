@@ -3,7 +3,6 @@ package sls
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/aliyun/aliyun-log-go-sdk/producer"
@@ -21,7 +20,6 @@ type Handler struct {
 
 // Store is store workflowRun to sls
 func (s *Handler) Store(ctx context.Context, run *v1alpha1.WorkflowRun) error {
-	fmt.Println("Hello, SLS")
 	producerConfig := producer.GetDefaultProducerConfig()
 	producerConfig.Endpoint = s.Endpoint
 	producerConfig.AccessKeyID = s.AccessKeyID
