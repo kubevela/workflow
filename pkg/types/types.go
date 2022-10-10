@@ -174,6 +174,26 @@ type Parameter struct {
 	JSONType string      `json:"jsonType,omitempty"`
 }
 
+// Resource is the log resources
+type Resource struct {
+	Name          string            `json:"name,omitempty"`
+	Namespace     string            `json:"namespace,omitempty"`
+	Cluster       string            `json:"cluster,omitempty"`
+	LabelSelector map[string]string `json:"labelSelector,omitempty"`
+}
+
+// LogSource is the source of the log
+type LogSource struct {
+	URL       string     `json:"url,omitempty"`
+	Resources []Resource `json:"resources,omitempty"`
+}
+
+// LogConfig is the config of the log
+type LogConfig struct {
+	Data   bool       `json:"data,omitempty"`
+	Source *LogSource `json:"source,omitempty"`
+}
+
 const (
 	// ContextKeyMetadata is key that refer to workflow metadata.
 	ContextKeyMetadata = "metadata__"
@@ -187,6 +207,8 @@ const (
 	ContextKeyLastExecuteTime = "last_execute_time"
 	// ContextKeyNextExecuteTime is the key that refer to the next execute time in workflow context config map.
 	ContextKeyNextExecuteTime = "next_execute_time"
+	// ContextKeyLogConfig is key for log config.
+	ContextKeyLogConfig = "logConfig"
 )
 
 const (
