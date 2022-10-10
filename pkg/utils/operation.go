@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -97,12 +96,18 @@ func GetPodListFromResources(ctx context.Context, cli client.Client, resources [
 			pods = append(pods, podList.Items...)
 			continue
 		}
+		if resource.Namespace == "" {
+			resource.Namespace = metav1.NamespaceDefault
+		}
 		var pod corev1.Pod
 		err := cli.Get(cliCtx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, &pod)
 		if err != nil {
 			return nil, err
 		}
 		pods = append(pods, pod)
+	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("no pod found")
 	}
 	return pods, nil
 }
@@ -121,11 +126,7 @@ func GetLogsFromURL(ctx context.Context, url string) (io.ReadCloser, error) {
 }
 
 // GetLogsFromPod get logs from pod
-func GetLogsFromPod(ctx context.Context, cfg *rest.Config, cli client.Client, podName, ns, cluster string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
-	clientSet, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
+func GetLogsFromPod(ctx context.Context, clientSet kubernetes.Interface, cli client.Client, podName, ns, cluster string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 	cliCtx := multicluster.WithCluster(ctx, cluster)
 	req := clientSet.CoreV1().Pods(ns).GetLogs(podName, opts)
 	readCloser, err := req.Stream(cliCtx)

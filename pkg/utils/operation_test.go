@@ -22,12 +22,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/kubevela/workflow/pkg/cue/model/sets"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestGetWorkflowContextData(t *testing.T) {
@@ -165,4 +168,106 @@ func TestGetStepLogConfig(t *testing.T) {
 			r.Equal(tc.expected, string(b))
 		})
 	}
+}
+
+func TestGetPodListFromResources(t *testing.T) {
+	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+	ctx := context.Background()
+	err := cli.Create(ctx, &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-test",
+			Namespace: "default",
+			Labels: map[string]string{
+				"test-label": "test",
+			},
+		},
+	})
+	r := require.New(t)
+	r.NoError(err)
+
+	testCases := map[string]struct {
+		name        string
+		step        string
+		resources   []types.Resource
+		expected    string
+		expectedErr string
+	}{
+		"not found": {
+			name: "not-found",
+			resources: []types.Resource{
+				{
+					Name: "not-found",
+				},
+			},
+			expectedErr: "not found",
+		},
+		"not found with label": {
+			name: "not-found",
+			resources: []types.Resource{
+				{
+					LabelSelector: map[string]string{
+						"test-label": "not-found",
+					},
+				},
+			},
+			expectedErr: "no pod found",
+		},
+		"found with name": {
+			name: "not-found",
+			resources: []types.Resource{
+				{
+					Name: "pod-test",
+				},
+			},
+			expected: "pod-test",
+		},
+		"found with label": {
+			name: "not-found",
+			resources: []types.Resource{
+				{
+					LabelSelector: map[string]string{
+						"test-label": "test",
+					},
+				},
+			},
+			expected: "pod-test",
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			pods, err := GetPodListFromResources(ctx, cli, tc.resources)
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
+			r.Equal(tc.expected, pods[0].Name)
+		})
+	}
+}
+
+func TestGetLogsFromURL(t *testing.T) {
+	r := require.New(t)
+	_, err := GetLogsFromURL(context.Background(), "https://kubevela.io")
+	r.NoError(err)
+}
+
+func TestGetLogsFromPod(t *testing.T) {
+	r := require.New(t)
+	clientSet := clientfake.NewSimpleClientset()
+	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+	ctx := context.Background()
+	err := cli.Create(ctx, &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-test",
+			Namespace: "default",
+			Labels: map[string]string{
+				"test-label": "test",
+			},
+		},
+	})
+	r.NoError(err)
+	_, err = GetLogsFromPod(ctx, clientSet, cli, "pod-test", "default", "", nil)
+	r.NoError(err)
 }
