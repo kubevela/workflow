@@ -35,8 +35,8 @@ import (
 )
 
 // GetDataFromContext get data from workflow context
-func GetDataFromContext(ctx context.Context, cli client.Client, name, ns string, paths ...string) (*value.Value, error) {
-	wfCtx, err := wfContext.LoadContext(cli, ns, name)
+func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, ns string, paths ...string) (*value.Value, error) {
+	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +51,8 @@ func GetDataFromContext(ctx context.Context, cli client.Client, name, ns string,
 }
 
 // GetLogConfigFromStep get log config from step
-func GetLogConfigFromStep(ctx context.Context, cli client.Client, name, ns, step string) (*types.LogConfig, error) {
-	wfCtx, err := wfContext.LoadContext(cli, ns, name)
+func GetLogConfigFromStep(ctx context.Context, cli client.Client, ctxName, name, ns, step string) (*types.LogConfig, error) {
+	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
 	if err != nil {
 		return nil, err
 	}

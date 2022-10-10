@@ -26,6 +26,7 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	yamlUtil "sigs.k8s.io/yaml"
 
@@ -231,18 +232,21 @@ func TestContext(t *testing.T) {
 	cli := newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(cli, "default", "app-v1", nil)
+	wfCtx, err := NewContext(cli, "default", "app-v1", []metav1.OwnerReference{{Name: "test1"}})
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
 
-	wfCtx, err = LoadContext(cli, "default", "app-v1")
+	_, err = NewContext(cli, "default", "app-v1", []metav1.OwnerReference{{Name: "test2"}})
+	r.NoError(err)
+
+	wfCtx, err = LoadContext(cli, "default", "app-v1", "workflow-app-v1-context")
 	r.NoError(err)
 	err = wfCtx.Commit()
 	r.NoError(err)
 
 	cli = newCliForTest(t, nil)
-	_, err = LoadContext(cli, "default", "app-v1")
+	_, err = LoadContext(cli, "default", "app-v1", "workflow-app-v1-context")
 	r.Equal(err.Error(), `configMap "workflow-app-v1-context" not found`)
 
 	wfCtx, err = NewContext(cli, "default", "app-v1", nil)
@@ -326,7 +330,7 @@ func newCliForTest(t *testing.T, wfCm *corev1.ConfigMap) *test.MockClient {
 					r.NoError(err)
 					*o = cm
 					return nil
-				case GenerateStoreName("app-v1"):
+				case generateStoreName("app-v1"):
 					if wfCm != nil {
 						*o = *wfCm
 						return nil

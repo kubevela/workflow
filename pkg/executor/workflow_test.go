@@ -1560,7 +1560,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(instance, k8sClient)
 		_, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e := &engine{
 			status: &instance.Status,
@@ -1595,7 +1595,7 @@ var _ = Describe("Test Workflow", func() {
 		wfContext.CleanupMemoryStore(instance.Name, instance.Namespace)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err = wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err = wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e = &engine{
 			status: &instance.Status,
@@ -2177,7 +2177,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		v, err := wfCtx.GetVar("saved")
 		Expect(err).ToNot(HaveOccurred())
