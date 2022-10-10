@@ -231,6 +231,8 @@ require (
 
 replace (
 	github.com/go-kit/kit => github.com/go-kit/kit v0.12.0
+	github.com/nats-io/jwt/v2 => github.com/nats-io/jwt/v2 v2.0.3
+	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.7.4
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.31-0.20220502234555-5308cea56b78
 )
 
