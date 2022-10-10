@@ -88,7 +88,15 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 	stepConfig := config[stepName]
 	data, err := v.LookupValue("data")
 	if err == nil {
-		if err := printDataInLog(ctx, data, &stepConfig); err != nil {
+		level := 3
+		logLevel, err := v.LookupValue("level")
+		if err == nil {
+			l, err := logLevel.CueValue().Int64()
+			if err == nil {
+				level = int(l)
+			}
+		}
+		if err := printDataInLog(ctx, data, level, &stepConfig); err != nil {
 			return err
 		}
 	}
@@ -107,9 +115,10 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 	return nil
 }
 
-func printDataInLog(ctx monitorContext.Context, data *value.Value, stepConfig *types.LogConfig) error {
+func printDataInLog(ctx monitorContext.Context, data *value.Value, level int, stepConfig *types.LogConfig) error {
 	stepConfig.Data = true
 	logCtx := ctx.Fork("cue logs")
+	ctx.V(level)
 	if s, err := data.GetString(); err == nil {
 		logCtx.Info(s)
 		return nil
