@@ -221,7 +221,8 @@ func TestLog(t *testing.T) {
 			value: `
 data: {
 	message: "test"
-}`,
+}
+level: 3`,
 			expected: `{"test-step":{"data":true}}`,
 		},
 		{
