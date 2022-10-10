@@ -19,7 +19,6 @@ package utils
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -59,16 +58,16 @@ func TestGetWorkflowContextData(t *testing.T) {
 			expectedErr: "not found",
 		},
 		"found": {
-			name:     "test",
+			name:     "workflow-test-context",
 			expected: "\"test-test\": \"test\"\n",
 		},
 		"found with path": {
-			name:     "test",
+			name:     "workflow-test-context",
 			paths:    "test-test",
 			expected: "\"test\"\n",
 		},
 		"path not found": {
-			name:        "test",
+			name:        "workflow-test-context",
 			paths:       "not-found",
 			expectedErr: "not exist",
 		},
@@ -76,7 +75,7 @@ func TestGetWorkflowContextData(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			v, err := GetDataFromContext(ctx, cli, tc.name, "default", tc.paths)
+			v, err := GetDataFromContext(ctx, cli, tc.name, tc.name, "default", tc.paths)
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return
@@ -106,31 +105,31 @@ func TestGetStepLogConfig(t *testing.T) {
 			expectedErr: "not found",
 		},
 		"no data": {
-			name:        "test",
+			name:        "workflow-test-context",
 			step:        "step-test",
 			config:      "",
 			expectedErr: "no log config found",
 		},
 		"failed to marshal": {
-			name:        "test",
+			name:        "workflow-test-context",
 			step:        "step-test",
 			config:      "test",
 			expectedErr: "invalid character",
 		},
 		"invalid config": {
-			name:        "test",
+			name:        "workflow-test-context",
 			step:        "step-test",
 			config:      `{"test": "test"}`,
 			expectedErr: "cannot unmarshal string into Go value of type types.LogConfig",
 		},
 		"no config for step": {
-			name:        "test",
+			name:        "workflow-test-context",
 			step:        "step-test",
 			config:      `{"no-step": {}}`,
 			expectedErr: "no log config found for step step-test",
 		},
 		"success": {
-			name:     "test",
+			name:     "workflow-test-context",
 			step:     "step-test",
 			config:   `{"step-test": {"data":true}}`,
 			expected: `{"data":true}`,
@@ -143,7 +142,7 @@ func TestGetStepLogConfig(t *testing.T) {
 			if tc.config != "not-found" {
 				cm = &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("workflow-%s-context", tc.name),
+						Name:      tc.name,
 						Namespace: "default",
 					},
 					Data: map[string]string{
@@ -157,7 +156,7 @@ func TestGetStepLogConfig(t *testing.T) {
 					r.NoError(err)
 				}()
 			}
-			v, err := GetLogConfigFromStep(ctx, cli, tc.name, "default", tc.step)
+			v, err := GetLogConfigFromStep(ctx, cli, tc.name, tc.name, "default", tc.step)
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return

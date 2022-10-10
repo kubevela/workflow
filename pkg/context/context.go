@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/util/rand"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
@@ -266,6 +268,7 @@ func (wf *WorkflowContext) StoreRef() *corev1.ObjectReference {
 		APIVersion: wf.store.APIVersion,
 		Kind:       wf.store.Kind,
 		Name:       wf.store.Name,
+		Namespace:  wf.store.Namespace,
 		UID:        wf.store.UID,
 	}
 }
@@ -350,7 +353,7 @@ func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReferenc
 		ctx   = context.Background()
 		store corev1.ConfigMap
 	)
-	store.Name = GenerateStoreName(name)
+	store.Name = generateStoreName(name)
 	store.Namespace = ns
 	store.SetOwnerReferences(owner)
 	if EnableInMemoryContext {
@@ -361,6 +364,17 @@ func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReferenc
 				return nil, err
 			}
 		} else {
+			return nil, err
+		}
+	} else if !reflect.DeepEqual(store.OwnerReferences, owner) {
+		store = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("%s-%s", generateStoreName(name), rand.RandomString(5)),
+				Namespace:       ns,
+				OwnerReferences: owner,
+			},
+		}
+		if err := cli.Create(ctx, &store); err != nil {
 			return nil, err
 		}
 	}
@@ -396,15 +410,15 @@ func getMemoryStore(key string) *sync.Map {
 }
 
 // LoadContext load workflow context from store.
-func LoadContext(cli client.Client, ns, name string) (Context, error) {
+func LoadContext(cli client.Client, ns, name, ctxName string) (Context, error) {
 	var store corev1.ConfigMap
-	store.Name = GenerateStoreName(name)
+	store.Name = ctxName
 	store.Namespace = ns
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
 	} else if err := cli.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
-		Name:      GenerateStoreName(name),
+		Name:      ctxName,
 	}, &store); err != nil {
 		return nil, err
 	}
@@ -420,7 +434,7 @@ func LoadContext(cli client.Client, ns, name string) (Context, error) {
 	return ctx, nil
 }
 
-// GenerateStoreName generates the config map name of workflow context.
-func GenerateStoreName(name string) string {
+// generateStoreName generates the config map name of workflow context.
+func generateStoreName(name string) string {
 	return fmt.Sprintf("workflow-%s-context", name)
 }

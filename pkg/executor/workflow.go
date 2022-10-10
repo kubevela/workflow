@@ -336,7 +336,7 @@ func (w *workflowExecutor) allDone(taskRunners []types.TaskRunner) (bool, bool) 
 func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
 	status := &w.instance.Status
 	if status.ContextBackend != nil {
-		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, name)
+		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, w.instance.Name, w.instance.Status.ContextBackend.Name)
 		if err != nil {
 			return nil, errors.WithMessage(err, "load context")
 		}
