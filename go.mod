@@ -1,6 +1,6 @@
 module github.com/kubevela/workflow
 
-go 1.17
+go 1.19
 
 require (
 	cuelang.org/go v0.4.4-0.20220915174651-ad253ed099e9
