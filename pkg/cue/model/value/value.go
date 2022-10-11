@@ -103,6 +103,11 @@ func NewValue(s string, pd *packages.PackageDiscover, tagTempl string, opts ...f
 	return newValue(builder, pd, tagTempl)
 }
 
+// NewValueWithInstance new value with instance
+func NewValueWithInstance(instance *build.Instance, pd *packages.PackageDiscover, tagTempl string) (*Value, error) {
+	return newValue(instance, pd, tagTempl)
+}
+
 func newValue(builder *build.Instance, pd *packages.PackageDiscover, tagTempl string) (*Value, error) {
 	addImports := func(inst *build.Instance) error {
 		if pd != nil {
