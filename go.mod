@@ -6,6 +6,7 @@ require (
 	cuelang.org/go v0.4.4-0.20220915174651-ad253ed099e9
 	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/crossplane/crossplane-runtime v0.14.1-0.20210722005935-0b469fcc77cd
+	github.com/cue-exp/kubevelafix v0.0.0-20220922150317-aead819d979d
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/google/go-cmp v0.5.8

@@ -30,6 +30,7 @@ import (
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
+	"github.com/cue-exp/kubevelafix"
 	"github.com/pkg/errors"
 
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
@@ -82,50 +83,6 @@ func (val *Value) UnmarshalTo(x interface{}) error {
 	return json.Unmarshal(data, x)
 }
 
-// NewValueWithMainAndFiles new a value from main and appendix files
-func NewValueWithMainAndFiles(main string, slaveFiles []string, pd *packages.PackageDiscover, tagTempl string, opts ...func(*ast.File) error) (*Value, error) {
-	builder := &build.Instance{}
-
-	mainFile, err := parser.ParseFile("main.cue", main, parser.ParseComments)
-	if err != nil {
-		return nil, errors.Wrap(err, "parse main file")
-	}
-	if mainFile.PackageName() == "" {
-		// add a default package main if not exist
-		mainFile, err = parser.ParseFile("main.cue", DefaultPackageHeader+main, parser.ParseComments)
-		if err != nil {
-			return nil, errors.Wrap(err, "parse main file with added package main header")
-		}
-	}
-	for _, opt := range opts {
-		if err := opt(mainFile); err != nil {
-			return nil, errors.Wrap(err, "run option func for main file")
-		}
-	}
-	if err := builder.AddSyntax(mainFile); err != nil {
-		return nil, errors.Wrap(err, "add main file to CUE builder")
-	}
-
-	for idx, sf := range slaveFiles {
-		cueSF, err := parser.ParseFile("sf-"+strconv.Itoa(idx)+".cue", sf, parser.ParseComments)
-		if err != nil {
-			return nil, errors.Wrap(err, "parse added file "+strconv.Itoa(idx)+" \n"+sf)
-		}
-		if cueSF.PackageName() != mainFile.PackageName() {
-			continue
-		}
-		for _, opt := range opts {
-			if err := opt(cueSF); err != nil {
-				return nil, errors.Wrap(err, "run option func for files")
-			}
-		}
-		if err := builder.AddSyntax(cueSF); err != nil {
-			return nil, errors.Wrap(err, "add slave files to CUE builder")
-		}
-	}
-	return newValue(builder, pd, tagTempl)
-}
-
 // NewValue new a value
 func NewValue(s string, pd *packages.PackageDiscover, tagTempl string, opts ...func(*ast.File) error) (*Value, error) {
 	builder := &build.Instance{}
@@ -134,6 +91,7 @@ func NewValue(s string, pd *packages.PackageDiscover, tagTempl string, opts ...f
 	if err != nil {
 		return nil, err
 	}
+	file = kubevelafix.Fix(file).(*ast.File)
 	for _, opt := range opts {
 		if err := opt(file); err != nil {
 			return nil, err
@@ -176,6 +134,7 @@ func AddFile(bi *build.Instance, filename string, src interface{}) error {
 		filename = "-"
 	}
 	file, err := parser.ParseFile(filename, src, parser.ParseComments)
+	file = kubevelafix.Fix(file).(*ast.File)
 	if err != nil {
 		return err
 	}
