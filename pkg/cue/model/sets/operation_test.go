@@ -427,9 +427,10 @@ containers: [{
 
 func TestStrategyPatch(t *testing.T) {
 	testCase := []struct {
-		base   string
-		patch  string
-		result string
+		base    string
+		patch   string
+		options []UnifyOption
+		result  string
 	}{
 		{
 			base: `
@@ -636,7 +637,56 @@ metadata: {
 		keep: "true"
 	}
 }
-`},
+`}, {
+			base: `
+spec: containers: [{
+	name: "c1"
+	image: "image1"
+},
+{
+	name: "c2"
+	envs:[{name: "e1",value: "v1"}]
+}]
+`,
+			patch: `
+spec: containers: [{
+	name: "c3"
+	image: "image3"
+}]
+`,
+			result: `spec: {
+	containers: [{
+		image: "image3"
+		name:  "c3"
+	}, ...]
+}
+`,
+			options: []UnifyOption{UnifyByJSONMergePatch{}},
+		},
+		{
+			base: `
+spec: containers: [{
+	name: "c1"
+	image: "image1"
+}]
+`,
+			patch: `
+operations: [{
+	{op: "add", path: "/spec/containers/0", value: {name: "c4", image: "image4"}}
+}]
+`,
+			result: `spec: {
+	containers: [{
+		name:  "c4"
+		image: "image4"
+	}, {
+		name:  "c1"
+		image: "image1"
+	}, ...]
+}
+`,
+			options: []UnifyOption{UnifyByJSONPatch{}},
+		},
 	}
 
 	for i, tcase := range testCase {
@@ -644,7 +694,7 @@ metadata: {
 		ctx := cuecontext.New()
 		base := ctx.CompileString(tcase.base)
 		patch := ctx.CompileString(tcase.patch)
-		v, err := StrategyUnify(base, patch)
+		v, err := StrategyUnify(base, patch, tcase.options...)
 		r.NoError(err)
 		s, err := toString(v)
 		r.NoError(err)
