@@ -39,7 +39,7 @@ ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
 	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	GO111MODULE=on go get honnef.co/go/tools/cmd/staticcheck@v0.3.0 ;\
+	go install honnef.co/go/tools/cmd/staticcheck@2022.1 ;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
