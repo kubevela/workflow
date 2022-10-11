@@ -31,7 +31,7 @@ func TestGetPackages(t *testing.T) {
 	pkg, err := GetPackages()
 	r.NoError(err)
 	cuectx := cuecontext.New()
-	file, err := parser.ParseFile(builtinPackageName, pkg)
+	file, err := parser.ParseFile(builtinPackageName, pkg[builtinPackageName])
 	r.NoError(err)
 	_ = cuectx.BuildFile(file)
 
