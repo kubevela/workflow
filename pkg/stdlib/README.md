@@ -1,0 +1,2 @@
+- For the stable version, the folder name and pkgName is “vela/op”, which is the same as before in order to the previous users can still use their Definition without editing.
+- For other versions, the name is “vela/op/v2”,”vela/op/v3” etc. Users need to import them explicitly and change the “op.action” to “v2.action” and so on to use another version of Cue Action.
