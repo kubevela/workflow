@@ -529,25 +529,24 @@ func (iter *stepsIterator) next() bool {
 	return iter.index <= len(iter.queue)-1
 }
 
-// nolint:staticcheck
 func (iter *stepsIterator) assemble() {
-	st, err := iter.target.v.Struct()
-	if err != nil {
-		iter.err = err
-		return
-	}
-
 	filters := map[string]struct{}{}
 	for _, item := range iter.queue {
 		filters[item.Name] = struct{}{}
 	}
+	cueIter, err := iter.target.v.Fields(cue.Definitions(true), cue.Hidden(true), cue.All())
+	if err != nil {
+		iter.err = err
+		return
+	}
 	var addFields []*field
-	for i := 0; i < st.Len(); i++ {
-		if st.Field(i).Value.IncompleteKind() == cue.TopKind {
+	for cueIter.Next() {
+		val := cueIter.Value()
+		name := cueIter.Label()
+		if val.IncompleteKind() == cue.TopKind {
 			continue
 		}
-		name := st.Field(i).Selector
-		attr := st.Field(i).Value.Attribute("step")
+		attr := val.Attribute("step")
 		no, err := attr.Int(0)
 		if err != nil {
 			no = 100
