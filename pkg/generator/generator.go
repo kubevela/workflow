@@ -231,9 +231,9 @@ func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName s
 
 func generateContextDataFromWorkflowRun(instance *types.WorkflowInstance) process.ContextData {
 	data := process.ContextData{
-		Name:      instance.Name,
-		Namespace: instance.Namespace,
-		Data:      instance.Context,
+		Name:       instance.Name,
+		Namespace:  instance.Namespace,
+		CustomData: instance.Context,
 	}
 	return data
 }

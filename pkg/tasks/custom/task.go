@@ -317,7 +317,7 @@ func getContextTemplate(ctx wfContext.Context, step, id string, pCtx process.Con
 	}
 	pCtx.PushData(model.ContextStepSessionID, id)
 	pCtx.PushData(model.ContextStepName, step)
-	c, err := pCtx.ExtendedContextFile()
+	c, err := pCtx.BaseContextFile()
 	if err != nil {
 		return ""
 	}
