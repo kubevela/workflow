@@ -27,6 +27,7 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
@@ -68,12 +69,21 @@ func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	operations = &types.Operation{Suspend: true}
 
 	status := &stepStatus
-	defer handleOutput(ctx, status, operations, tr.step, options.PostStopHooks, tr.pd, tr.id, tr.pCtx)
+	paramsStr, err := custom.GetParameterTemplate(tr.step)
+	if err != nil {
+		return stepStatus, operations, err
+	}
+	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, tr.pd, tr.step.Name, tr.id, paramsStr, tr.pCtx)
+	if err != nil {
+		return stepStatus, operations, err
+	}
+	defer handleOutput(ctx, status, operations, tr.step, options.PostStopHooks, basicVal)
 
 	for _, hook := range options.PreCheckHooks {
 		result, err := hook(tr.step, &types.PreCheckOptions{
 			PackageDiscover: tr.pd,
-			ProcessContext:  tr.pCtx,
+			BasicTemplate:   basicTemplate,
+			BasicValue:      basicVal,
 		})
 		if err != nil {
 			stepStatus.Phase = v1alpha1.WorkflowStepPhaseSkipped
@@ -134,7 +144,8 @@ func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 
 // Pending check task should be executed or not.
 func (tr *suspendTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus)
+	basicVal, _, _ := custom.MakeBasicValue(ctx, tr.pd, tr.step.Name, tr.id, "", tr.pCtx)
+	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus, basicVal)
 }
 
 // GetSuspendStepDurationWaiting get suspend step wait duration
@@ -159,21 +170,10 @@ func GetSuspendStepDurationWaiting(step v1alpha1.WorkflowStep) (time.Duration, e
 	return 0, nil
 }
 
-func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, pd *packages.PackageDiscover, id string, pCtx process.Context) {
+func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal *value.Value) {
 	if len(step.Outputs) > 0 {
-		contextValue, err := custom.MakeValueForContext(ctx, pd, step.Name, id, pCtx)
-		if err != nil {
-			stepStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
-			if stepStatus.Reason == "" {
-				stepStatus.Reason = types.StatusReasonOutput
-			}
-			operations.Terminated = true
-			stepStatus.Message = fmt.Sprintf("make context value error: %s", err.Error())
-			return
-		}
-
 		for _, hook := range postStopHooks {
-			if err := hook(ctx, contextValue, step, *stepStatus, nil); err != nil {
+			if err := hook(ctx, basicVal, step, *stepStatus, nil); err != nil {
 				stepStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
 				if stepStatus.Reason == "" {
 					stepStatus.Reason = types.StatusReasonOutput

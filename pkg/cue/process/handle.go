@@ -98,6 +98,7 @@ type ContextData struct {
 	PublishVersion string
 
 	Ctx            context.Context
+	Data           map[string]interface{}
 	BaseHooks      []BaseHook
 	AuxiliaryHooks []AuxiliaryHook
 }
@@ -115,6 +116,7 @@ func NewContext(data ContextData) Context {
 		parameters:  map[string]interface{}{},
 
 		ctx:            data.Ctx,
+		data:           data.Data,
 		baseHooks:      data.BaseHooks,
 		auxiliaryHooks: data.AuxiliaryHooks,
 	}

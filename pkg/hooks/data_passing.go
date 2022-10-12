@@ -35,10 +35,13 @@ func Input(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.Workflo
 	for _, input := range step.Inputs {
 		inputValue, err := ctx.GetVar(strings.Split(input.From, ".")...)
 		if err != nil {
-			return errors.WithMessagef(err, "get input from [%s]", input.From)
+			inputValue, err = paramValue.LookupByScript(input.From)
+			if err != nil {
+				return errors.WithMessagef(err, "get input from [%s]", input.From)
+			}
 		}
 		if input.ParameterKey != "" {
-			if err := paramValue.FillValueByScript(inputValue, input.ParameterKey); err != nil {
+			if err := paramValue.FillValueByScript(inputValue, strings.Join([]string{"parameter", input.ParameterKey}, ".")); err != nil {
 				return err
 			}
 		}
