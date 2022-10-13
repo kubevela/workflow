@@ -263,7 +263,7 @@ close({
 		status, operation, err := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
 		case "input-err":
-			r.Equal(err.Error(), "do preStartHook: score.x: conflicting values 100 and 101")
+			r.Equal(err.Error(), "do preStartHook: parameter.score.x: conflicting values 100 and 101")
 		case "input":
 			r.Equal(err.Error(), "do preStartHook: get input from [podIP]: failed to lookup value: var(path=podIP) not exist")
 		case "output-var-conflict":
@@ -580,7 +580,11 @@ func TestValidateIfValue(t *testing.T) {
 	pCtx := process.NewContext(process.ContextData{
 		Name:      "app",
 		Namespace: "default",
+		Data:      map[string]interface{}{"arr": []string{"a", "b"}},
 	})
+	basicVal, basicTemplate, err := MakeBasicValue(ctx, nil, "test-step", "id", `key: "value"`, pCtx)
+	r := require.New(t)
+	r.NoError(err)
 
 	testCases := []struct {
 		name        string
@@ -613,6 +617,24 @@ func TestValidateIfValue(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "context arr true",
+			step: v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					If: `context.arr[0] == "a"`,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "parameter true",
+			step: v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					If: `parameter.key == "value"`,
+				},
+			},
+			expected: true,
+		},
+		{
 			name: "failed true",
 			step: v1alpha1.WorkflowStep{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -634,6 +656,20 @@ func TestValidateIfValue(t *testing.T) {
 					Inputs: v1alpha1.StepInputs{
 						{
 							From: "test",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "input with arr in context",
+			step: v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					If: `inputs["context.arr[0]"] == "a"`,
+					Inputs: v1alpha1.StepInputs{
+						{
+							From: "context.arr[0]",
 						},
 					},
 				},
@@ -695,7 +731,8 @@ func TestValidateIfValue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := require.New(t)
 			v, err := ValidateIfValue(ctx, tc.step, tc.status, &types.PreCheckOptions{
-				ProcessContext: pCtx,
+				BasicTemplate: basicTemplate,
+				BasicValue:    basicVal,
 			})
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
@@ -730,9 +767,11 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	}
 	wfCtx, err := wfContext.NewContext(cli, "default", "app-v1", nil)
 	r.NoError(err)
-	v, _ := value.NewValue(`name: "app"`, nil, "")
+	v, err := value.NewValue(`name: "app"`, nil, "")
+	r.NoError(err)
 	r.NoError(wfCtx.SetVar(v, types.ContextKeyMetadata))
-	v, _ = value.NewValue(`"yes"`, nil, "")
+	v, err = value.NewValue(`"yes"`, nil, "")
+	r.NoError(err)
 	r.NoError(wfCtx.SetVar(v, "test"))
 	return wfCtx
 }

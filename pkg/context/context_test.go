@@ -190,9 +190,7 @@ result: 101
 	}
 
 	r := require.New(t)
-	param, err := wfCtx.MakeParameter(map[string]interface{}{
-		"name": "foo",
-	})
+	param, err := wfCtx.MakeParameter(`{"name": "foo"}`)
 	r.NoError(err)
 	mark, err := wfCtx.GetVar("football")
 	r.NoError(err)

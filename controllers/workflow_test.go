@@ -998,6 +998,7 @@ var _ = Describe("Test Workflow", func() {
 	It("test if expressions", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-expressions"
+		wr.Spec.Context = &runtime.RawExtension{Raw: []byte(`{"mycontext":{"a":1,"b":2,"c":["hello", "world"]}}`)}
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -1008,6 +1009,10 @@ var _ = Describe("Test Workflow", func() {
 						{
 							Name:      "suspend-output",
 							ValueFrom: "context.name",
+						},
+						{
+							Name:      "custom-output",
+							ValueFrom: "context.mycontext.a",
 						},
 					},
 				},
@@ -1022,8 +1027,16 @@ var _ = Describe("Test Workflow", func() {
 							From:         "suspend-output",
 							ParameterKey: "",
 						},
+						{
+							From:         "custom-output",
+							ParameterKey: "",
+						},
+						{
+							From:         "context.mycontext.c[1]",
+							ParameterKey: "",
+						},
 					},
-					If: `status.suspend.timeout && inputs["suspend-output"] == "wr-if-expressions"`,
+					If: `status.suspend.timeout && inputs["suspend-output"] == "wr-if-expressions" && inputs["custom-output"] == 1 && context.mycontext.b == 2 && context.mycontext.c[0] == "hello" && inputs["context.mycontext.c[1]"] == "world"`,
 				},
 			},
 			{
@@ -1069,11 +1082,19 @@ var _ = Describe("Test Workflow", func() {
 	It("test if expressions in sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-expressions-substeps"
+		wr.Spec.Context = &runtime.RawExtension{Raw: []byte(`{"mycontext":{"a":1,"b":2,"c":["hello", "world"]}}`)}
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
+					Inputs: v1alpha1.StepInputs{
+						{
+							From:         "context.mycontext.c[1]",
+							ParameterKey: "",
+						},
+					},
+					If: `context.mycontext.b == 2`,
 				},
 				SubSteps: []v1alpha1.WorkflowStepBase{
 					{
@@ -1087,10 +1108,21 @@ var _ = Describe("Test Workflow", func() {
 						Name:       "sub2",
 						Type:       "suspend",
 						Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"1s"}`)},
+						If:         `inputs["context.mycontext.c[0]"] == "hello" && context.mycontext.c[1] == "world"`,
 						Outputs: v1alpha1.StepOutputs{
 							{
 								Name:      "suspend-output",
 								ValueFrom: "context.name",
+							},
+							{
+								Name:      "suspend-custom-output",
+								ValueFrom: "context.mycontext.a",
+							},
+						},
+						Inputs: v1alpha1.StepInputs{
+							{
+								From:         "context.mycontext.c[0]",
+								ParameterKey: "",
 							},
 						},
 					},

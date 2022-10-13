@@ -33,9 +33,7 @@ import (
 func TestInput(t *testing.T) {
 	wfCtx := mockContext(t)
 	r := require.New(t)
-	paramValue, err := wfCtx.MakeParameter(map[string]interface{}{
-		"name": "foo",
-	})
+	paramValue, err := wfCtx.MakeParameter(`"name": "foo"`)
 	r.NoError(err)
 	score, err := paramValue.MakeValue(`score: 99`)
 	r.NoError(err)
@@ -51,11 +49,28 @@ func TestInput(t *testing.T) {
 		},
 	})
 	r.NoError(err)
-	result, err := paramValue.LookupValue("myscore")
+	result, err := paramValue.LookupValue("parameter", "myscore")
 	r.NoError(err)
 	s, err := result.String()
 	r.NoError(err)
 	r.Equal(s, `99
+`)
+	paramValue, err = wfCtx.MakeParameter(`context: {name: "test"}`)
+	r.NoError(err)
+	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
+		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			Inputs: v1alpha1.StepInputs{{
+				From:         "context.name",
+				ParameterKey: "contextname",
+			}},
+		},
+	})
+	r.NoError(err)
+	result, err = paramValue.LookupValue("parameter", "contextname")
+	r.NoError(err)
+	s, err = result.String()
+	r.NoError(err)
+	r.Equal(s, `"test"
 `)
 }
 

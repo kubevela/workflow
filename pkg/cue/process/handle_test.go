@@ -93,7 +93,7 @@ image: "myserver"
 	get := ctx.GetData("arbitraryData")
 	r.Equal(get, targetArbitraryData)
 
-	c, err := ctx.ExtendedContextFile()
+	c, err := ctx.BaseContextFile()
 	r.NoError(err)
 	ctxInst := cuecontext.New().CompileString(c)
 

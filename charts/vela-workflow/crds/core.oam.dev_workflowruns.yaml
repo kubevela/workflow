@@ -46,6 +46,9 @@ spec:
           spec:
             description: WorkflowRunSpec is the spec for the WorkflowRun
             properties:
+              context:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
               mode:
                 description: WorkflowExecuteMode defines the mode of workflow execution
                 properties:

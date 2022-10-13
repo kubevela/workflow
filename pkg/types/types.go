@@ -40,6 +40,7 @@ type WorkflowInstance struct {
 	WorkflowMeta
 	OwnerInfo []metav1.OwnerReference
 	Debug     bool
+	Context   map[string]interface{}
 	Mode      *v1alpha1.WorkflowExecuteMode
 	Steps     []v1alpha1.WorkflowStep
 	Status    v1alpha1.WorkflowRunStatus
@@ -98,7 +99,8 @@ type PreCheckResult struct {
 // PreCheckOptions is the options for pre check.
 type PreCheckOptions struct {
 	PackageDiscover *packages.PackageDiscover
-	ProcessContext  process.Context
+	BasicTemplate   string
+	BasicValue      *value.Value
 }
 
 // TaskPreCheckHook is the hook for pre check.

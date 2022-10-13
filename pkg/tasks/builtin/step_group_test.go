@@ -1,12 +1,16 @@
 package builtin
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
+	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/types"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type testEngine struct {
@@ -35,6 +39,7 @@ func (e *testEngine) GetOperation() *types.Operation {
 
 func TestStepGroupStep(t *testing.T) {
 	r := require.New(t)
+	ctx := newWorkflowContextForTest(t)
 	subRunner, err := StepGroup(v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			Name: "sub",
@@ -51,18 +56,18 @@ func TestStepGroupStep(t *testing.T) {
 	r.Equal(runner.Name(), "test")
 
 	// test pending
-	p, _ := runner.Pending(nil, nil)
+	p, _ := runner.Pending(ctx, nil)
 	r.Equal(p, true)
 	ss := map[string]v1alpha1.StepStatus{
 		"depend": {
 			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 		},
 	}
-	p, _ = runner.Pending(nil, ss)
+	p, _ = runner.Pending(ctx, ss)
 	r.Equal(p, false)
 
 	// test skip
-	status, operations, err := runner.Run(nil, &types.TaskRunOptions{
+	status, operations, err := runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Skip: true}, nil
@@ -80,7 +85,7 @@ func TestStepGroupStep(t *testing.T) {
 	r.Equal(operations.Skip, true)
 
 	// test timeout
-	status, operations, err = runner.Run(nil, &types.TaskRunOptions{
+	status, operations, err = runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Timeout: true}, nil
@@ -195,7 +200,7 @@ func TestStepGroupStep(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			status, act, err := runner.Run(nil, &types.TaskRunOptions{
+			status, act, err := runner.Run(ctx, &types.TaskRunOptions{
 				Engine: tc.engine,
 			})
 			r.NoError(err)
@@ -206,3 +211,27 @@ func TestStepGroupStep(t *testing.T) {
 		})
 	}
 }
+
+func newWorkflowContextForTest(t *testing.T) wfContext.Context {
+	cm := corev1.ConfigMap{}
+	r := require.New(t)
+	testCaseJson, err := yaml.YAMLToJSON([]byte(testCaseYaml))
+	r.NoError(err)
+	err = json.Unmarshal(testCaseJson, &cm)
+	r.NoError(err)
+
+	wfCtx := new(wfContext.WorkflowContext)
+	err = wfCtx.LoadFromConfigMap(cm)
+	r.NoError(err)
+	return wfCtx
+}
+
+var (
+	testCaseYaml = `apiVersion: v1
+data:
+  test: ""
+kind: ConfigMap
+metadata:
+  name: app-v1
+`
+)

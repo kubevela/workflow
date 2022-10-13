@@ -166,18 +166,13 @@ func (wf *WorkflowContext) DeleteValueInMemory(paths ...string) {
 	wf.memoryStore.Delete(strings.Join(paths, "."))
 }
 
-// MakeParameter make 'value' with interface{}
-func (wf *WorkflowContext) MakeParameter(parameter interface{}) (*value.Value, error) {
-	var s = "{}"
-	if parameter != nil {
-		bt, err := json.Marshal(parameter)
-		if err != nil {
-			return nil, err
-		}
-		s = string(bt)
+// MakeParameter make 'value' with string
+func (wf *WorkflowContext) MakeParameter(parameter string) (*value.Value, error) {
+	if parameter == "" {
+		parameter = "{}"
 	}
 
-	return wf.vars.MakeValue(s)
+	return wf.vars.MakeValue(parameter)
 }
 
 // Commit the workflow context and persist it's content.

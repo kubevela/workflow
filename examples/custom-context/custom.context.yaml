@@ -1,0 +1,16 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: custom-context
+  namespace: default
+spec:
+  context:
+    env: dev
+    name: override
+  workflowSpec:
+    steps:
+    - name: apply
+      type: apply-deployment
+      if: context.env == "dev"
+      properties:
+        image: nginx
