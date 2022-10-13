@@ -51,7 +51,7 @@ jobs:
 
   publish-charts:
     env:
-      HELM_CHART: charts/
+      HELM_CHART: charts/vela-workflow
       LOCAL_OSS_DIRECTORY: .oss/
     runs-on: ubuntu-20.04
     steps:
