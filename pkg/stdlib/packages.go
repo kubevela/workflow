@@ -81,7 +81,7 @@ func GetPackages() (map[string]string, error) {
 			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
 			opContent += pkgContent
 		}
-		pkgName := "vela/op"
+		pkgName := builtinPackageName
 		if dirs.Name() != "v1" {
 			pkgName = pkgName + "/" + dirs.Name()
 		}
