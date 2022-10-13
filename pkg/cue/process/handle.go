@@ -20,10 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 
 	"github.com/kubevela/workflow/pkg/cue/model"
 )
@@ -169,6 +171,9 @@ func (ctx *templateContext) BaseContextFile() (string, error) {
 	}
 
 	for k, v := range ctx.customData {
+		if exist := ctx.GetData(k); exist != nil && reflect.DeepEqual(exist, v) {
+			klog.Warningf("Built-in value [%s: %s] in context will be overridden", k, exist)
+		}
 		ctx.PushData(k, v)
 	}
 
