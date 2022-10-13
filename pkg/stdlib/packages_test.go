@@ -27,6 +27,7 @@ import (
 )
 
 func TestGetPackages(t *testing.T) {
+	//test vela/op
 	r := require.New(t)
 	pkg, err := GetPackages()
 	r.NoError(err)
@@ -49,4 +50,25 @@ out: custom.context`)
 	str, err := inst.LookupPath(cue.ParsePath("out.id")).String()
 	r.NoError(err)
 	r.Equal(str, "xxx")
+
+	//test vela/op/v2
+	cuectx2 := cuecontext.New()
+	file, err = parser.ParseFile("vela/op/v2", pkg["vela/op/v2"])
+	r.NoError(err)
+	_ = cuectx2.BuildFile(file)
+
+	file, err = parser.ParseFile("-", `
+import "vela/custom"
+out: custom.context`)
+	r.NoError(err)
+	builder2 := &build.Instance{}
+	err = builder2.AddSyntax(file)
+	r.NoError(err)
+	err = AddImportsFor(builder2, "context: id: \"yyy\"")
+	r.NoError(err)
+
+	inst2 := cuectx2.BuildInstance(builder2)
+	str2, err := inst2.LookupPath(cue.ParsePath("out.id")).String()
+	r.NoError(err)
+	r.Equal(str2, "yyy")
 }
