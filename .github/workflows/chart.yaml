@@ -95,10 +95,10 @@ jobs:
       - name: Configure Alibaba Cloud OSSUTIL
         run: ./ossutil --config-file .ossutilconfig config -i ${ACCESS_KEY} -k ${ACCESS_KEY_SECRET} -e ${ENDPOINT} -c .ossutilconfig
       - name: sync cloud to local
-        run: ./ossutil --config-file .ossutilconfig sync oss://$BUCKET/vela-workflow $LOCAL_OSS_DIRECTORY
+        run: ./ossutil --config-file .ossutilconfig sync oss://$BUCKET/core $LOCAL_OSS_DIRECTORY
       - name: Package helm charts
         run: |
           helm package $HELM_CHART --destination $LOCAL_OSS_DIRECTORY
-          helm repo index --url https://$BUCKET.$ENDPOINT/vela-workflow $LOCAL_OSS_DIRECTORY
+          helm repo index --url https://$BUCKET.$ENDPOINT/core $LOCAL_OSS_DIRECTORY
       - name: sync local to cloud
-        run: ./ossutil --config-file .ossutilconfig sync $LOCAL_OSS_DIRECTORY oss://$BUCKET/vela-workflow -f
+        run: ./ossutil --config-file .ossutilconfig sync $LOCAL_OSS_DIRECTORY oss://$BUCKET/core -f
