@@ -28,7 +28,7 @@ func TestHandler_Store(t *testing.T) {
 	}{
 		{
 			name: "Success",
-			fields: fields {
+			fields: fields{
 				LogStoreName:    os.Getenv("LOG_TEST_LOGSTORE"),
 				ProjectName:     os.Getenv("LOG_TEST_PROJECT"),
 				Endpoint:        os.Getenv("LOG_TEST_ENDPOINT"),
