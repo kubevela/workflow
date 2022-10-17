@@ -89,19 +89,19 @@ var _ = Describe("Test the config provider", func() {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		v, err := value.NewValue(`
 		name: "hub-kubevela"
-		namespace: "vela-system"
-		template: "test-image-registry"
+		namespace: "default"
+		template: "default/test-image-registry"
 		config: {
 			registry: "hub.kubevela.net"
 		}
 		`, nil, "")
 		Expect(err).ToNot(HaveOccurred())
 		err = p.Create(mCtx, new(wfContext.WorkflowContext), v, nil)
-		Expect(strings.Contains(err.Error(), "the template image-registry is not exist")).Should(BeTrue())
+		Expect(strings.Contains(err.Error(), "the template is not exist")).Should(BeTrue())
 
 		template, err := p.factory.ParseTemplate("test-image-registry", []byte(templateContent))
 		Expect(err).ToNot(HaveOccurred())
-		Expect(p.factory.CreateOrUpdateConfigTemplate(context.TODO(), "vela-system", template)).ToNot(HaveOccurred())
+		Expect(p.factory.CreateOrUpdateConfigTemplate(context.TODO(), "default", template)).ToNot(HaveOccurred())
 
 		Expect(p.Create(mCtx, new(wfContext.WorkflowContext), v, nil)).ToNot(HaveOccurred())
 	})
@@ -110,7 +110,7 @@ var _ = Describe("Test the config provider", func() {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		v, err := value.NewValue(`
 		name: "www-kubevela"
-		namespace: "vela-system"
+		namespace: "default"
 		config: {
 			url: "kubevela.net"
 		}
@@ -122,7 +122,7 @@ var _ = Describe("Test the config provider", func() {
 	It("test listing the config", func() {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		v, err := value.NewValue(`
-		namespace: "vela-system"
+		namespace: "default"
 		template: "test-image-registry"
 		`, nil, "")
 		Expect(err).ToNot(HaveOccurred())
@@ -132,14 +132,14 @@ var _ = Describe("Test the config provider", func() {
 		var contents []map[string]interface{}
 		Expect(configs.UnmarshalTo(&contents)).ToNot(HaveOccurred())
 		Expect(len(contents)).To(Equal(1))
-		Expect(contents[0]["registry"]).To(Equal("hub.kubevela.net"))
+		Expect(contents[0]["config"].(map[string]interface{})["registry"]).To(Equal("hub.kubevela.net"))
 	})
 
 	It("test reading the config", func() {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		v, err := value.NewValue(`
 		name: "hub-kubevela"
-		namespace: "vela-system"
+		namespace: "default"
 		`, nil, "")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(p.Read(mCtx, new(wfContext.WorkflowContext), v, nil)).ToNot(HaveOccurred())
@@ -152,12 +152,12 @@ var _ = Describe("Test the config provider", func() {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		v, err := value.NewValue(`
 		name: "hub-kubevela"
-		namespace: "vela-system"
+		namespace: "default"
 		`, nil, "")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(p.Delete(mCtx, new(wfContext.WorkflowContext), v, nil)).ToNot(HaveOccurred())
 
-		configs, err := p.factory.ListConfigs(context.Background(), "vela-system", "", "", false)
+		configs, err := p.factory.ListConfigs(context.Background(), "default", "", "", false)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(configs)).To(Equal(1))
 		Expect(configs[0].Properties["url"]).To(Equal("kubevela.net"))

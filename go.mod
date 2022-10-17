@@ -12,7 +12,7 @@ require (
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/go-version v1.3.0
 	github.com/kubevela/pkg v0.0.0-20220930055431-990bad3c95e6
-	github.com/oam-dev/kubevela v0.0.0-00010101000000-000000000000
+	github.com/oam-dev/kubevela v1.6.0-alpha.4.0.20221017121106-dc7d7911273e
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.2
 	github.com/pkg/errors v0.9.1
@@ -33,6 +33,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.2
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.1.1 // indirect
@@ -180,7 +182,6 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
-	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
@@ -224,4 +225,4 @@ require (
 
 replace sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.31-0.20220502234555-5308cea56b78
 
-replace github.com/oam-dev/kubevela => ../kubevela
+replace cloud.google.com/go => cloud.google.com/go v0.100.2

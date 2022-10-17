@@ -23,11 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
-	"github.com/oam-dev/kubevela/pkg/config"
-
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/types"
+
+	"github.com/oam-dev/kubevela/pkg/config"
 )
 
 const (
@@ -113,9 +113,14 @@ func (p *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 	if err != nil {
 		return err
 	}
-	var contents []map[string]interface{}
+	var contents = []map[string]interface{}{}
 	for _, config := range configs {
-		contents = append(contents, config.Properties)
+		contents = append(contents, map[string]interface{}{
+			"name":        config.Name,
+			"alias":       config.Alias,
+			"description": config.Description,
+			"config":      config.Properties,
+		})
 	}
 	return v.FillObject(contents, "configs")
 }
