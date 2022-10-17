@@ -16,7 +16,7 @@ const (
 func NewPersister(persistType string, config map[string][]byte) persistWorkflowRecord {
 	switch persistType {
 	case PersistTypeSLS:
-		return &sls.Handler{
+		return &sls.Handler {
 			LogStoreName:    string(config["LogStoreName"]),
 			ProjectName:     string(config["ProjectName"]),
 			Endpoint:        string(config["Endpoint"]),

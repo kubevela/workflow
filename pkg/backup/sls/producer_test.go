@@ -24,7 +24,7 @@ func TestHandler_Store(t *testing.T) {
 		fields  fields
 		args    args
 		wantErr bool
-	}{
+	} {
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
