@@ -150,6 +150,10 @@ issues:
     - text: "SA3000:"
       linters:
         - staticcheck
+    
+    - text: "package-comments: should have a package comment"
+      linters:
+        - revive
 
     - text: "k8s.io/api/core/v1"
       linters:

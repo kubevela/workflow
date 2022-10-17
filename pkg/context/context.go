@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/util/rand"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
@@ -164,18 +166,13 @@ func (wf *WorkflowContext) DeleteValueInMemory(paths ...string) {
 	wf.memoryStore.Delete(strings.Join(paths, "."))
 }
 
-// MakeParameter make 'value' with interface{}
-func (wf *WorkflowContext) MakeParameter(parameter interface{}) (*value.Value, error) {
-	var s = "{}"
-	if parameter != nil {
-		bt, err := json.Marshal(parameter)
-		if err != nil {
-			return nil, err
-		}
-		s = string(bt)
+// MakeParameter make 'value' with string
+func (wf *WorkflowContext) MakeParameter(parameter string) (*value.Value, error) {
+	if parameter == "" {
+		parameter = "{}"
 	}
 
-	return wf.vars.MakeValue(s)
+	return wf.vars.MakeValue(parameter)
 }
 
 // Commit the workflow context and persist it's content.
@@ -233,19 +230,24 @@ func (wf *WorkflowContext) sync() error {
 
 // LoadFromConfigMap recover workflow context from configMap.
 func (wf *WorkflowContext) LoadFromConfigMap(cm corev1.ConfigMap) error {
+	if wf.store == nil {
+		wf.store = &cm
+	}
 	data := cm.Data
 	componentsJs := map[string]string{}
 
-	if err := json.Unmarshal([]byte(data[ConfigMapKeyComponents]), &componentsJs); err != nil {
-		return errors.WithMessage(err, "decode components")
-	}
-	wf.components = map[string]*ComponentManifest{}
-	for name, compJs := range componentsJs {
-		cm := new(ComponentManifest)
-		if err := cm.unmarshal(compJs); err != nil {
-			return errors.WithMessagef(err, "unmarshal component(%s) manifest", name)
+	if data[ConfigMapKeyComponents] != "" {
+		if err := json.Unmarshal([]byte(data[ConfigMapKeyComponents]), &componentsJs); err != nil {
+			return errors.WithMessage(err, "decode components")
 		}
-		wf.components[name] = cm
+		wf.components = map[string]*ComponentManifest{}
+		for name, compJs := range componentsJs {
+			cm := new(ComponentManifest)
+			if err := cm.unmarshal(compJs); err != nil {
+				return errors.WithMessagef(err, "unmarshal component(%s) manifest", name)
+			}
+			wf.components[name] = cm
+		}
 	}
 	var err error
 	wf.vars, err = value.NewValue(data[ConfigMapKeyVars], nil, "")
@@ -261,6 +263,7 @@ func (wf *WorkflowContext) StoreRef() *corev1.ObjectReference {
 		APIVersion: wf.store.APIVersion,
 		Kind:       wf.store.Kind,
 		Name:       wf.store.Name,
+		Namespace:  wf.store.Namespace,
 		UID:        wf.store.UID,
 	}
 }
@@ -326,8 +329,8 @@ func (comp *ComponentManifest) unmarshal(v string) error {
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (Context, error) {
-	wfCtx, err := newContext(cli, ns, app, owner)
+func NewContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (Context, error) {
+	wfCtx, err := newContext(cli, ns, name, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -336,16 +339,16 @@ func NewContext(cli client.Client, ns, app string, owner []metav1.OwnerReference
 }
 
 // CleanupMemoryStore cleans up memory store.
-func CleanupMemoryStore(app, ns string) {
-	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", app, ns))
+func CleanupMemoryStore(name, ns string) {
+	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", name, ns))
 }
 
-func newContext(cli client.Client, ns, app string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
+func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
 	var (
 		ctx   = context.Background()
 		store corev1.ConfigMap
 	)
-	store.Name = generateStoreName(app)
+	store.Name = generateStoreName(name)
 	store.Namespace = ns
 	store.SetOwnerReferences(owner)
 	if EnableInMemoryContext {
@@ -358,11 +361,22 @@ func newContext(cli client.Client, ns, app string, owner []metav1.OwnerReference
 		} else {
 			return nil, err
 		}
+	} else if !reflect.DeepEqual(store.OwnerReferences, owner) {
+		store = corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("%s-%s", generateStoreName(name), rand.RandomString(5)),
+				Namespace:       ns,
+				OwnerReferences: owner,
+			},
+		}
+		if err := cli.Create(ctx, &store); err != nil {
+			return nil, err
+		}
 	}
 	store.Annotations = map[string]string{
 		AnnotationStartTimestamp: time.Now().String(),
 	}
-	memCache := getMemoryStore(fmt.Sprintf("%s-%s", app, ns))
+	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
 		cli:         cli,
 		store:       &store,
@@ -391,19 +405,19 @@ func getMemoryStore(key string) *sync.Map {
 }
 
 // LoadContext load workflow context from store.
-func LoadContext(cli client.Client, ns, app string) (Context, error) {
+func LoadContext(cli client.Client, ns, name, ctxName string) (Context, error) {
 	var store corev1.ConfigMap
-	store.Name = generateStoreName(app)
+	store.Name = ctxName
 	store.Namespace = ns
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
 	} else if err := cli.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
-		Name:      generateStoreName(app),
+		Name:      ctxName,
 	}, &store); err != nil {
 		return nil, err
 	}
-	memCache := getMemoryStore(fmt.Sprintf("%s-%s", app, ns))
+	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	ctx := &WorkflowContext{
 		cli:         cli,
 		store:       &store,
@@ -416,6 +430,6 @@ func LoadContext(cli client.Client, ns, app string) (Context, error) {
 }
 
 // generateStoreName generates the config map name of workflow context.
-func generateStoreName(app string) string {
-	return fmt.Sprintf("workflow-%s-context", app)
+func generateStoreName(name string) string {
+	return fmt.Sprintf("workflow-%s-context", name)
 }

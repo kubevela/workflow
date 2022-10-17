@@ -57,7 +57,8 @@ func (tr *stepGroupTaskRunner) Name() string {
 
 // Pending check task should be executed or not.
 func (tr *stepGroupTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus)
+	basicVal, _, _ := custom.MakeBasicValue(ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus, basicVal)
 }
 
 // Run make workflow step group.
@@ -70,11 +71,17 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	}
 
 	pStatus := &status
-	defer handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, tr.pd, tr.id, tr.pCtx)
+	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	if err != nil {
+		return status, nil, err
+	}
+	defer handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, basicVal)
+
 	for _, hook := range options.PreCheckHooks {
 		result, err := hook(tr.step, &types.PreCheckOptions{
 			PackageDiscover: tr.pd,
-			ProcessContext:  options.PCtx,
+			BasicTemplate:   basicTemplate,
+			BasicValue:      basicVal,
 		})
 		if err != nil {
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped

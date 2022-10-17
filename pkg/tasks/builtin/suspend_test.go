@@ -27,6 +27,7 @@ import (
 
 func TestSuspendStep(t *testing.T) {
 	r := require.New(t)
+	ctx := newWorkflowContextForTest(t)
 	runner, err := Suspend(v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			Name:      "test",
@@ -37,18 +38,18 @@ func TestSuspendStep(t *testing.T) {
 	r.Equal(runner.Name(), "test")
 
 	// test pending
-	p, _ := runner.Pending(nil, nil)
+	p, _ := runner.Pending(ctx, nil)
 	r.Equal(p, true)
 	ss := map[string]v1alpha1.StepStatus{
 		"depend": {
 			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 		},
 	}
-	p, _ = runner.Pending(nil, ss)
+	p, _ = runner.Pending(ctx, ss)
 	r.Equal(p, false)
 
 	// test skip
-	status, operations, err := runner.Run(nil, &types.TaskRunOptions{
+	status, operations, err := runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Skip: true}, nil
@@ -62,7 +63,7 @@ func TestSuspendStep(t *testing.T) {
 	r.Equal(operations.Skip, true)
 
 	// test timeout
-	status, operations, err = runner.Run(nil, &types.TaskRunOptions{
+	status, operations, err = runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Timeout: true}, nil
@@ -76,7 +77,7 @@ func TestSuspendStep(t *testing.T) {
 	r.Equal(operations.Terminated, true)
 
 	// test run
-	status, act, err := runner.Run(nil, &types.TaskRunOptions{})
+	status, act, err := runner.Run(ctx, &types.TaskRunOptions{})
 	r.NoError(err)
 	r.Equal(act.Suspend, true)
 	r.Equal(status.ID, "124")

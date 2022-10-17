@@ -18,6 +18,7 @@ package generator
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,6 +97,16 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 		debug = true
 	}
 
+	contextData := make(map[string]interface{})
+	if run.Spec.Context != nil {
+		contextByte, err := run.Spec.Context.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(contextByte, &contextData); err != nil {
+			return nil, err
+		}
+	}
 	instance := &types.WorkflowInstance{
 		WorkflowMeta: types.WorkflowMeta{
 			Name:        run.Name,
@@ -112,10 +123,11 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 				},
 			},
 		},
-		Debug:  debug,
-		Mode:   run.Spec.Mode,
-		Steps:  steps,
-		Status: run.Status,
+		Context: contextData,
+		Debug:   debug,
+		Mode:    run.Spec.Mode,
+		Steps:   steps,
+		Status:  run.Status,
 	}
 	executor.InitializeWorkflowInstance(instance)
 	return instance, nil
@@ -125,20 +137,20 @@ func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.Workfl
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
 	}
-	installBuiltinProviders(instance, options.Client, options.Providers)
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
 	}
+	installBuiltinProviders(instance, options.Client, options.Providers, options.ProcessCtx)
 	if options.TemplateLoader == nil {
 		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
 	}
 	return options
 }
 
-func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers) {
+func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers, pCtx process.Context) {
 	workspace.Install(providerHandlers)
 	email.Install(providerHandlers)
-	util.Install(providerHandlers)
+	util.Install(providerHandlers, pCtx)
 	http.Install(providerHandlers, client, instance.Namespace)
 	kube.Install(providerHandlers, client, map[string]string{
 		types.LabelWorkflowRunName:      instance.Name,
@@ -219,8 +231,9 @@ func generateSubStepID(status v1alpha1.WorkflowRunStatus, name, parentStepName s
 
 func generateContextDataFromWorkflowRun(instance *types.WorkflowInstance) process.ContextData {
 	data := process.ContextData{
-		Name:      instance.Name,
-		Namespace: instance.Namespace,
+		Name:       instance.Name,
+		Namespace:  instance.Namespace,
+		CustomData: instance.Context,
 	}
 	return data
 }

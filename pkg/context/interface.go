@@ -38,6 +38,6 @@ type Context interface {
 	GetValueInMemory(paths ...string) (interface{}, bool)
 	DeleteValueInMemory(paths ...string)
 	Commit() error
-	MakeParameter(parameter interface{}) (*value.Value, error)
+	MakeParameter(parameter string) (*value.Value, error)
 	StoreRef() *corev1.ObjectReference
 }

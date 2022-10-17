@@ -64,9 +64,9 @@ const (
 )
 
 // Reconcile reconciles the WorkflowRun object
-//+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/finalizers,verbs=update
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, ReconcileTimeout)
 	defer cancel()

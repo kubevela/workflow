@@ -44,6 +44,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
+	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -1560,7 +1561,7 @@ var _ = Describe("Test Workflow", func() {
 		wf := New(instance, k8sClient)
 		_, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e := &engine{
 			status: &instance.Status,
@@ -1595,7 +1596,7 @@ var _ = Describe("Test Workflow", func() {
 		wfContext.CleanupMemoryStore(instance.Name, instance.Namespace)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err = wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err = wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e = &engine{
 			status: &instance.Status,
@@ -2177,7 +2178,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name)
+		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		v, err := wfCtx.GetVar("saved")
 		Expect(err).ToNot(HaveOccurred())
@@ -2354,10 +2355,15 @@ func (tr *testTaskRunner) Name() string {
 
 // Run execute task.
 func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
+	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, nil, tr.step.Name, "id", "", options.PCtx)
+	if err != nil {
+		return v1alpha1.StepStatus{}, nil, err
+	}
 	if tr.step.Type != "step-group" && options != nil {
 		for _, hook := range options.PreCheckHooks {
 			result, err := hook(tr.step, &types.PreCheckOptions{
-				ProcessContext: options.PCtx,
+				BasicTemplate: basicTemplate,
+				BasicValue:    basicVal,
 			})
 			if err != nil {
 				return v1alpha1.StepStatus{

@@ -71,9 +71,11 @@ func (w WorkflowRunList) Less(i, j int) bool {
 
 // WorkflowRunSpec is the spec for the WorkflowRun
 type WorkflowRunSpec struct {
-	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`
-	WorkflowSpec *WorkflowSpec        `json:"workflowSpec,omitempty"`
-	WorkflowRef  string               `json:"workflowRef,omitempty"`
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Context      *runtime.RawExtension `json:"context,omitempty"`
+	Mode         *WorkflowExecuteMode  `json:"mode,omitempty"`
+	WorkflowSpec *WorkflowSpec         `json:"workflowSpec,omitempty"`
+	WorkflowRef  string                `json:"workflowRef,omitempty"`
 }
 
 // WorkflowRunStatus record the status of workflow run
