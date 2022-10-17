@@ -25,11 +25,11 @@ func TestHandler_Store(t *testing.T) {
 		fields  fields
 		args    args
 		wantErr bool
-	} {
+	}{
 		// TODO: Add test cases.
 		{
 			name: "Err",
-			fields: fields {
+			fields: fields{
 				LogStoreName:    os.Getenv("LOG_TEST_LOGSTORE"),
 				ProjectName:     os.Getenv("LOG_TEST_PROJECT"),
 				Endpoint:        os.Getenv("LOG_TEST_ENDPOINT"),
@@ -41,7 +41,7 @@ func TestHandler_Store(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Handler {
+			s := &Handler{
 				LogStoreName:    tt.fields.LogStoreName,
 				ProjectName:     tt.fields.ProjectName,
 				Endpoint:        tt.fields.Endpoint,
