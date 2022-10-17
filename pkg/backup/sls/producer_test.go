@@ -2,6 +2,7 @@ package sls
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -26,10 +27,21 @@ func TestHandler_Store(t *testing.T) {
 		wantErr bool
 	} {
 		// TODO: Add test cases.
+		{
+			name: "Err",
+			fields: fields {
+				LogStoreName:    os.Getenv("LOG_TEST_LOGSTORE"),
+				ProjectName:     os.Getenv("LOG_TEST_PROJECT"),
+				Endpoint:        os.Getenv("LOG_TEST_ENDPOINT"),
+				AccessKeyID:     os.Getenv("LOG_TEST_ACCESS_KEY_ID"),
+				AccessKeySecret: os.Getenv("LOG_TEST_ACCESS_KEY_SECRET"),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Handler{
+			s := &Handler {
 				LogStoreName:    tt.fields.LogStoreName,
 				ProjectName:     tt.fields.ProjectName,
 				Endpoint:        tt.fields.Endpoint,

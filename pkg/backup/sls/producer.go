@@ -3,11 +3,9 @@ package sls
 import (
 	"context"
 	"encoding/json"
-	sls "github.com/aliyun/aliyun-log-go-sdk"
 	"time"
 
 	"github.com/aliyun/aliyun-log-go-sdk/producer"
-	"github.com/gogo/protobuf/proto"
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
 
@@ -34,16 +32,7 @@ func (s *Handler) Store(ctx context.Context, run *v1alpha1.WorkflowRun) error {
 		return err
 	}
 
-	var content []*sls.LogContent
-	content = append(content, &sls.LogContent{
-		Key:   proto.String("content"),
-		Value: proto.String(string(data)),
-	})
-	log := &sls.Log{
-		Time:     proto.Uint32(uint32(time.Now().Unix())),
-		Contents: content,
-	}
-
+	log := producer.GenerateLog(uint32(time.Now().Unix()), map[string]string{"content": string(data)})
 	err = producerInstance.SendLog(s.ProjectName, s.LogStoreName, "topic", "", log)
 	if err != nil {
 		return err
