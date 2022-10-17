@@ -1,12 +1,14 @@
 package builtin
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/types"
@@ -18,7 +20,7 @@ type testEngine struct {
 	operation  *types.Operation
 }
 
-func (e *testEngine) Run(taskRunners []types.TaskRunner, dag bool) error {
+func (e *testEngine) Run(ctx monitorContext.Context, taskRunners []types.TaskRunner, dag bool) error {
 	return nil
 }
 
@@ -56,14 +58,15 @@ func TestStepGroupStep(t *testing.T) {
 	r.Equal(runner.Name(), "test")
 
 	// test pending
-	p, _ := runner.Pending(ctx, nil)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	p, _ := runner.Pending(logCtx, ctx, nil)
 	r.Equal(p, true)
 	ss := map[string]v1alpha1.StepStatus{
 		"depend": {
 			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 		},
 	}
-	p, _ = runner.Pending(ctx, ss)
+	p, _ = runner.Pending(logCtx, ctx, ss)
 	r.Equal(p, false)
 
 	// test skip

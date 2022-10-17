@@ -17,6 +17,7 @@ limitations under the License.
 package builtin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -24,6 +25,8 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -73,7 +76,13 @@ func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	if err != nil {
 		return stepStatus, operations, err
 	}
-	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, tr.pd, tr.step.Name, tr.id, paramsStr, tr.pCtx)
+	if options.GetTracer == nil {
+		options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context {
+			return monitorContext.NewTraceContext(context.Background(), "")
+		}
+	}
+	tracer := options.GetTracer(tr.id, tr.step).AddTag("step_name", tr.step.Name, "step_type", types.WorkflowStepTypeStepGroup)
+	basicVal, basicTemplate, err := custom.MakeBasicValue(tracer, ctx, tr.pd, tr.step.Name, tr.id, paramsStr, tr.pCtx)
 	if err != nil {
 		return stepStatus, operations, err
 	}
@@ -143,9 +152,9 @@ func (tr *suspendTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 }
 
 // Pending check task should be executed or not.
-func (tr *suspendTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	basicVal, _, _ := custom.MakeBasicValue(ctx, tr.pd, tr.step.Name, tr.id, "", tr.pCtx)
-	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus, basicVal)
+func (tr *suspendTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	basicVal, _, _ := custom.MakeBasicValue(ctx, wfCtx, tr.pd, tr.step.Name, tr.id, "", tr.pCtx)
+	return custom.CheckPending(wfCtx, tr.step, tr.id, stepStatus, basicVal)
 }
 
 // GetSuspendStepDurationWaiting get suspend step wait duration

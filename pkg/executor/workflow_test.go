@@ -2326,7 +2326,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 	return &testTaskRunner{
 		step: step,
 		run:  run,
-		checkPending: func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+		checkPending: func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 			if step.Type != "pending" {
 				return false, v1alpha1.StepStatus{}
 			}
@@ -2345,7 +2345,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 type testTaskRunner struct {
 	step         v1alpha1.WorkflowStep
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
-	checkPending func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
+	checkPending func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 }
 
 // Name return step name.
@@ -2355,7 +2355,8 @@ func (tr *testTaskRunner) Name() string {
 
 // Run execute task.
 func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
-	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, nil, tr.step.Name, "id", "", options.PCtx)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	basicVal, basicTemplate, err := custom.MakeBasicValue(logCtx, ctx, nil, tr.step.Name, "id", "", options.PCtx)
 	if err != nil {
 		return v1alpha1.StepStatus{}, nil, err
 	}
@@ -2396,8 +2397,8 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 }
 
 // Pending check task should be executed or not.
-func (tr *testTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	return tr.checkPending(ctx, stepStatus)
+func (tr *testTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	return tr.checkPending(ctx, wfCtx, stepStatus)
 }
 
 func cleanStepTimeStamp(wfStatus *v1alpha1.WorkflowRunStatus) {
