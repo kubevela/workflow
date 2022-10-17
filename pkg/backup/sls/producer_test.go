@@ -26,10 +26,9 @@ func TestHandler_Store(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{
-			name: "Err",
-			fields: fields{
+			name: "Success",
+			fields: fields {
 				LogStoreName:    os.Getenv("LOG_TEST_LOGSTORE"),
 				ProjectName:     os.Getenv("LOG_TEST_PROJECT"),
 				Endpoint:        os.Getenv("LOG_TEST_ENDPOINT"),

@@ -28,15 +28,9 @@ func (s *Handler) Store(ctx context.Context, run *v1alpha1.WorkflowRun) error {
 	producerInstance := producer.InitProducer(producerConfig)
 	producerInstance.Start()
 	data, err := json.Marshal(run)
-	if err != nil {
-		return err
-	}
 
 	log := producer.GenerateLog(uint32(time.Now().Unix()), map[string]string{"content": string(data)})
 	err = producerInstance.SendLog(s.ProjectName, s.LogStoreName, "topic", "", log)
-	if err != nil {
-		return err
-	}
 	err = producerInstance.Close(60000)
 	if err != nil {
 		return err

@@ -19,8 +19,13 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/spf13/pflag v1.0.5
+<<<<<<< HEAD
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
+=======
+	github.com/stretchr/testify v1.7.1
+	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
+>>>>>>> Feat(backup): update sls producer version
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.23.6
@@ -189,7 +194,11 @@ require (
 	golang.org/x/crypto v0.0.0-20220507011949-2cf3adece122 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
+<<<<<<< HEAD
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
+=======
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
+>>>>>>> Feat(backup): update sls producer version
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
@@ -231,8 +240,8 @@ require (
 
 replace (
 	github.com/go-kit/kit => github.com/go-kit/kit v0.12.0
-	github.com/nats-io/jwt/v2 => github.com/nats-io/jwt/v2 v2.0.3
-	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.7.4
+	github.com/nats-io/jwt/v2 => github.com/nats-io/jwt/v2 v2.0.1
+	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.9.3
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.31-0.20220502234555-5308cea56b78
 )
 
