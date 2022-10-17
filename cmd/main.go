@@ -75,7 +75,7 @@ func main() {
 	var controllerArgs controllers.Args
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8083", "The address the probe endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&logFilePath, "log-file-path", "", "The file to write logs to.")
 	flag.Uint64Var(&logFileMaxSize, "log-file-max-size", 1024, "Defines the maximum size a log file can grow to, Unit is megabytes.")
 	flag.BoolVar(&logDebug, "log-debug", false, "Enable debug logs for development purpose")
