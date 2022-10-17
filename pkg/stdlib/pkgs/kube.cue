@@ -46,9 +46,13 @@
 		apiVersion: string
 		kind:       string
 		metadata: {
-			name:      string
+			name?:      string
 			namespace: *"default" | string
 		}
 	}
+	filter?: {
+		namespace?: string
+    matchingLabels?: {...}
+  }
 	...
 }

@@ -18,6 +18,7 @@ package kube
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -264,6 +265,7 @@ func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 
 // Delete deletes CR from cluster.
 func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+	fmt.Println(v.CueValue())
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
