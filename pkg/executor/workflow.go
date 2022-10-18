@@ -135,7 +135,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 
 	e := newEngine(ctx, wfCtx, w, status)
 
-	err = e.Run(taskRunners, dagMode)
+	err = e.Run(ctx, taskRunners, dagMode)
 	if err != nil {
 		ctx.Error(err, "run steps")
 		StepStatusCache.Store(cacheKey, len(status.Steps))
@@ -476,7 +476,7 @@ func (e *engine) setNextExecuteTime() {
 	e.wfCtx.SetValueInMemory(next, types.ContextKeyNextExecuteTime)
 }
 
-func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) error {
+func (e *engine) runAsDAG(ctx monitorContext.Context, taskRunners []types.TaskRunner, pendingRunners bool) error {
 	var (
 		todoTasks    []types.TaskRunner
 		pendingTasks []types.TaskRunner
@@ -492,7 +492,7 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) e
 		}
 		if !finish {
 			done = false
-			if pending, status := tRunner.Pending(wfCtx, e.stepStatus); pending {
+			if pending, status := tRunner.Pending(ctx, wfCtx, e.stepStatus); pending {
 				if pendingRunners {
 					wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 					e.updateStepStatus(status)
@@ -512,7 +512,7 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) e
 	}
 
 	if len(todoTasks) > 0 {
-		err := e.steps(todoTasks, true)
+		err := e.steps(ctx, todoTasks, true)
 		if err != nil {
 			return err
 		}
@@ -522,19 +522,19 @@ func (e *engine) runAsDAG(taskRunners []types.TaskRunner, pendingRunners bool) e
 		}
 
 		if len(pendingTasks) > 0 {
-			return e.runAsDAG(pendingTasks, true)
+			return e.runAsDAG(ctx, pendingTasks, true)
 		}
 	}
 	return nil
 
 }
 
-func (e *engine) Run(taskRunners []types.TaskRunner, dag bool) error {
+func (e *engine) Run(ctx monitorContext.Context, taskRunners []types.TaskRunner, dag bool) error {
 	var err error
 	if dag {
-		err = e.runAsDAG(taskRunners, false)
+		err = e.runAsDAG(ctx, taskRunners, false)
 	} else {
-		err = e.steps(taskRunners, dag)
+		err = e.steps(ctx, taskRunners, dag)
 	}
 
 	e.checkFailedAfterRetries()
@@ -553,7 +553,7 @@ func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus
 	}
 }
 
-func (e *engine) steps(taskRunners []types.TaskRunner, dag bool) error {
+func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunner, dag bool) error {
 	wfCtx := e.wfCtx
 	for index, runner := range taskRunners {
 		if status, ok := e.stepStatus[runner.Name()]; ok {
@@ -561,7 +561,7 @@ func (e *engine) steps(taskRunners []types.TaskRunner, dag bool) error {
 				continue
 			}
 		}
-		if pending, status := runner.Pending(wfCtx, e.stepStatus); pending {
+		if pending, status := runner.Pending(ctx, wfCtx, e.stepStatus); pending {
 			wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 			e.updateStepStatus(status)
 			if dag {

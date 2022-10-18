@@ -454,7 +454,8 @@ func TestPendingInputCheck(t *testing.T) {
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
 	r.NoError(err)
-	p, _ := run.Pending(wfCtx, nil)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	p, _ := run.Pending(logCtx, wfCtx, nil)
 	r.Equal(p, true)
 	score, err := value.NewValue(`
 100
@@ -462,7 +463,7 @@ func TestPendingInputCheck(t *testing.T) {
 	r.NoError(err)
 	err = wfCtx.SetVar(score, "score")
 	r.NoError(err)
-	p, _ = run.Pending(wfCtx, nil)
+	p, _ = run.Pending(logCtx, wfCtx, nil)
 	r.Equal(p, false)
 }
 
@@ -491,14 +492,15 @@ func TestPendingDependsOnCheck(t *testing.T) {
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
 	r.NoError(err)
-	p, _ := run.Pending(wfCtx, nil)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	p, _ := run.Pending(logCtx, wfCtx, nil)
 	r.Equal(p, true)
 	ss := map[string]v1alpha1.StepStatus{
 		"depend": {
 			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 		},
 	}
-	p, _ = run.Pending(wfCtx, ss)
+	p, _ = run.Pending(logCtx, wfCtx, ss)
 	r.Equal(p, false)
 }
 
@@ -582,7 +584,8 @@ func TestValidateIfValue(t *testing.T) {
 		Namespace: "default",
 		Data:      map[string]interface{}{"arr": []string{"a", "b"}},
 	})
-	basicVal, basicTemplate, err := MakeBasicValue(ctx, nil, "test-step", "id", `key: "value"`, pCtx)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	basicVal, basicTemplate, err := MakeBasicValue(logCtx, ctx, nil, "test-step", "id", `key: "value"`, pCtx)
 	r := require.New(t)
 	r.NoError(err)
 
