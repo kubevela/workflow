@@ -18,6 +18,7 @@ package kube
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -279,21 +280,30 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 	deleteCtx := handleContext(ctx, cluster)
 
 	filterValue, err := v.LookupValue("filter")
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "failed to lookup value: var(path=filter) not exist"){
 		return err
 	}
+
 	filter := &filters{}
-	if err := filterValue.UnmarshalTo(filter); err != nil {
-		return err
+	if filterValue != nil {
+		if err := filterValue.UnmarshalTo(filter); err != nil {
+			return err
+		}
+		labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: filter.MatchingLabels})
+		if err != nil {
+			return err
+		}
+		if err := h.cli.DeleteAllOf(deleteCtx , obj, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector:  labelSelector}}); err != nil {
+			return v.FillObject(err.Error(), "err")
+		}
+		return nil
 	}
 
-
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: filter.MatchingLabels})
-	if err != nil {
-		return err
+	if err := h.handlers.Delete(deleteCtx, cluster, WorkflowResourceCreator, obj); err != nil {
+		return v.FillObject(err.Error(), "err")
 	}
 
-	return h.cli.DeleteAllOf(deleteCtx , obj, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector:  labelSelector}})
+	return nil
 }
 
 // Install register handlers to provider discover.
