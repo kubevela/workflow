@@ -58,7 +58,7 @@ type WorkflowMeta struct {
 // TaskRunner is a task runner
 type TaskRunner interface {
 	Name() string
-	Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
+	Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 	Run(ctx wfContext.Context, options *TaskRunOptions) (v1alpha1.StepStatus, *Operation, error)
 }
 
@@ -69,7 +69,7 @@ type TaskDiscover interface {
 
 // Engine is the engine to run workflow
 type Engine interface {
-	Run(taskRunners []TaskRunner, dag bool) error
+	Run(ctx monitorContext.Context, taskRunners []TaskRunner, dag bool) error
 	GetStepStatus(stepName string) v1alpha1.WorkflowStepStatus
 	GetCommonStepStatus(stepName string) v1alpha1.StepStatus
 	SetParentRunner(name string)

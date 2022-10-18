@@ -62,7 +62,7 @@ func (t *TaskLoader) GetTaskGenerator(ctx context.Context, name string) (types.T
 type taskRunner struct {
 	name         string
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
-	checkPending func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
+	checkPending func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 }
 
 // Name return step name.
@@ -76,8 +76,8 @@ func (tr *taskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) 
 }
 
 // Pending check task should be executed or not.
-func (tr *taskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	return tr.checkPending(ctx, stepStatus)
+func (tr *taskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	return tr.checkPending(ctx, wfCtx, stepStatus)
 }
 
 // nolint:gocyclo
@@ -112,13 +112,13 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 
 		tRunner := new(taskRunner)
 		tRunner.name = wfStep.Name
-		tRunner.checkPending = func(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+		tRunner.checkPending = func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 			options := &types.TaskRunOptions{}
 			if t.runOptionsProcess != nil {
 				t.runOptionsProcess(options)
 			}
-			basicVal, _, _ := MakeBasicValue(ctx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
-			return CheckPending(ctx, wfStep, exec.wfStatus.ID, stepStatus, basicVal)
+			basicVal, _, _ := MakeBasicValue(ctx, wfCtx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
+			return CheckPending(wfCtx, wfStep, exec.wfStatus.ID, stepStatus, basicVal)
 		}
 		tRunner.run = func(ctx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 			if options.GetTracer == nil {
@@ -136,7 +136,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				t.runOptionsProcess(options)
 			}
 
-			basicVal, basicTemplate, err := MakeBasicValue(ctx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
+			basicVal, basicTemplate, err := MakeBasicValue(tracer, ctx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")
 				return v1alpha1.StepStatus{}, nil, errors.WithMessage(err, "make context parameter")
@@ -286,13 +286,13 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, temp
 }
 
 // MakeBasicValue makes basic value
-func MakeBasicValue(ctx wfContext.Context, pd *packages.PackageDiscover, step, id, parameterTemplate string, pCtx process.Context) (*value.Value, string, error) {
+func MakeBasicValue(ctx monitorContext.Context, wfCtx wfContext.Context, pd *packages.PackageDiscover, step, id, parameterTemplate string, pCtx process.Context) (*value.Value, string, error) {
 	paramStr := model.ParameterFieldName + ": {}\n"
 	if parameterTemplate != "" {
 		paramStr = fmt.Sprintf(model.ParameterFieldName+": {%s}\n", parameterTemplate)
 	}
-	template := strings.Join([]string{getContextTemplate(ctx, step, id, pCtx), paramStr}, "\n")
-	v, err := ctx.MakeParameter(template)
+	template := strings.Join([]string{getContextTemplate(ctx, wfCtx, step, id, pCtx), paramStr}, "\n")
+	v, err := wfCtx.MakeParameter(template)
 	if err != nil {
 		return nil, "", err
 	}
@@ -302,9 +302,9 @@ func MakeBasicValue(ctx wfContext.Context, pd *packages.PackageDiscover, step, i
 	return v, template, nil
 }
 
-func getContextTemplate(ctx wfContext.Context, step, id string, pCtx process.Context) string {
+func getContextTemplate(ctx monitorContext.Context, wfCtx wfContext.Context, step, id string, pCtx process.Context) string {
 	var contextTempl string
-	meta, _ := ctx.GetVar(types.ContextKeyMetadata)
+	meta, _ := wfCtx.GetVar(types.ContextKeyMetadata)
 	if meta != nil {
 		ms, err := meta.String()
 		if err != nil {
@@ -317,6 +317,7 @@ func getContextTemplate(ctx wfContext.Context, step, id string, pCtx process.Con
 	}
 	pCtx.PushData(model.ContextStepSessionID, id)
 	pCtx.PushData(model.ContextStepName, step)
+	pCtx.PushData(model.ContextSpanID, ctx.GetID())
 	c, err := pCtx.BaseContextFile()
 	if err != nil {
 		return ""

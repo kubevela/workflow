@@ -11,7 +11,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/google/go-cmp v0.5.8
 	github.com/hashicorp/go-version v1.3.0
-	github.com/kubevela/pkg v0.0.0-20220930055431-990bad3c95e6
+	github.com/kubevela/pkg v0.0.0-20221017134311-26e5042d4503
 	github.com/oam-dev/kubevela v1.6.0-alpha.4.0.20221017121106-dc7d7911273e
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.2

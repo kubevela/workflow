@@ -17,10 +17,12 @@ limitations under the License.
 package builtin
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -38,14 +40,15 @@ func TestSuspendStep(t *testing.T) {
 	r.Equal(runner.Name(), "test")
 
 	// test pending
-	p, _ := runner.Pending(ctx, nil)
+	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
+	p, _ := runner.Pending(logCtx, ctx, nil)
 	r.Equal(p, true)
 	ss := map[string]v1alpha1.StepStatus{
 		"depend": {
 			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 		},
 	}
-	p, _ = runner.Pending(ctx, ss)
+	p, _ = runner.Pending(logCtx, ctx, ss)
 	r.Equal(p, false)
 
 	// test skip

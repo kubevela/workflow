@@ -17,7 +17,10 @@ limitations under the License.
 package builtin
 
 import (
+	"context"
 	"fmt"
+
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -56,9 +59,9 @@ func (tr *stepGroupTaskRunner) Name() string {
 }
 
 // Pending check task should be executed or not.
-func (tr *stepGroupTaskRunner) Pending(ctx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	basicVal, _, _ := custom.MakeBasicValue(ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
-	return custom.CheckPending(ctx, tr.step, tr.id, stepStatus, basicVal)
+func (tr *stepGroupTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
+	basicVal, _, _ := custom.MakeBasicValue(ctx, wfCtx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	return custom.CheckPending(wfCtx, tr.step, tr.id, stepStatus, basicVal)
 }
 
 // Run make workflow step group.
@@ -71,7 +74,13 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	}
 
 	pStatus := &status
-	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	if options.GetTracer == nil {
+		options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context {
+			return monitorContext.NewTraceContext(context.Background(), "")
+		}
+	}
+	tracer := options.GetTracer(tr.id, tr.step).AddTag("step_name", tr.name, "step_type", types.WorkflowStepTypeStepGroup)
+	basicVal, basicTemplate, err := custom.MakeBasicValue(tracer, ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
 	if err != nil {
 		return status, nil, err
 	}
@@ -110,7 +119,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 		if tr.mode == v1alpha1.WorkflowModeStep {
 			dag = false
 		}
-		if err := e.Run(tr.subTaskRunners, dag); err != nil {
+		if err := e.Run(tracer, tr.subTaskRunners, dag); err != nil {
 			return v1alpha1.StepStatus{
 				ID:    tr.id,
 				Name:  tr.name,
