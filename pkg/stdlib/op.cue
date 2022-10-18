@@ -87,6 +87,12 @@ import (
 
 #SendEmail: email.#Send
 
+// The providers about the config
+#CreateConfig: config.#Create
+#DeleteConfig: config.#Delete
+#ReadConfig:   config.#Read
+#ListConfig:   config.#List
+
 #PatchK8sObject: util.#PatchK8sObject
 
 #Steps: {
