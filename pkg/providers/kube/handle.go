@@ -18,7 +18,6 @@ package kube
 
 import (
 	"context"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -279,13 +278,8 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 	}
 	deleteCtx := handleContext(ctx, cluster)
 
-	filterValue, err := v.LookupValue("filter")
-	if err != nil && !strings.Contains(err.Error(), "failed to lookup value: var(path=filter) not exist"){
-		return err
-	}
-
-	filter := &filters{}
-	if filterValue != nil {
+	if filterValue, err := v.LookupValue("filter"); err == nil {
+		filter := &filters{}
 		if err := filterValue.UnmarshalTo(filter); err != nil {
 			return err
 		}
