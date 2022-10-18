@@ -1,7 +1,6 @@
 package sls
 
 import (
-	"context"
 	"encoding/json"
 	"time"
 
@@ -21,9 +20,8 @@ type Handler struct {
 }
 
 // Store is store workflowRun to sls
-func (s *Handler) Store(ctx context.Context, run *v1alpha1.WorkflowRun) error {
-	logCtx := monitorContext.NewTraceContext(ctx, "")
-	logCtx.Info("Start Send workflow record to SLS")
+func (s *Handler) Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) error {
+	ctx.Info("Start Send workflow record to SLS")
 	producerConfig := producer.GetDefaultProducerConfig()
 	producerConfig.Endpoint = s.Endpoint
 	producerConfig.AccessKeyID = s.AccessKeyID
@@ -33,19 +31,21 @@ func (s *Handler) Store(ctx context.Context, run *v1alpha1.WorkflowRun) error {
 	producerInstance.Start()
 	data, err := json.Marshal(run)
 	if err != nil {
-		logCtx.Info(err.Error())
+		ctx.Info(err.Error())
 	}
 
 	log := producer.GenerateLog(uint32(time.Now().Unix()), map[string]string{"content": string(data)})
 	err = producerInstance.SendLog(s.ProjectName, s.LogStoreName, "topic", "", log)
 	if err != nil {
-		logCtx.Info(err.Error())
+		ctx.Info(err.Error())
 	}
 
-	err = producerInstance.Close(60000)
-	if err != nil {
-		return err
-	}
+	defer func(producerInstance *producer.Producer, timeoutMs int64) {
+		err = producerInstance.Close(timeoutMs)
+		if err != nil {
+			ctx.Info(err.Error())
+		}
+	}(producerInstance, 60000)
 
 	return nil
 }

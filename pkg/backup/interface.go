@@ -1,7 +1,7 @@
 package backup
 
 import (
-	"context"
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/backup/sls"
@@ -29,5 +29,5 @@ func NewPersister(persistType string, config map[string][]byte) persistWorkflowR
 }
 
 type persistWorkflowRecord interface {
-	Store(ctx context.Context, run *v1alpha1.WorkflowRun) error
+	Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) error
 }

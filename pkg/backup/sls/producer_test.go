@@ -1,9 +1,10 @@
 package sls
 
 import (
-	"context"
 	"os"
 	"testing"
+
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
@@ -17,7 +18,7 @@ func TestHandler_Store(t *testing.T) {
 		AccessKeySecret string
 	}
 	type args struct {
-		ctx context.Context
+		ctx monitorContext.Context
 		run *v1alpha1.WorkflowRun
 	}
 	tests := []struct {
