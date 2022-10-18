@@ -1,6 +1,7 @@
 package sls
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -35,6 +36,9 @@ func TestHandler_Store(t *testing.T) {
 				Endpoint:        os.Getenv("LOG_TEST_ENDPOINT"),
 				AccessKeyID:     os.Getenv("LOG_TEST_ACCESS_KEY_ID"),
 				AccessKeySecret: os.Getenv("LOG_TEST_ACCESS_KEY_SECRET"),
+			},
+			args: args{
+				ctx: monitorContext.NewTraceContext(context.Background(), "test-sls"),
 			},
 			wantErr: false,
 		},
