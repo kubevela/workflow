@@ -78,6 +78,7 @@ func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v
 // Log print cue value in log
 func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	stepName := fmt.Sprint(p.pCtx.GetData(model.ContextStepName))
+	stepID := fmt.Sprint(p.pCtx.GetData(model.ContextStepSessionID))
 	config := make(map[string]types.LogConfig)
 	c := wfCtx.GetMutableValue(types.ContextKeyLogConfig)
 	if c != "" {
@@ -96,7 +97,7 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 				level = int(l)
 			}
 		}
-		if err := printDataInLog(ctx, data, level, &stepConfig); err != nil {
+		if err := printDataInLog(ctx, data, level, stepID, &stepConfig); err != nil {
 			return err
 		}
 	}
@@ -115,10 +116,11 @@ func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *v
 	return nil
 }
 
-func printDataInLog(ctx monitorContext.Context, data *value.Value, level int, stepConfig *types.LogConfig) error {
+func printDataInLog(ctx monitorContext.Context, data *value.Value, level int, stepID string, stepConfig *types.LogConfig) error {
 	stepConfig.Data = true
 	logCtx := ctx.Fork("cue logs")
-	ctx.V(level)
+	logCtx.AddTag(model.ContextStepSessionID, stepID)
+	logCtx.V(level)
 	if s, err := data.GetString(); err == nil {
 		logCtx.Info(s)
 		return nil
