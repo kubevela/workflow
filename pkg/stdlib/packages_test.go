@@ -58,17 +58,19 @@ out: custom.context`)
 	_ = cuectx1.BuildFile(file)
 
 	file, err = parser.ParseFile("-", `
-import "vela/custom"
-out: custom.context`)
+import "vela/op/v1"
+out: v1.#Break & {
+	message: "break"
+}
+`)
 	r.NoError(err)
 	builder1 := &build.Instance{}
 	err = builder1.AddSyntax(file)
 	r.NoError(err)
-	err = AddImportsFor(builder1, "context: id: \"yyy\"")
+	err = AddImportsFor(builder1, "")
 	r.NoError(err)
-
 	inst1 := cuectx1.BuildInstance(builder1)
-	str1, err := inst1.LookupPath(cue.ParsePath("out.id")).String()
+	str1, err := inst1.LookupPath(cue.ParsePath("out.message")).String()
 	r.NoError(err)
-	r.Equal(str1, "yyy")
+	r.Equal(str1, "break")
 }
