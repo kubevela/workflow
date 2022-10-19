@@ -1,0 +1,12 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: message
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: step1
+        type: message
+        properties:
+          message: "hello"

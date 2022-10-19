@@ -193,11 +193,12 @@ func (h *provider) Message(ctx monitorContext.Context, wfCtx wfContext.Context, 
 func Install(p types.Providers) {
 	prd := &provider{}
 	p.Register(ProviderName, map[string]types.Handler{
-		"load":   prd.Load,
-		"export": prd.Export,
-		"wait":   prd.Wait,
-		"break":  prd.Break,
-		"fail":   prd.Fail,
-		"var":    prd.DoVar,
+		"load":    prd.Load,
+		"export":  prd.Export,
+		"wait":    prd.Wait,
+		"break":   prd.Break,
+		"fail":    prd.Fail,
+		"message": prd.Message,
+		"var":     prd.DoVar,
 	})
 }
