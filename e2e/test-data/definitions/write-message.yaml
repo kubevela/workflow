@@ -1,0 +1,19 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  annotations:
+    definition.oam.dev/alias: ""
+  name: message
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+        	"vela/op"
+        )
+
+        msg: op.#Message & {
+        	parameter
+        }
+        parameter: message: string
