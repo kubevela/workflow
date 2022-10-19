@@ -96,6 +96,9 @@ var _ = BeforeSuite(func(done Done) {
 			Apply:  d.apply,
 			Delete: d.delete,
 		},
+		labels: map[string]string{
+			"hello": "world",
+		},
 	}
 	close(done)
 }, 120)
@@ -120,6 +123,9 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 value:{
 	%s
 	metadata: name: "app"
+	metadata: labels: {
+		"test": "test"
+	}
 }
 cluster: ""
 `, s), nil, "")
@@ -146,6 +152,7 @@ cluster: ""
 				Name:      "app",
 			}, workload)
 		}, time.Second*2, time.Millisecond*300).Should(BeNil())
+		Expect(len(workload.GetLabels())).To(Equal(2))
 
 		s, err = component.Workload.String()
 		Expect(err).ToNot(HaveOccurred())
@@ -328,7 +335,7 @@ cluster: ""
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
-				Labels: map[string]string {
+				Labels: map[string]string{
 					"test.oam.dev": "true",
 				},
 			},
