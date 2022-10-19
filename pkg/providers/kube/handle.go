@@ -58,6 +58,11 @@ type Handlers struct {
 	Delete Deleter
 }
 
+type filters struct {
+	Namespace      string            `json:"namespace"`
+	MatchingLabels map[string]string `json:"matchingLabels"`
+}
+
 type provider struct {
 	labels   map[string]string
 	handlers Handlers
@@ -234,10 +239,6 @@ func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 		"apiVersion": resource.APIVersion,
 	}}
 
-	type filters struct {
-		Namespace      string            `json:"namespace"`
-		MatchingLabels map[string]string `json:"matchingLabels"`
-	}
 	filterValue, err := v.LookupValue("filter")
 	if err != nil {
 		return err
@@ -276,9 +277,26 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 		return err
 	}
 	deleteCtx := handleContext(ctx, cluster)
+
+	if filterValue, err := v.LookupValue("filter"); err == nil {
+		filter := &filters{}
+		if err := filterValue.UnmarshalTo(filter); err != nil {
+			return err
+		}
+		labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: filter.MatchingLabels})
+		if err != nil {
+			return err
+		}
+		if err := h.cli.DeleteAllOf(deleteCtx, obj, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector: labelSelector}}); err != nil {
+			return v.FillObject(err.Error(), "err")
+		}
+		return nil
+	}
+
 	if err := h.handlers.Delete(deleteCtx, cluster, WorkflowResourceCreator, obj); err != nil {
 		return v.FillObject(err.Error(), "err")
 	}
+
 	return nil
 }
 
