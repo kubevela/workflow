@@ -32,7 +32,7 @@ func (s *Handler) Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) e
 	defer func(producerInstance *producer.Producer, timeoutMs int64) {
 		err := producerInstance.Close(timeoutMs)
 		if err != nil {
-			ctx.Info(err.Error())
+			ctx.Error(err, "Close SLS fail")
 		}
 	}(producerInstance, 60000)
 

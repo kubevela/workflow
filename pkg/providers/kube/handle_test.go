@@ -328,7 +328,7 @@ cluster: ""
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "default",
-				Labels: map[string]string {
+				Labels: map[string]string{
 					"test.oam.dev": "true",
 				},
 			},
