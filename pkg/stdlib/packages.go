@@ -81,11 +81,10 @@ func GetPackages() (map[string]string, error) {
 			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
 			opContent += pkgContent
 		}
-		pkgName := builtinPackageName
+		pkgName := builtinPackageName + "/" + dirs.Name()
 		if dirs.Name() == "v1" {
-			ret[pkgName] = opContent
+			ret[builtinPackageName] = opContent
 		}
-		pkgName = pkgName + "/" + dirs.Name()
 		ret[pkgName] = opContent
 	}
 	return ret, nil
