@@ -161,6 +161,7 @@ type Action interface {
 	Terminate(message string)
 	Wait(message string)
 	Fail(message string)
+	Message(message string)
 }
 
 // Parameter defines a parameter for cli from capability template

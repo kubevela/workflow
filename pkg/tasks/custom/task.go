@@ -385,7 +385,9 @@ type executor struct {
 func (exec *executor) Suspend(message string) {
 	exec.suspend = true
 	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSucceeded
-	exec.wfStatus.Message = message
+	if message != "" {
+		exec.wfStatus.Message = message
+	}
 	exec.wfStatus.Reason = types.StatusReasonSuspend
 }
 
@@ -393,7 +395,9 @@ func (exec *executor) Suspend(message string) {
 func (exec *executor) Terminate(message string) {
 	exec.terminated = true
 	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSucceeded
-	exec.wfStatus.Message = message
+	if message != "" {
+		exec.wfStatus.Message = message
+	}
 	exec.wfStatus.Reason = types.StatusReasonTerminate
 }
 
@@ -403,7 +407,9 @@ func (exec *executor) Wait(message string) {
 	if exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseFailed {
 		exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseRunning
 		exec.wfStatus.Reason = types.StatusReasonWait
-		exec.wfStatus.Message = message
+		if message != "" {
+			exec.wfStatus.Message = message
+		}
 	}
 }
 
@@ -412,7 +418,16 @@ func (exec *executor) Fail(message string) {
 	exec.terminated = true
 	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
 	exec.wfStatus.Reason = types.StatusReasonAction
-	exec.wfStatus.Message = message
+	if message != "" {
+		exec.wfStatus.Message = message
+	}
+}
+
+// Message writes message to step status, note that the message will be overwritten by the next message.
+func (exec *executor) Message(message string) {
+	if message != "" {
+		exec.wfStatus.Message = message
+	}
 }
 
 func (exec *executor) Skip(message string) {

@@ -18,30 +18,46 @@ package mock
 
 // Action ...
 type Action struct {
-	Phase   string
-	Message string
+	Phase string
+	Msg   string
 }
 
 // Suspend makes the step suspend
 func (act *Action) Suspend(message string) {
 	act.Phase = "Suspend"
-	act.Message = message
+	if message != "" {
+		act.Msg = message
+	}
 }
 
 // Terminate makes the step terminate
 func (act *Action) Terminate(message string) {
 	act.Phase = "Terminate"
-	act.Message = message
+	if message != "" {
+		act.Msg = message
+	}
 }
 
 // Wait makes the step wait
 func (act *Action) Wait(message string) {
 	act.Phase = "Wait"
-	act.Message = message
+	if message != "" {
+		act.Msg = message
+	}
 }
 
 // Fail makes the step fail
 func (act *Action) Fail(message string) {
 	act.Phase = "Fail"
-	act.Message = message
+	if message != "" {
+		act.Msg = message
+	}
+}
+
+// Message write message to step status
+func (act *Action) Message(message string) {
+	act.Phase = "Fail"
+	if message != "" {
+		act.Msg = message
+	}
 }

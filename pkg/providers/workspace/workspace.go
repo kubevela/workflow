@@ -144,7 +144,6 @@ func (h *provider) Export(ctx monitorContext.Context, wfCtx wfContext.Context, v
 
 // Wait let workflow wait.
 func (h *provider) Wait(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
-
 	cv := v.CueValue()
 	if cv.Exists() {
 		ret := cv.LookupPath(value.FieldPath("continue"))
@@ -177,6 +176,16 @@ func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 		msg, _ = v.GetString("message")
 	}
 	act.Fail(msg)
+	return nil
+}
+
+// Message writes message to step status, note that the message will be overwritten by the next message.
+func (h *provider) Message(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+	var msg string
+	if v != nil {
+		msg, _ = v.GetString("message")
+	}
+	act.Message(msg)
 	return nil
 }
 
