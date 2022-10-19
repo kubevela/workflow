@@ -153,7 +153,11 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 	if workload.GetNamespace() == "" {
 		workload.SetNamespace("default")
 	}
-	workload.SetLabels(h.labels)
+	for k, v := range h.labels {
+		if err := k8s.AddLabel(workload, k, v); err != nil {
+			return err
+		}
+	}
 	cluster, err := v.GetString("cluster")
 	if err != nil {
 		return err
