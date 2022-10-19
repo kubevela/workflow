@@ -82,9 +82,10 @@ func GetPackages() (map[string]string, error) {
 			opContent += pkgContent
 		}
 		pkgName := builtinPackageName
-		if dirs.Name() != "v1" {
-			pkgName = pkgName + "/" + dirs.Name()
+		if dirs.Name() == "v1" {
+			ret[pkgName] = opContent
 		}
+		pkgName = pkgName + "/" + dirs.Name()
 		ret[pkgName] = opContent
 	}
 	return ret, nil
