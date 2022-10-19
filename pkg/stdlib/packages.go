@@ -64,28 +64,28 @@ func GetPackages() (map[string]string, error) {
 	ret := make(map[string]string)
 
 	for _, dirs := range versions {
-		files, err := fs.ReadDir("actions/" + dirs.Name() + "/pkgs")
+		pathPrefix := fmt.Sprintf("actions/%s", dirs.Name())
+		files, err := fs.ReadDir(filepath.Join(pathPrefix, "/pkgs"))
 		if err != nil {
 			return nil, err
 		}
-		opBytes, err := fs.ReadFile("actions/" + dirs.Name() + "/op.cue")
+		opBytes, err := fs.ReadFile(filepath.Join(pathPrefix, "/op.cue"))
 		if err != nil {
 			return nil, err
 		}
 		opContent := string(opBytes) + "\n"
 		for _, file := range files {
-			body, err := fs.ReadFile("actions/" + dirs.Name() + "/pkgs/" + file.Name())
+			body, err := fs.ReadFile(filepath.Join(pathPrefix, "/pkgs", file.Name()))
 			if err != nil {
 				return nil, err
 			}
 			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
 			opContent += pkgContent
 		}
-		pkgName := builtinPackageName + "/" + dirs.Name()
 		if dirs.Name() == "v1" {
 			ret[builtinPackageName] = opContent
 		}
-		ret[pkgName] = opContent
+		ret[filepath.Join(builtinPackageName, dirs.Name())] = opContent
 	}
 	return ret, nil
 }
@@ -96,14 +96,14 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	addDefault := true
 
 	for _, a := range inst.Imports {
-		if a.PkgName == filepath.Base(builtinPackageName) {
+		if a.PkgName == filepath.Base(builtinPackageName) || (a.PkgName == filepath.Join(filepath.Base(builtinPackageName), "/v1")) {
 			addDefault = false
 			break
 		}
 
 	}
 	if addDefault {
-		inst.Imports = append(inst.Imports, builtinImport[0])
+		inst.Imports = append(inst.Imports, builtinImport...)
 	}
 	if tagTempl != "" {
 		p := &build.Instance{
