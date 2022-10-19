@@ -51,24 +51,24 @@ out: custom.context`)
 	r.NoError(err)
 	r.Equal(str, "xxx")
 
-	//test vela/op/v2
-	cuectx2 := cuecontext.New()
-	file, err = parser.ParseFile("vela/op/v2", pkg["vela/op/v2"])
+	//test vela/op/v1
+	cuectx1 := cuecontext.New()
+	file, err = parser.ParseFile("vela/op/v1", pkg["vela/op/v1"])
 	r.NoError(err)
-	_ = cuectx2.BuildFile(file)
+	_ = cuectx1.BuildFile(file)
 
 	file, err = parser.ParseFile("-", `
 import "vela/custom"
 out: custom.context`)
 	r.NoError(err)
-	builder2 := &build.Instance{}
-	err = builder2.AddSyntax(file)
+	builder1 := &build.Instance{}
+	err = builder1.AddSyntax(file)
 	r.NoError(err)
-	err = AddImportsFor(builder2, "context: id: \"yyy\"")
+	err = AddImportsFor(builder1, "context: id: \"yyy\"")
 	r.NoError(err)
 
-	inst2 := cuectx2.BuildInstance(builder2)
-	str2, err := inst2.LookupPath(cue.ParsePath("out.id")).String()
+	inst1 := cuectx1.BuildInstance(builder1)
+	str1, err := inst1.LookupPath(cue.ParsePath("out.id")).String()
 	r.NoError(err)
-	r.Equal(str2, "yyy")
+	r.Equal(str1, "yyy")
 }
