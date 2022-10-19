@@ -269,6 +269,35 @@ message: "fail"
 	r.Equal(act.msg, "fail")
 }
 
+func TestProvider_Message(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	p := &provider{}
+	r := require.New(t)
+	act := &mockAction{}
+	v, err := value.NewValue(`
+message: "test"
+`, nil, "")
+	r.NoError(err)
+	err = p.Message(nil, wfCtx, nil, act)
+	r.NoError(err)
+	r.Equal(act.msg, "")
+	err = p.Message(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.msg, "test")
+	err = p.Message(nil, wfCtx, nil, act)
+	r.NoError(err)
+	r.Equal(act.msg, "test")
+
+	act = &mockAction{}
+	v, err = value.NewValue(`
+message: "fail"
+`, nil, "")
+	r.NoError(err)
+	err = p.Fail(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.msg, "fail")
+}
+
 type mockAction struct {
 	suspend   bool
 	terminate bool
@@ -278,7 +307,9 @@ type mockAction struct {
 
 func (act *mockAction) Suspend(msg string) {
 	act.suspend = true
-	act.msg = msg
+	if msg != "" {
+		act.msg = msg
+	}
 }
 
 func (act *mockAction) Terminate(msg string) {
@@ -288,12 +319,22 @@ func (act *mockAction) Terminate(msg string) {
 
 func (act *mockAction) Wait(msg string) {
 	act.wait = true
-	act.msg = msg
+	if msg != "" {
+		act.msg = msg
+	}
 }
 
 func (act *mockAction) Fail(msg string) {
 	act.terminate = true
-	act.msg = msg
+	if msg != "" {
+		act.msg = msg
+	}
+}
+
+func (act *mockAction) Message(msg string) {
+	if msg != "" {
+		act.msg = msg
+	}
 }
 
 func newWorkflowContextForTest(t *testing.T) wfContext.Context {

@@ -1,5 +1,6 @@
 include makefiles/const.mk
 include makefiles/dependency.mk
+include makefiles/e2e.mk
 
 .PHONY: all
 all: build
@@ -61,7 +62,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" GODEBUG=x509sha1=1 go test ./... -coverprofile coverage.txt
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" GODEBUG=x509sha1=1 go test $(shell go list ./... | grep -v e2e) -coverprofile coverage.txt
 
 .PHONY: helm-doc-gen
 helm-doc-gen: helmdoc
@@ -80,6 +81,11 @@ run: manifests generate fmt vet ## Run a controller from your host.
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	docker build --build-arg=VERSION=$(VELA_VERSION) --build-arg=GITVERSION=$(GIT_COMMIT) --build-arg=OS=$(OS) --build-arg=ARCH=${ARCH} -t ${IMG}:${IMG_TAG} .
+
+# load docker image to the k3d cluster
+image-load: 
+	docker build -t ${IMG}:${IMG_TAG} -f Dockerfile.e2e .
+	k3d image import ${IMG}:${IMG_TAG} || { echo >&2 "kind not installed or error loading image: ${IMG}:${IMG_TAG}"; exit 1; }
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
