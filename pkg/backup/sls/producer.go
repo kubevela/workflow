@@ -29,23 +29,25 @@ func (s *Handler) Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) e
 
 	producerInstance := producer.InitProducer(producerConfig)
 	producerInstance.Start()
+	defer func(producerInstance *producer.Producer, timeoutMs int64) {
+		err := producerInstance.Close(timeoutMs)
+		if err != nil {
+			ctx.Info(err.Error())
+		}
+	}(producerInstance, 60000)
+
 	data, err := json.Marshal(run)
 	if err != nil {
-		ctx.Info(err.Error())
+		ctx.Error(err, "Marshal WorkflowRun Content fail")
+		return err
 	}
 
 	log := producer.GenerateLog(uint32(time.Now().Unix()), map[string]string{"content": string(data)})
 	err = producerInstance.SendLog(s.ProjectName, s.LogStoreName, "topic", "", log)
 	if err != nil {
-		ctx.Info(err.Error())
+		ctx.Error(err, "Send WorkflowRun Content to SLS fail")
+		return err
 	}
-
-	defer func(producerInstance *producer.Producer, timeoutMs int64) {
-		err = producerInstance.Close(timeoutMs)
-		if err != nil {
-			ctx.Info(err.Error())
-		}
-	}(producerInstance, 60000)
 
 	return nil
 }
