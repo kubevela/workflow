@@ -15,6 +15,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -45,8 +46,10 @@ var _ = Describe("Test the workflow run with the config steps", func() {
 	})
 
 	It("Test the workflow", func() {
+		content, err := os.ReadFile("./test-data/config-workflow-run.yaml")
+		Expect(err).Should(BeNil())
 		var workflowRun v1alpha1.WorkflowRun
-		Expect(yaml.Unmarshal([]byte(manageConfigWorkflowRun), &workflowRun)).Should(BeNil())
+		Expect(yaml.Unmarshal(content, &workflowRun)).Should(BeNil())
 		workflowRun.Namespace = namespace
 		Expect(k8sClient.Create(context.TODO(), &workflowRun)).Should(BeNil())
 		Eventually(
@@ -66,35 +69,3 @@ var _ = Describe("Test the workflow run with the config steps", func() {
 		k8sClient.DeleteAllOf(ctx, &v1alpha1.WorkflowRun{}, client.InNamespace(namespace))
 	})
 })
-
-var manageConfigWorkflowRun = `
-kind: WorkflowRun
-apiVersion: core.oam.dev/v1alpha1
-metadata:
-  name: test-config
-  namespace: "config-e2e-test"
-spec:
-  workflowSpec:
-    steps:
-    - name: write-config
-      type: create-config
-      properties:
-        name: test
-        config: 
-          key1: value1
-          key2: 2
-          key3: true
-          key4: 
-            key5: value5
-    - name: read-config
-      type: read-config
-      properties:
-        name: test
-      outputs:
-      - fromKey: config
-        name: read-config
-    - name: delete-config
-      type: delete-config
-      properties:
-        name: test
-`
