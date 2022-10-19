@@ -287,7 +287,7 @@ func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v
 		if err != nil {
 			return err
 		}
-		if err := h.cli.DeleteAllOf(deleteCtx , obj, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector:  labelSelector}}); err != nil {
+		if err := h.cli.DeleteAllOf(deleteCtx, obj, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector: labelSelector}}); err != nil {
 			return v.FillObject(err.Error(), "err")
 		}
 		return nil
