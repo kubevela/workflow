@@ -322,6 +322,62 @@ cluster: ""
 		Expect(errors.IsNotFound(err)).Should(Equal(true))
 	})
 
+	It("delete with labels", func() {
+		ctx := context.Background()
+		err := k8sClient.Create(ctx, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Labels: map[string]string {
+					"test.oam.dev": "true",
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "busybox",
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		err = k8sClient.Get(ctx, types.NamespacedName{
+			Name:      "test",
+			Namespace: "default",
+		}, &corev1.Pod{})
+		Expect(err).ToNot(HaveOccurred())
+
+		v, err := value.NewValue(`
+value: {
+apiVersion: "v1"
+kind: "Pod"
+metadata: {
+  namespace: "default"
+}
+}
+filter: {
+  namespace: "default"
+  matchingLabels: {
+      "test.oam.dev": "true"
+  }
+}
+cluster: ""
+`, nil, "")
+		Expect(err).ToNot(HaveOccurred())
+		wfCtx, err := newWorkflowContextForTest()
+		Expect(err).ToNot(HaveOccurred())
+		mCtx := monitorContext.NewTraceContext(context.Background(), "")
+		err = p.Delete(mCtx, wfCtx, v, nil)
+		Expect(err).ToNot(HaveOccurred())
+		err = k8sClient.Get(ctx, types.NamespacedName{
+			Name:      "test",
+			Namespace: "default",
+		}, &corev1.Pod{})
+		Expect(err).To(HaveOccurred())
+		Expect(errors.IsNotFound(err)).Should(Equal(true))
+	})
+
 	It("apply parallel", func() {
 		ctx, err := newWorkflowContextForTest()
 		Expect(err).ToNot(HaveOccurred())
