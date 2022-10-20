@@ -28,6 +28,10 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +70,7 @@ func init() {
 
 func main() {
 	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock string
-	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel string
+	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
 	var enableLeaderElection, logDebug, backupCleanOnBackup bool
 	var qps float64
 	var logFileMaxSize uint64
@@ -97,11 +101,13 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
-	flag.StringVar(&backupStrategy, "backup-strategy", "RemainLatestFailedRecord", "Set the strategy for backup workflow records, default is RemainLatestFailedRecord")
-	flag.StringVar(&backupIgnoreStrategy, "backup-ignore-strategy", "IgnoreLatestFailedRecord", "Set the strategy for ignore backup workflow records, default is IgnoreLatestFailedRecord")
+	flag.StringVar(&backupStrategy, "backup-strategy", "BackupFinishedRecord", "Set the strategy for backup workflow records, default is RemainLatestFailedRecord")
+	flag.StringVar(&backupIgnoreStrategy, "backup-ignore-strategy", "", "Set the strategy for ignore backup workflow records, default is IgnoreLatestFailedRecord")
 	flag.StringVar(&backupPersistType, "backup-persist-type", "", "Set the persist type for backup workflow records, default is empty")
 	flag.StringVar(&groupByLabel, "backup-group-by-label", "", "Set the label for group by, default is empty")
 	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
+	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
+	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 
@@ -192,8 +198,10 @@ func main() {
 		}
 	}
 
+	kubeClient := mgr.GetClient()
+
 	if err = (&controllers.WorkflowRunReconciler{
-		Client:          mgr.GetClient(),
+		Client:          kubeClient,
 		Scheme:          mgr.GetScheme(),
 		PackageDiscover: pd,
 		Recorder:        event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
@@ -204,14 +212,29 @@ func main() {
 	}
 
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnableBackupWorkflowRecord) {
+		configSecret := &corev1.Secret{}
+		reader := mgr.GetAPIReader()
+		if err := reader.Get(context.Background(), client.ObjectKey{
+			Name:      backupConfigSecretName,
+			Namespace: backupConfigSecretNamespace,
+		}, configSecret); err != nil && !kerrors.IsNotFound(err) {
+			klog.Error(err, "unable to find secret")
+			os.Exit(1)
+		}
+		configData := configSecret.Data
+		if configData == nil {
+			configData = make(map[string][]byte)
+		}
 		if err = (&controllers.BackupReconciler{
-			Client: mgr.GetClient(),
+			Client: kubeClient,
 			Scheme: mgr.GetScheme(),
 			BackupArgs: controllers.BackupArgs{
 				BackupStrategy: backupStrategy,
 				IgnoreStrategy: backupIgnoreStrategy,
 				CleanOnBackup:  backupCleanOnBackup,
 				GroupByLabel:   groupByLabel,
+				PersistType:    backupPersistType,
+				PersistConfig:  configData,
 			},
 			Args: controllerArgs,
 		}).SetupWithManager(mgr); err != nil {
@@ -220,7 +243,6 @@ func main() {
 		}
 	}
 	//+kubebuilder:scaffold:builder
-
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		klog.Error(err, "unable to set up health check")
 		os.Exit(1)
