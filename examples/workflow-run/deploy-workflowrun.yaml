@@ -1,0 +1,9 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: deploy-run
+  namespace: default
+spec:
+  context:
+    env: test
+  workflowRef: deploy-template

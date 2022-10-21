@@ -1,0 +1,16 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: deploy-template
+  namespace: default
+steps:
+  - name: apply
+    type: apply-deployment
+    if: context.env == "dev"
+    properties:
+      image: nginx
+  - name: apply-test
+    type: apply-deployment
+    if: context.env == "test"
+    properties:
+      image: crccheck/hello-world
