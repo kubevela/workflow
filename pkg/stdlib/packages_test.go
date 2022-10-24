@@ -52,8 +52,9 @@ out: custom.context`)
 	r.Equal(str, "xxx")
 
 	//test vela/op/v1
+	testVersion := "vela/op/v1"
 	cuectx1 := cuecontext.New()
-	file, err = parser.ParseFile("vela/op/v1", pkg["vela/op/v1"])
+	file, err = parser.ParseFile(testVersion, pkg[testVersion])
 	r.NoError(err)
 	_ = cuectx1.BuildFile(file)
 
