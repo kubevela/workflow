@@ -48,6 +48,9 @@ var (
 
 const (
 	builtinPackageName = "vela/op"
+	builtinActionPath  = "actions"
+	packagePath        = "pkgs"
+	defaultVersion     = "v1"
 )
 
 // SetupGeneralImports setup general imports
@@ -57,32 +60,32 @@ func SetupGeneralImports(general []*build.Instance) {
 
 // GetPackages Get Stdlib packages
 func GetPackages() (map[string]string, error) {
-	versions, err := fs.ReadDir("actions")
+	versions, err := fs.ReadDir(builtinActionPath)
 	if err != nil {
 		return nil, err
 	}
 	ret := make(map[string]string)
 
 	for _, dirs := range versions {
-		pathPrefix := fmt.Sprintf("actions/%s", dirs.Name())
-		files, err := fs.ReadDir(filepath.Join(pathPrefix, "/pkgs"))
+		pathPrefix := filepath.Join(builtinActionPath, dirs.Name())
+		files, err := fs.ReadDir(filepath.Join(pathPrefix, packagePath))
 		if err != nil {
 			return nil, err
 		}
-		opBytes, err := fs.ReadFile(filepath.Join(pathPrefix, "/op.cue"))
+		opBytes, err := fs.ReadFile(filepath.Join(pathPrefix, "op.cue"))
 		if err != nil {
 			return nil, err
 		}
 		opContent := string(opBytes) + "\n"
 		for _, file := range files {
-			body, err := fs.ReadFile(filepath.Join(pathPrefix, "/pkgs", file.Name()))
+			body, err := fs.ReadFile(filepath.Join(pathPrefix, packagePath, file.Name()))
 			if err != nil {
 				return nil, err
 			}
 			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
 			opContent += pkgContent
 		}
-		if dirs.Name() == "v1" {
+		if dirs.Name() == defaultVersion {
 			ret[builtinPackageName] = opContent
 		}
 		ret[filepath.Join(builtinPackageName, dirs.Name())] = opContent
@@ -96,7 +99,7 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	addDefault := true
 
 	for _, a := range inst.Imports {
-		if a.PkgName == filepath.Base(builtinPackageName) || (a.PkgName == filepath.Join(filepath.Base(builtinPackageName), "/v1")) {
+		if a.PkgName == filepath.Base(builtinPackageName) || (a.PkgName == filepath.Join(filepath.Base(builtinPackageName), "v1")) {
 			addDefault = false
 			break
 		}
