@@ -38,16 +38,19 @@ func init() {
 }
 
 var (
-	//go:embed pkgs op.cue
+	//go:embed actions
 	fs embed.FS
 	// builtinImport is the builtin import for cue
-	builtinImport *build.Instance
+	builtinImport []*build.Instance
 	// GeneralImports is the general imports for cue
 	GeneralImports []*build.Instance
 )
 
 const (
 	builtinPackageName = "vela/op"
+	builtinActionPath  = "actions"
+	packagePath        = "pkgs"
+	defaultVersion     = "v1"
 )
 
 // SetupGeneralImports setup general imports
@@ -56,42 +59,54 @@ func SetupGeneralImports(general []*build.Instance) {
 }
 
 // GetPackages Get Stdlib packages
-func GetPackages() (string, error) {
-	files, err := fs.ReadDir("pkgs")
+func GetPackages() (map[string]string, error) {
+	versions, err := fs.ReadDir(builtinActionPath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	ret := make(map[string]string)
 
-	opBytes, err := fs.ReadFile("op.cue")
-	if err != nil {
-		return "", err
-	}
-
-	opContent := string(opBytes) + "\n"
-	for _, file := range files {
-		body, err := fs.ReadFile("pkgs/" + file.Name())
+	for _, dirs := range versions {
+		pathPrefix := filepath.Join(builtinActionPath, dirs.Name())
+		files, err := fs.ReadDir(filepath.Join(pathPrefix, packagePath))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
-		opContent += pkgContent
+		opBytes, err := fs.ReadFile(filepath.Join(pathPrefix, "op.cue"))
+		if err != nil {
+			return nil, err
+		}
+		opContent := string(opBytes) + "\n"
+		for _, file := range files {
+			body, err := fs.ReadFile(filepath.Join(pathPrefix, packagePath, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
+			opContent += pkgContent
+		}
+		if dirs.Name() == defaultVersion {
+			ret[builtinPackageName] = opContent
+		}
+		ret[filepath.Join(builtinPackageName, dirs.Name())] = opContent
 	}
-
-	return opContent, nil
+	return ret, nil
 }
 
 // AddImportsFor install imports for build.Instance.
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	inst.Imports = append(inst.Imports, GeneralImports...)
 	addDefault := true
+
 	for _, a := range inst.Imports {
-		if a.PkgName == filepath.Base(builtinPackageName) {
+		if a.PkgName == filepath.Base(builtinPackageName) || (a.PkgName == filepath.Join(filepath.Base(builtinPackageName), "v1")) {
 			addDefault = false
 			break
 		}
+
 	}
 	if addDefault {
-		inst.Imports = append(inst.Imports, builtinImport)
+		inst.Imports = append(inst.Imports, builtinImport...)
 	}
 	if tagTempl != "" {
 		p := &build.Instance{
@@ -110,21 +125,26 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	return nil
 }
 
-func initBuiltinImports() (*build.Instance, error) {
-	pkg, err := GetPackages()
+func initBuiltinImports() ([]*build.Instance, error) {
+
+	imports := make([]*build.Instance, 0)
+	pkgs, err := GetPackages()
 	if err != nil {
 		return nil, err
 	}
-	p := &build.Instance{
-		PkgName:    filepath.Base(builtinPackageName),
-		ImportPath: builtinPackageName,
+	for path, content := range pkgs {
+		p := &build.Instance{
+			PkgName:    filepath.Base(path),
+			ImportPath: path,
+		}
+		file, err := parser.ParseFile("-", content, parser.ParseComments)
+		if err != nil {
+			return nil, err
+		}
+		if err := p.AddSyntax(file); err != nil {
+			return nil, err
+		}
+		imports = append(imports, p)
 	}
-	file, err := parser.ParseFile("-", pkg, parser.ParseComments)
-	if err != nil {
-		return nil, err
-	}
-	if err := p.AddSyntax(file); err != nil {
-		return nil, err
-	}
-	return p, nil
+	return imports, nil
 }

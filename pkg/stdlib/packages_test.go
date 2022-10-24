@@ -27,11 +27,12 @@ import (
 )
 
 func TestGetPackages(t *testing.T) {
+	//test vela/op
 	r := require.New(t)
 	pkg, err := GetPackages()
 	r.NoError(err)
 	cuectx := cuecontext.New()
-	file, err := parser.ParseFile(builtinPackageName, pkg)
+	file, err := parser.ParseFile(builtinPackageName, pkg[builtinPackageName])
 	r.NoError(err)
 	_ = cuectx.BuildFile(file)
 
@@ -49,4 +50,28 @@ out: custom.context`)
 	str, err := inst.LookupPath(cue.ParsePath("out.id")).String()
 	r.NoError(err)
 	r.Equal(str, "xxx")
+
+	//test vela/op/v1
+	testVersion := "vela/op/v1"
+	cuectx1 := cuecontext.New()
+	file, err = parser.ParseFile(testVersion, pkg[testVersion])
+	r.NoError(err)
+	_ = cuectx1.BuildFile(file)
+
+	file, err = parser.ParseFile("-", `
+import "vela/op/v1"
+out: v1.#Break & {
+	message: "break"
+}
+`)
+	r.NoError(err)
+	builder1 := &build.Instance{}
+	err = builder1.AddSyntax(file)
+	r.NoError(err)
+	err = AddImportsFor(builder1, "")
+	r.NoError(err)
+	inst1 := cuectx1.BuildInstance(builder1)
+	str1, err := inst1.LookupPath(cue.ParsePath("out.message")).String()
+	r.NoError(err)
+	r.Equal(str1, "break")
 }
