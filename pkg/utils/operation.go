@@ -43,7 +43,7 @@ type workflowRunOperator struct {
 	run          *v1alpha1.WorkflowRun
 }
 
-// NewApplicationWorkflowOperator get an workflow operator with k8sClient, ioWriter(optional, useful for cli) and application
+// NewWorkflowRunOperator get an workflow operator with k8sClient, ioWriter(optional, useful for cli) and application
 func NewWorkflowRunOperator(cli client.Client, w io.Writer, run *v1alpha1.WorkflowRun) WorkflowOperator {
 	return workflowRunOperator{
 		cli:          cli,
@@ -109,12 +109,12 @@ func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workfl
 
 // Rollback is not supported for WorkflowRun
 func (wo workflowRunOperator) Rollback(ctx context.Context) error {
-	return fmt.Errorf("Can not rollback a WorkflowRun")
+	return fmt.Errorf("can not rollback a WorkflowRun")
 }
 
 // Restart is not supported for WorkflowRun
 func (wo workflowRunOperator) Restart(ctx context.Context) error {
-	return fmt.Errorf("Can not restart a WorkflowRun")
+	return fmt.Errorf("can not restart a WorkflowRun")
 }
 
 // Terminate terminate workflow

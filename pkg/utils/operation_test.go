@@ -325,12 +325,12 @@ func TestRestartWorkflowRun(t *testing.T) {
 	r := require.New(t)
 	operator := NewWorkflowRunOperator(cli, nil, nil)
 	err := operator.Restart(context.Background())
-	r.Equal("Can not restart a WorkflowRun", err.Error())
+	r.Equal("can not restart a WorkflowRun", err.Error())
 }
 
 func TestRollbackWorkflowRun(t *testing.T) {
 	r := require.New(t)
 	operator := NewWorkflowRunOperator(cli, nil, nil)
 	err := operator.Rollback(context.Background())
-	r.Equal("Can not rollback a WorkflowRun", err.Error())
+	r.Equal("can not rollback a WorkflowRun", err.Error())
 }
