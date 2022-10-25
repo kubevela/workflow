@@ -32,7 +32,7 @@ import (
 
 func TestGetWorkflowContextData(t *testing.T) {
 	ctx := context.Background()
-	err := cli.Create(ctx, &corev1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "workflow-test-context",
 			Namespace: "default",
@@ -40,9 +40,14 @@ func TestGetWorkflowContextData(t *testing.T) {
 		Data: map[string]string{
 			"vars": `{"test-test": "test"}`,
 		},
-	})
+	}
+	err := cli.Create(ctx, cm)
 	r := require.New(t)
 	r.NoError(err)
+	defer func() {
+		err = cli.Delete(ctx, cm)
+		r.NoError(err)
+	}()
 
 	testCases := map[string]struct {
 		name        string
@@ -167,7 +172,7 @@ func TestGetStepLogConfig(t *testing.T) {
 
 func TestGetPodListFromResources(t *testing.T) {
 	ctx := context.Background()
-	err := cli.Create(ctx, &corev1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod-test",
 			Namespace: "default",
@@ -175,9 +180,14 @@ func TestGetPodListFromResources(t *testing.T) {
 				"test-label": "test",
 			},
 		},
-	})
+	}
+	err := cli.Create(ctx, pod)
 	r := require.New(t)
 	r.NoError(err)
+	defer func() {
+		err = cli.Delete(ctx, pod)
+		r.NoError(err)
+	}()
 
 	testCases := map[string]struct {
 		name        string
