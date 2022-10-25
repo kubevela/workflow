@@ -25,15 +25,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestGetWorkflowContextData(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
 	ctx := context.Background()
 	err := cli.Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -169,7 +166,6 @@ func TestGetStepLogConfig(t *testing.T) {
 }
 
 func TestGetPodListFromResources(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
 	ctx := context.Background()
 	err := cli.Create(ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -254,7 +250,6 @@ func TestGetLogsFromURL(t *testing.T) {
 func TestGetLogsFromPod(t *testing.T) {
 	r := require.New(t)
 	clientSet := clientfake.NewSimpleClientset()
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
 	ctx := context.Background()
 	err := cli.Create(ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
