@@ -17,7 +17,7 @@ template: {
 			apiVersion: "apps/v1"
 			kind:       "Deployment"
 			metadata: {
-				name:      context.name
+				name:      context.stepName
 				namespace: context.namespace
 			}
 			spec: {
