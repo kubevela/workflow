@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The KubeVela Authors.
+Copyright 2022 The KubeVela Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,255 +18,319 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/pkg/cue/model/sets"
-	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/api/v1alpha1"
+	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
-func TestGetWorkflowContextData(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+func TestSuspendWorkflowRun(t *testing.T) {
 	ctx := context.Background()
-	err := cli.Create(ctx, &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "workflow-test-context",
-			Namespace: "default",
-		},
-		Data: map[string]string{
-			"vars": `{"test-test": "test"}`,
-		},
-	})
-	r := require.New(t)
-	r.NoError(err)
 
 	testCases := map[string]struct {
-		name        string
-		paths       string
-		expected    string
-		expectedErr string
+		run *v1alpha1.WorkflowRun
 	}{
-		"not found": {
-			name:        "not-found",
-			expectedErr: "not found",
+		"already suspend": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "already-suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+				},
+			},
 		},
-		"found": {
-			name:     "workflow-test-context",
-			expected: "\"test-test\": \"test\"\n",
-		},
-		"found with path": {
-			name:     "workflow-test-context",
-			paths:    "test-test",
-			expected: "\"test\"\n",
-		},
-		"path not found": {
-			name:        "workflow-test-context",
-			paths:       "not-found",
-			expectedErr: "not exist",
+		"not suspend": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "not-suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: false,
+				},
+			},
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			v, err := GetDataFromContext(ctx, cli, tc.name, tc.name, "default", tc.paths)
-			if tc.expectedErr != "" {
-				r.Contains(err.Error(), tc.expectedErr)
-				return
-			}
+			err := cli.Create(ctx, tc.run)
 			r.NoError(err)
-			s, err := sets.ToString(v.CueValue())
-			r.NoError(err)
-			r.Equal(tc.expected, s)
-		})
-	}
-}
-
-func TestGetStepLogConfig(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
-	ctx := context.Background()
-
-	testCases := map[string]struct {
-		name        string
-		step        string
-		config      string
-		expected    string
-		expectedErr string
-	}{
-		"not found": {
-			name:        "not-found",
-			config:      "not-found",
-			expectedErr: "not found",
-		},
-		"no data": {
-			name:        "workflow-test-context",
-			step:        "step-test",
-			config:      "",
-			expectedErr: "no log config found",
-		},
-		"failed to marshal": {
-			name:        "workflow-test-context",
-			step:        "step-test",
-			config:      "test",
-			expectedErr: "invalid character",
-		},
-		"invalid config": {
-			name:        "workflow-test-context",
-			step:        "step-test",
-			config:      `{"test": "test"}`,
-			expectedErr: "cannot unmarshal string into Go value of type types.LogConfig",
-		},
-		"no config for step": {
-			name:        "workflow-test-context",
-			step:        "step-test",
-			config:      `{"no-step": {}}`,
-			expectedErr: "no log config found for step step-test",
-		},
-		"success": {
-			name:     "workflow-test-context",
-			step:     "step-test",
-			config:   `{"step-test": {"data":true}}`,
-			expected: `{"data":true}`,
-		},
-	}
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			r := require.New(t)
-			cm := &corev1.ConfigMap{}
-			if tc.config != "not-found" {
-				cm = &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      tc.name,
-						Namespace: "default",
-					},
-					Data: map[string]string{
-						"logConfig": tc.config,
-					},
-				}
-				err := cli.Create(ctx, cm)
+			defer func() {
+				err = cli.Delete(ctx, tc.run)
 				r.NoError(err)
-				defer func() {
-					err = cli.Delete(ctx, cm)
-					r.NoError(err)
-				}()
-			}
-			v, err := GetLogConfigFromStep(ctx, cli, tc.name, tc.name, "default", tc.step)
-			if tc.expectedErr != "" {
-				r.Contains(err.Error(), tc.expectedErr)
-				return
-			}
+			}()
+			operator := NewWorkflowRunOperator(cli, nil, tc.run)
+			err = operator.Suspend(ctx)
 			r.NoError(err)
-			b, err := json.Marshal(v)
+			run := &v1alpha1.WorkflowRun{}
+			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
 			r.NoError(err)
-			r.Equal(tc.expected, string(b))
+			r.Equal(true, run.Status.Suspend)
 		})
 	}
 }
 
-func TestGetPodListFromResources(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+func TestTerminateWorkflowRun(t *testing.T) {
 	ctx := context.Background()
-	err := cli.Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod-test",
-			Namespace: "default",
-			Labels: map[string]string{
-				"test-label": "test",
-			},
-		},
-	})
-	r := require.New(t)
-	r.NoError(err)
 
 	testCases := map[string]struct {
-		name        string
-		step        string
-		resources   []types.Resource
-		expected    string
-		expectedErr string
+		run      *v1alpha1.WorkflowRun
+		expected *v1alpha1.WorkflowRun
 	}{
-		"not found": {
-			name: "not-found",
-			resources: []types.Resource{
-				{
-					Name: "not-found",
+		"suspend": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
 				},
 			},
-			expectedErr: "not found",
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Terminated: true,
+				},
+			},
 		},
-		"not found with label": {
-			name: "not-found",
-			resources: []types.Resource{
-				{
-					LabelSelector: map[string]string{
-						"test-label": "not-found",
+		"running step": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "running-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonFailedAfterRetries,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonTimeout,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonExecute,
+								},
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonFailedAfterRetries,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonTimeout,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonExecute,
+							},
+						},
 					},
 				},
 			},
-			expectedErr: "no pod found",
-		},
-		"found with name": {
-			name: "not-found",
-			resources: []types.Resource{
-				{
-					Name: "pod-test",
-				},
-			},
-			expected: "pod-test",
-		},
-		"found with label": {
-			name: "not-found",
-			resources: []types.Resource{
-				{
-					LabelSelector: map[string]string{
-						"test-label": "test",
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonTerminate,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonTerminate,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonFailedAfterRetries,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonTimeout,
+								},
+								{
+									Phase:  v1alpha1.WorkflowStepPhaseFailed,
+									Reason: wfTypes.StatusReasonTerminate,
+								},
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonFailedAfterRetries,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonTimeout,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Phase:  v1alpha1.WorkflowStepPhaseFailed,
+								Reason: wfTypes.StatusReasonTerminate,
+							},
+						},
 					},
+					Terminated: true,
 				},
 			},
-			expected: "pod-test",
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			pods, err := GetPodListFromResources(ctx, cli, tc.resources)
-			if tc.expectedErr != "" {
-				r.Contains(err.Error(), tc.expectedErr)
-				return
-			}
+			err := cli.Create(ctx, tc.run)
 			r.NoError(err)
-			r.Equal(tc.expected, pods[0].Name)
+			defer func() {
+				err = cli.Delete(ctx, tc.run)
+				r.NoError(err)
+			}()
+			operator := NewWorkflowRunOperator(cli, nil, tc.run)
+			err = operator.Terminate(ctx)
+			r.NoError(err)
+			run := &v1alpha1.WorkflowRun{}
+			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
+			r.NoError(err)
+			r.Equal(false, run.Status.Suspend)
+			r.Equal(true, run.Status.Terminated)
+			r.Equal(tc.expected.Status, run.Status)
 		})
 	}
 }
 
-func TestGetLogsFromURL(t *testing.T) {
-	r := require.New(t)
-	_, err := GetLogsFromURL(context.Background(), "https://kubevela.io")
-	r.NoError(err)
-}
-
-func TestGetLogsFromPod(t *testing.T) {
-	r := require.New(t)
-	clientSet := clientfake.NewSimpleClientset()
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+func TestResumeWorkflowRun(t *testing.T) {
 	ctx := context.Background()
-	err := cli.Create(ctx, &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod-test",
-			Namespace: "default",
-			Labels: map[string]string{
-				"test-label": "test",
+
+	testCases := map[string]struct {
+		run      *v1alpha1.WorkflowRun
+		expected *v1alpha1.WorkflowRun
+	}{
+		"not suspend": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: false,
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: false,
+				},
 			},
 		},
-	})
-	r.NoError(err)
-	_, err = GetLogsFromPod(ctx, clientSet, cli, "pod-test", "default", "", nil)
-	r.NoError(err)
+		"suspend": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: false,
+				},
+			},
+		},
+		"suspend step": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Type:  wfTypes.WorkflowStepTypeSuspend,
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Type:  wfTypes.WorkflowStepTypeSuspend,
+									Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			err := cli.Create(ctx, tc.run)
+			r.NoError(err)
+			defer func() {
+				err = cli.Delete(ctx, tc.run)
+				r.NoError(err)
+			}()
+			operator := NewWorkflowRunOperator(cli, nil, tc.run)
+			err = operator.Resume(ctx)
+			r.NoError(err)
+			run := &v1alpha1.WorkflowRun{}
+			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
+			r.NoError(err)
+			r.Equal(false, run.Status.Suspend)
+			r.Equal(tc.expected.Status, run.Status)
+		})
+	}
+}
+
+func TestRestartWorkflowRun(t *testing.T) {
+	r := require.New(t)
+	operator := NewWorkflowRunOperator(cli, nil, nil)
+	err := operator.Restart(context.Background())
+	r.Equal("can not restart a WorkflowRun", err.Error())
+}
+
+func TestRollbackWorkflowRun(t *testing.T) {
+	r := require.New(t)
+	operator := NewWorkflowRunOperator(cli, nil, nil)
+	err := operator.Rollback(context.Background())
+	r.Equal("can not rollback a WorkflowRun", err.Error())
 }

@@ -139,6 +139,7 @@ func TestNotFoundMatcher(t *testing.T) {
 	r.Equal("Expected\n    <string>: myerror\nto be not found", matcher.FailureMessage("myerror"))
 	r.Equal("Expected\n    <string>: myerror\nnot to be not found", matcher.NegatedFailureMessage("myerror"))
 }
+
 func TestErrorMatcher(t *testing.T) {
 	type input struct {
 		expected error

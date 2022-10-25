@@ -18,120 +18,158 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 
-	"github.com/kubevela/pkg/multicluster"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
-	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/api/v1alpha1"
+	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
-// GetDataFromContext get data from workflow context
-func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, ns string, paths ...string) (*value.Value, error) {
-	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
-	if err != nil {
-		return nil, err
-	}
-	v, err := wfCtx.GetVar(paths...)
-	if err != nil {
-		return nil, err
-	}
-	if v.Error() != nil {
-		return nil, v.Error()
-	}
-	return v, nil
+// WorkflowOperator is operation handler for workflow's suspend/resume/rollback/restart/terminate
+type WorkflowOperator interface {
+	Suspend(ctx context.Context) error
+	Resume(ctx context.Context) error
+	Rollback(ctx context.Context) error
+	Restart(ctx context.Context) error
+	Terminate(ctx context.Context) error
 }
 
-// GetLogConfigFromStep get log config from step
-func GetLogConfigFromStep(ctx context.Context, cli client.Client, ctxName, name, ns, step string) (*types.LogConfig, error) {
-	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
-	if err != nil {
-		return nil, err
-	}
-	config := make(map[string]types.LogConfig)
-	c := wfCtx.GetMutableValue(types.ContextKeyLogConfig)
-	if c == "" {
-		return nil, fmt.Errorf("no log config found")
-	}
-
-	if err := json.Unmarshal([]byte(c), &config); err != nil {
-		return nil, err
-	}
-
-	stepConfig, ok := config[step]
-	if !ok {
-		return nil, fmt.Errorf("no log config found for step %s", step)
-	}
-	return &stepConfig, nil
+type workflowRunOperator struct {
+	cli          client.Client
+	outputWriter io.Writer
+	run          *v1alpha1.WorkflowRun
 }
 
-// GetPodListFromResources get pod list from resources
-func GetPodListFromResources(ctx context.Context, cli client.Client, resources []types.Resource) ([]corev1.Pod, error) {
-	pods := make([]corev1.Pod, 0)
-	for _, resource := range resources {
-		cliCtx := multicluster.WithCluster(ctx, resource.Cluster)
-		if resource.LabelSelector != nil {
-			labels := &metav1.LabelSelector{
-				MatchLabels: resource.LabelSelector,
-			}
-			selector, err := metav1.LabelSelectorAsSelector(labels)
-			if err != nil {
-				return nil, err
-			}
-			var podList corev1.PodList
-			err = cli.List(cliCtx, &podList, &client.ListOptions{
-				LabelSelector: selector,
-			})
-			if err != nil {
-				return nil, err
-			}
-			pods = append(pods, podList.Items...)
-			continue
+// NewWorkflowRunOperator get an workflow operator with k8sClient, ioWriter(optional, useful for cli) and application
+func NewWorkflowRunOperator(cli client.Client, w io.Writer, run *v1alpha1.WorkflowRun) WorkflowOperator {
+	return workflowRunOperator{
+		cli:          cli,
+		outputWriter: w,
+		run:          run,
+	}
+}
+
+// Suspend suspend workflow
+func (wo workflowRunOperator) Suspend(ctx context.Context) error {
+	run := wo.run
+	runKey := client.ObjectKeyFromObject(run)
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := wo.cli.Get(ctx, runKey, run); err != nil {
+			return err
 		}
-		if resource.Namespace == "" {
-			resource.Namespace = metav1.NamespaceDefault
-		}
-		var pod corev1.Pod
-		err := cli.Get(cliCtx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, &pod)
-		if err != nil {
-			return nil, err
-		}
-		pods = append(pods, pod)
+		// set the workflow suspend to true
+		run.Status.Suspend = true
+		return wo.cli.Status().Patch(ctx, run, client.Merge)
+	}); err != nil {
+		return err
 	}
-	if len(pods) == 0 {
-		return nil, fmt.Errorf("no pod found")
-	}
-	return pods, nil
+
+	return wo.writeOutputF("Successfully suspend workflow: %s\n", run.Name)
 }
 
-// GetLogsFromURL get logs from url
-func GetLogsFromURL(ctx context.Context, url string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+// Resume resume a suspended workflow
+func (wo workflowRunOperator) Resume(ctx context.Context) error {
+	run := wo.run
+	if run.Status.Terminated {
+		return fmt.Errorf("can not resume a terminated workflow")
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
+
+	if run.Status.Suspend {
+		if err := ResumeWorkflow(ctx, wo.cli, run); err != nil {
+			return err
+		}
 	}
-	return resp.Body, nil
+	return wo.writeOutputF("Successfully resume workflow: %s\n", run.Name)
 }
 
-// GetLogsFromPod get logs from pod
-func GetLogsFromPod(ctx context.Context, clientSet kubernetes.Interface, cli client.Client, podName, ns, cluster string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
-	cliCtx := multicluster.WithCluster(ctx, cluster)
-	req := clientSet.CoreV1().Pods(ns).GetLogs(podName, opts)
-	readCloser, err := req.Stream(cliCtx)
-	if err != nil {
-		return nil, err
+// ResumeWorkflow resume workflow
+func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+	run.Status.Suspend = false
+	steps := run.Status.Steps
+	for i, step := range steps {
+		if step.Type == wfTypes.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning {
+			steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+		}
+		for j, sub := range step.SubStepsStatus {
+			if sub.Type == wfTypes.WorkflowStepTypeSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
+				steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+			}
+		}
 	}
-	return readCloser, nil
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return cli.Status().Patch(ctx, run, client.Merge)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Rollback is not supported for WorkflowRun
+func (wo workflowRunOperator) Rollback(ctx context.Context) error {
+	return fmt.Errorf("can not rollback a WorkflowRun")
+}
+
+// Restart is not supported for WorkflowRun
+func (wo workflowRunOperator) Restart(ctx context.Context) error {
+	return fmt.Errorf("can not restart a WorkflowRun")
+}
+
+// Terminate terminate workflow
+func (wo workflowRunOperator) Terminate(ctx context.Context) error {
+	run := wo.run
+	if err := TerminateWorkflow(ctx, wo.cli, run); err != nil {
+		return err
+	}
+	return wo.writeOutputF("Successfully terminate workflow: %s\n", run.Name)
+}
+
+// TerminateWorkflow terminate workflow
+func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+	// set the workflow terminated to true
+	run.Status.Terminated = true
+	// set the workflow suspend to false
+	run.Status.Suspend = false
+	steps := run.Status.Steps
+	for i, step := range steps {
+		switch step.Phase {
+		case v1alpha1.WorkflowStepPhaseFailed:
+			if step.Reason != wfTypes.StatusReasonFailedAfterRetries && step.Reason != wfTypes.StatusReasonTimeout {
+				steps[i].Reason = wfTypes.StatusReasonTerminate
+			}
+		case v1alpha1.WorkflowStepPhaseRunning:
+			steps[i].Phase = v1alpha1.WorkflowStepPhaseFailed
+			steps[i].Reason = wfTypes.StatusReasonTerminate
+		default:
+		}
+		for j, sub := range step.SubStepsStatus {
+			switch sub.Phase {
+			case v1alpha1.WorkflowStepPhaseFailed:
+				if sub.Reason != wfTypes.StatusReasonFailedAfterRetries && sub.Reason != wfTypes.StatusReasonTimeout {
+					steps[i].SubStepsStatus[j].Reason = wfTypes.StatusReasonTerminate
+				}
+			case v1alpha1.WorkflowStepPhaseRunning:
+				steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseFailed
+				steps[i].SubStepsStatus[j].Reason = wfTypes.StatusReasonTerminate
+			default:
+			}
+		}
+	}
+
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return cli.Status().Patch(ctx, run, client.Merge)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (wo workflowRunOperator) writeOutputF(format string, a ...interface{}) error {
+	if wo.outputWriter == nil {
+		return nil
+	}
+	_, err := fmt.Fprintf(wo.outputWriter, format, a...)
+	return err
 }
