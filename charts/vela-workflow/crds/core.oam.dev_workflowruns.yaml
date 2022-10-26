@@ -53,10 +53,10 @@ spec:
                 description: WorkflowExecuteMode defines the mode of workflow execution
                 properties:
                   steps:
-                    description: WorkflowMode describes the mode of workflow
+                    description: Steps is the mode of workflow steps execution
                     type: string
                   subSteps:
-                    description: WorkflowMode describes the mode of workflow
+                    description: SubSteps is the mode of workflow sub steps execution
                     type: string
                 type: object
               workflowRef:
@@ -64,6 +64,17 @@ spec:
               workflowSpec:
                 description: WorkflowSpec defines workflow steps and other attributes
                 properties:
+                  mode:
+                    description: WorkflowExecuteMode defines the mode of workflow
+                      execution
+                    properties:
+                      steps:
+                        description: Steps is the mode of workflow steps execution
+                        type: string
+                      subSteps:
+                        description: SubSteps is the mode of workflow sub steps execution
+                        type: string
+                    type: object
                   steps:
                     items:
                       description: WorkflowStep defines how to execute a workflow
@@ -299,10 +310,10 @@ spec:
                 description: WorkflowExecuteMode defines the mode of workflow execution
                 properties:
                   steps:
-                    description: WorkflowMode describes the mode of workflow
+                    description: Steps is the mode of workflow steps execution
                     type: string
                   subSteps:
-                    description: WorkflowMode describes the mode of workflow
+                    description: SubSteps is the mode of workflow sub steps execution
                     type: string
                 type: object
               startTime:

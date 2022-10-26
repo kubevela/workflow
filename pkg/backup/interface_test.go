@@ -1,9 +1,10 @@
 package backup
 
 import (
-	"github.com/kubevela/workflow/pkg/backup/sls"
 	"reflect"
 	"testing"
+
+	"github.com/kubevela/workflow/pkg/backup/sls"
 )
 
 func TestNewPersister(t *testing.T) {

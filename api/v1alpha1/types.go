@@ -101,12 +101,15 @@ type WorkflowRunStatus struct {
 
 // WorkflowSpec defines workflow steps and other attributes
 type WorkflowSpec struct {
-	Steps []WorkflowStep `json:"steps,omitempty"`
+	Mode  *WorkflowExecuteMode `json:"mode,omitempty"`
+	Steps []WorkflowStep       `json:"steps,omitempty"`
 }
 
 // WorkflowExecuteMode defines the mode of workflow execution
 type WorkflowExecuteMode struct {
-	Steps    WorkflowMode `json:"steps,omitempty"`
+	// Steps is the mode of workflow steps execution
+	Steps WorkflowMode `json:"steps,omitempty"`
+	// SubSteps is the mode of workflow sub steps execution
 	SubSteps WorkflowMode `json:"subSteps,omitempty"`
 }
 

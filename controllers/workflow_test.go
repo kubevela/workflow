@@ -97,6 +97,9 @@ var _ = Describe("Test Workflow", func() {
 				Namespace: namespace,
 			},
 			WorkflowSpec: v1alpha1.WorkflowSpec{
+				Mode: &v1alpha1.WorkflowExecuteMode{
+					Steps: v1alpha1.WorkflowModeDAG,
+				},
 				Steps: []v1alpha1.WorkflowStep{
 					{
 						WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -124,6 +127,32 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(wrObj.Status.Suspend).Should(BeTrue())
 		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(wrObj.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
+		Expect(wrObj.Status.Mode.SubSteps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
+
+		wr2 := wrTemplate.DeepCopy()
+		wr2.Name = "wr-template-with-mode"
+		wr2.Spec = v1alpha1.WorkflowRunSpec{
+			WorkflowRef: "workflow",
+			Mode: &v1alpha1.WorkflowExecuteMode{
+				Steps:    v1alpha1.WorkflowModeStep,
+				SubSteps: v1alpha1.WorkflowModeStep,
+			},
+		}
+		Expect(k8sClient.Create(ctx, wr2)).Should(BeNil())
+
+		tryReconcile(reconciler, wr2.Name, wr2.Namespace)
+
+		wrObj = &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr2.Name,
+			Namespace: wr2.Namespace,
+		}, wrObj)).Should(BeNil())
+
+		Expect(wrObj.Status.Suspend).Should(BeTrue())
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(wrObj.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeStep))
+		Expect(wrObj.Status.Mode.SubSteps).Should(BeEquivalentTo(v1alpha1.WorkflowModeStep))
 	})
 
 	It("get failed to generate", func() {
