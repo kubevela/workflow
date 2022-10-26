@@ -77,6 +77,7 @@ func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstanc
 // GenerateWorkflowInstance generates a workflow instance
 func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) (*types.WorkflowInstance, error) {
 	var steps []v1alpha1.WorkflowStep
+	mode := run.Spec.Mode
 	switch {
 	case run.Spec.WorkflowSpec != nil:
 		steps = run.Spec.WorkflowSpec.Steps
@@ -89,6 +90,9 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 			return nil, err
 		}
 		steps = template.WorkflowSpec.Steps
+		if template.Mode != nil && mode == nil {
+			mode = template.Mode
+		}
 	default:
 		return nil, errors.New("failed to generate workflow instance")
 	}
@@ -126,7 +130,7 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 		},
 		Context: contextData,
 		Debug:   debug,
-		Mode:    run.Spec.Mode,
+		Mode:    mode,
 		Steps:   steps,
 		Status:  run.Status,
 	}
