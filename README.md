@@ -35,6 +35,9 @@ During the evolution of the [OAM](https://oam.dev/) and [KubeVela project](https
 
 ### As a standalone workflow engine
 
+- Glue and orchestrate operations, such as restart application, scale up/down, read-notify processes.
+- Orchestrate delivery process without day-2 management, just deploy. The workflow will not keep reconciliation, no garbage collection when workflow object deleted or updated. The most common use case is to initialize your infrastructure for some environment.
+
 Please refer to the [installation](#installation) and [quick start](#quick-start) sections.
 
 ### As an SDK
@@ -127,6 +130,7 @@ Apply the WorkflowRun, you can get a message from Slack like:
 If you change the `url` to an invalid one, you will get a failed notification:
 
 ![slack-failed](./static/slack-fail.png)
+
 ### Run a WorkflowRun from a Workflow Template
 
 You can also create a Workflow Template and run it with a WorkflowRun with different context.
