@@ -546,8 +546,6 @@ func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus
 	switch {
 	case !e.waiting && e.failedAfterRetries && feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
 		e.status.Message = types.MessageSuspendFailedAfterRetries
-	case wfStatus.Terminated && !feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
-		e.status.Message = types.MessageTerminated
 	default:
 		e.status.Message = ""
 	}
