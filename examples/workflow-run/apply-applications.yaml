@@ -1,0 +1,62 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: apply-applications
+  namespace: default
+  annotations:
+    workflowrun.oam.dev/debug: "true"
+spec:
+  workflowSpec:
+    steps:
+      - name: check-app-exist
+        type: read-app
+        properties:
+          name: webservice-app
+      - name: apply-app1
+        type: apply-app
+        if: status["check-app-exist"].message == "Application not found"
+        properties:
+          data:
+            apiVersion: core.oam.dev/v1beta1
+            kind: Application
+            metadata:
+              name: webservice-app
+            spec:
+              components:
+                - name: express-server
+                  type: webservice
+                  properties:
+                    image: crccheck/hello-world
+                    ports:
+                      - port: 8000
+      - name: suspend
+        type: suspend
+        timeout: 24h
+      - name: apply-app2
+        type: apply-app
+        properties:
+          ref:
+            name: my-app
+            key: application
+            type: configMap
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app
+  namespace: default
+data:
+  application: |
+    apiVersion: core.oam.dev/v1beta1
+    kind: Application
+    metadata:
+      name: webservice-app2
+    spec:
+      components:
+        - name: express-server2
+          type: webservice
+          properties:
+            image: crccheck/hello-world
+            ports:
+              - port: 8000
+        

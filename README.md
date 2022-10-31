@@ -1,4 +1,5 @@
-# KubeVela Workflow
+<h1 align="center">KubeVela Workflow</h1>
+
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubevela/workflow)](https://goreportcard.com/report/github.com/kubevela/workflow)
 [![codecov](https://codecov.io/gh/kubevela/workflow/branch/main/graph/badge.svg)](https://codecov.io/gh/kubevela/workflow)
 [![LICENSE](https://img.shields.io/github/license/kubevela/workflow.svg?style=flat-square)](/LICENSE)
@@ -35,10 +36,12 @@ During the evolution of the [OAM](https://oam.dev/) and [KubeVela project](https
 
 ### As a standalone workflow engine
 
-- Glue and orchestrate operations, such as restart application, scale up/down, read-notify processes.
-- Orchestrate delivery process without day-2 management, just deploy. The workflow will not keep reconciliation, no garbage collection when workflow object deleted or updated. The most common use case is to initialize your infrastructure for some environment.
+Unlike the workflow in the KubeVela Application, this workflow will only be executed once, and will **not keep reconciliation**, **no garbage collection** when the workflow object deleted or updated. You can use it for **one-time** operations like:
 
-Please refer to the [installation](#installation) and [quick start](#quick-start) sections.
+- Glue and orchestrate operations, such as control the deploy process of multiple resources(e.g. your Applications), scale up/down, read-notify processes, or the sequence between http requests.
+- Orchestrate delivery process without day-2 management, just deploy. The most common use case is to initialize your infrastructure for some environment.
+
+Please refer to the [installation](#installation) and [quick start](#quick-start) sections for more.
 
 ### As an SDK
 
@@ -82,95 +85,16 @@ You can either run a WorkflowRun directly or from a Workflow Template.
 
 ### Run a WorkflowRun directly
 
-```yaml
-apiVersion: core.oam.dev/v1alpha1
-kind: WorkflowRun
-metadata:
-  name: request-http
-  namespace: default
-spec:
-  workflowSpec:
-    steps:
-    - name: request
-      type: request
-      properties:
-        url: https://api.github.com/repos/kubevela/workflow
-      outputs:
-        - name: stars
-          valueFrom: |
-            import "strconv"
-            "Current star count: " + strconv.FormatInt(response["stargazers_count"], 10)
-    - name: notification
-      type: notification
-      inputs:
-        - from: stars
-          parameterKey: slack.message.text
-      properties:
-        slack:
-          url:
-            value: <your slack url>
-    - name: failed-notification
-      type: notification
-      if: status.request.failed
-      properties:
-        slack:
-          url:
-            value: <your slack url>
-          message:
-            text: "Failed to request github"
-            
-```
+Please refer to the following examples:
 
-Above workflow will send a request to the GitHub API and get the star count of the workflow repository as an output, then use the output as a message to send a notification to your Slack channel.
-
-Apply the WorkflowRun, you can get a message from Slack like:
-
-![slack-success](./static/slack-success.png)
-
-If you change the `url` to an invalid one, you will get a failed notification:
-
-![slack-failed](./static/slack-fail.png)
+- [Control the delivery process of multiple resources(e.g. your Applications)](./examples/multiple-apps)
+- [Request a specified URL and then use the response as a message to notify](./examples/request-and-notify)
 
 ### Run a WorkflowRun from a Workflow Template
 
-You can also create a Workflow Template and run it with a WorkflowRun with different context.
+Please refer to the following examples:
 
-Workflow Template:
-
-```yaml
-apiVersion: core.oam.dev/v1alpha1
-kind: Workflow
-metadata:
-  name: deploy-template
-  namespace: default
-steps:
-  - name: apply
-    type: apply-deployment
-    if: context.env == "dev"
-    properties:
-      image: nginx
-  - name: apply-test
-    type: apply-deployment
-    if: context.env == "test"
-    properties:
-      image: crccheck/hello-world
-```
-
-WorkflowRun:
-
-```yaml
-apiVersion: core.oam.dev/v1alpha1
-kind: WorkflowRun
-metadata:
-  name: deploy-run
-  namespace: default
-spec:
-  context:
-    env: dev
-  workflowRef: deploy-template
-```
-
-If you apply the WorkflowRun with `dev` in `context.env`, then you'll get a deployment with `nginx` image. If you change the `env` to `test`, you'll get a deployment with `crccheck/hello-world` image.
+- [Run the Workflow Template with different context to control the process](./examples/run-with-template)
 
 <h2 align="center">Features</h2>
 
