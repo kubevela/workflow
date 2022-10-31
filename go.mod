@@ -3,7 +3,7 @@ module github.com/kubevela/workflow
 go 1.19
 
 require (
-	cuelang.org/go v0.4.4-0.20220915174651-ad253ed099e9
+	cuelang.org/go v0.5.0-alpha.1
 	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.38
 	github.com/crossplane/crossplane-runtime v0.14.1-0.20210722005935-0b469fcc77cd

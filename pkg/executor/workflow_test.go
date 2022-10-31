@@ -285,7 +285,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
-			Message:    types.MessageTerminated,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{
 				{
@@ -371,7 +370,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
-			Message:    types.MessageTerminated,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{
 				{
@@ -464,7 +462,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
-			Message:    types.MessageTerminated,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
@@ -556,7 +553,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
-			Message:    types.MessageTerminated,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
@@ -641,7 +637,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
 			Terminated: true,
-			Message:    string(types.MessageTerminated),
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:   "s1",
@@ -729,7 +724,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
 			Terminated: true,
-			Message:    types.MessageTerminated,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:   "s1",
@@ -1057,7 +1051,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
-			Message:    types.MessageTerminated,
 			Suspend:    false,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
@@ -1154,7 +1147,6 @@ var _ = Describe("Test Workflow", func() {
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
 			Mode:       dagMode,
-			Message:    types.MessageTerminated,
 			Terminated: true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
@@ -1425,7 +1417,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
 			Terminated: true,
-			Message:    types.MessageTerminated,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s1",
@@ -1924,7 +1915,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
 			Terminated: true,
-			Message:    types.MessageTerminated,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s1",
@@ -1983,7 +1973,6 @@ var _ = Describe("Test Workflow", func() {
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
 			Mode:       defaultMode,
 			Terminated: true,
-			Message:    types.MessageTerminated,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s1",

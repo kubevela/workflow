@@ -12,8 +12,12 @@
 }
 
 #DoVar: {
-	#do:    "var"
+	#do: "var"
+
+	// +usage=The method to call on the variable
 	method: *"Get" | "Put"
-	path:   string
+	// +usage=The path to the variable
+	path: string
+	// +usage=The value of the variable
 	value?: _
 }
