@@ -1,6 +1,8 @@
 # Use Workflow for request and notify
 
-> Note: You need to install the [notification step definition](https://github.com/kubevela/kubevela/blob/master/vela-templates/definitions/internal/workflowstep/notification.cue) and definitions in the [example directory](https://github.com/kubevela/workflow/tree/main/examples/definitions) first to run the example.
+> Note: The example uses following definitions, please use `vela def apply -f <filename>` to install them first.
+> - [Definition `request`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/request.cue)
+> - [Definition `notification`](https://github.com/kubevela/kubevela/blob/master/vela-templates/definitions/internal/workflowstep/notification.cue)
 
 Apply the following workflow for request a specified URL first and then use the response as a message to your slack channel.
 

@@ -53,13 +53,15 @@ You just need to initialize a workflow instance and generate all the task runner
 
 ### Install Workflow
 
-You can install workflow with Helm:
+#### Helm
 
 ```shell
 helm repo add kubevela https://kubevela.github.io/charts
 helm repo update
 helm install --create-namespace -n vela-system vela-workflow kubevela/vela-workflow
 ```
+
+#### KubeVela Addon
 
 If you have installed KubeVela, you can install Workflow with the KubeVela Addon:
 
@@ -73,15 +75,15 @@ Please checkout: [Install Vela CLI](https://kubevela.io/docs/installation/kubern
 
 ### Install built-in steps in KubeVela(Optional)
 
-Use `vela def apply <directory>` to install built-in steps in [KubeVela](https://github.com/kubevela/kubevela/tree/master/vela-templates/definitions/internal/workflowstep).
+Use `vela def apply <directory>` to install built-in step definitions in [KubeVela](https://github.com/kubevela/kubevela/tree/master/vela-templates/definitions/internal/workflowstep) and [Workflow Addon](https://github.com/kubevela/catalog/tree/master/addons/vela-workflow/definitions).
+
+> Note that if you installed Workflow using KubeVela Addon, then the definitions in the addon will be installed automatically.
 
 Checkout this [doc](https://kubevela.io/docs/end-user/workflow/built-in-workflow-defs) for more details.
 
 <h2 align="center">Quick Start</h2>
 
 You can either run a WorkflowRun directly or from a Workflow Template.
-
-> Note: You need to install the [notification step definition](https://github.com/kubevela/kubevela/blob/master/vela-templates/definitions/internal/workflowstep/notification.cue) and definitions in the [example directory](https://github.com/kubevela/workflow/tree/main/examples/definitions) first to run the example.
 
 ### Run a WorkflowRun directly
 

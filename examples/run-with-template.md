@@ -1,5 +1,8 @@
 # Run your workflow with template
 
+> Note: The example uses following definitions, please use `vela def apply -f <filename>` to install them first.
+> - [Definition `apply-deployment`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/apply-deployment.cue)
+
 You can also create a Workflow Template and run it with a WorkflowRun with different context.
 
 Apply the following Workflow Template first:

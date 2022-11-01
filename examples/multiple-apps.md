@@ -1,6 +1,8 @@
 # Control the delivery process of multiple applications
 
-> Note: You need to install the definitions in the [example directory](https://github.com/kubevela/workflow/tree/main/examples/definitions) first to run the example.
+> Note: The example uses following definitions, please use `vela def apply -f <filename>` to install them first.
+> - [Definition `read-app`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/read-app.cue)
+> - [Definition `apply-app`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/apply-app.cue)
 
 Apply the following workflow to control the delivery process of multiple applications:
 
