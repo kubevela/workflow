@@ -67,18 +67,18 @@ func GetPackages() (map[string]string, error) {
 	ret := make(map[string]string)
 
 	for _, dirs := range versions {
-		pathPrefix := filepath.Join(builtinActionPath, dirs.Name())
-		files, err := fs.ReadDir(filepath.Join(pathPrefix, packagePath))
+		pathPrefix := fmt.Sprintf("%s/%s", builtinActionPath, dirs.Name())
+		files, err := fs.ReadDir(fmt.Sprintf("%s/%s", pathPrefix, packagePath))
 		if err != nil {
 			return nil, err
 		}
-		opBytes, err := fs.ReadFile(filepath.Join(pathPrefix, "op.cue"))
+		opBytes, err := fs.ReadFile(fmt.Sprintf("%s/%s", pathPrefix, "op.cue"))
 		if err != nil {
 			return nil, err
 		}
 		opContent := string(opBytes) + "\n"
 		for _, file := range files {
-			body, err := fs.ReadFile(filepath.Join(pathPrefix, packagePath, file.Name()))
+			body, err := fs.ReadFile(fmt.Sprintf("%s/%s/%s", pathPrefix, packagePath, file.Name()))
 			if err != nil {
 				return nil, err
 			}
@@ -96,17 +96,23 @@ func GetPackages() (map[string]string, error) {
 // AddImportsFor install imports for build.Instance.
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	inst.Imports = append(inst.Imports, GeneralImports...)
-	addDefault := true
+	addDefault := make(map[string]bool)
+	for _, builtin := range builtinImport {
+		addDefault[builtin.PkgName] = true
+	}
 
 	for _, a := range inst.Imports {
-		if a.PkgName == filepath.Base(builtinPackageName) || (a.PkgName == filepath.Join(filepath.Base(builtinPackageName), "v1")) {
-			addDefault = false
-			break
+		for _, builtin := range builtinImport {
+			if a.PkgName == builtin.PkgName {
+				addDefault[builtin.PkgName] = false
+			}
 		}
-
 	}
-	if addDefault {
-		inst.Imports = append(inst.Imports, builtinImport...)
+
+	for _, builtin := range builtinImport {
+		if add := addDefault[builtin.PkgName]; add {
+			inst.Imports = append(inst.Imports, builtin)
+		}
 	}
 	if tagTempl != "" {
 		p := &build.Instance{
@@ -126,7 +132,6 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 }
 
 func initBuiltinImports() ([]*build.Instance, error) {
-
 	imports := make([]*build.Instance, 0)
 	pkgs, err := GetPackages()
 	if err != nil {
