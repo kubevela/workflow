@@ -21,6 +21,7 @@ import (
 
 	"cuelang.org/go/cue"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -52,6 +53,7 @@ type WorkflowMeta struct {
 	Namespace            string
 	Annotations          map[string]string
 	Labels               map[string]string
+	UID                  types.UID
 	ChildOwnerReferences []metav1.OwnerReference
 }
 
