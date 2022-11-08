@@ -35,7 +35,7 @@ func TestSetContext(t *testing.T) {
 	r := require.New(t)
 	cli := newCliForTest(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: GenerateContextName("test", "step1"),
+			Name: GenerateContextName("test", "step1", "123456"),
 		},
 		Data: map[string]string{
 			"debug": "test",
@@ -73,7 +73,7 @@ func newCliForTest(wfCm *corev1.ConfigMap) *test.MockClient {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {
 				switch key.Name {
-				case GenerateContextName("test", "step1"):
+				case GenerateContextName("test", "step1", "123456"):
 					if wfCm != nil {
 						*o = *wfCm
 						return nil

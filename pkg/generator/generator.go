@@ -118,6 +118,7 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 			Namespace:   run.Namespace,
 			Annotations: run.Annotations,
 			Labels:      run.Labels,
+			UID:         run.UID,
 			ChildOwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: v1alpha1.SchemeGroupVersion.String(),

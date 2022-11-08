@@ -59,14 +59,15 @@ func setStore(ctx context.Context, cli client.Client, instance *wfTypes.Workflow
 	cm := &corev1.ConfigMap{}
 	if err := cli.Get(ctx, types.NamespacedName{
 		Namespace: instance.Namespace,
-		Name:      GenerateContextName(instance.Name, step),
+		Name:      GenerateContextName(instance.Name, step, string(instance.UID)),
 	}, cm); err != nil {
 		if errors.IsNotFound(err) {
-			cm.Name = GenerateContextName(instance.Name, step)
+			cm.Name = GenerateContextName(instance.Name, step, string(instance.UID))
 			cm.Namespace = instance.Namespace
 			cm.Data = map[string]string{
 				"debug": data,
 			}
+			cm.Labels = map[string]string{}
 			cm.SetOwnerReferences(instance.ChildOwnerReferences)
 			if err := cli.Create(ctx, cm); err != nil {
 				return err
@@ -95,6 +96,9 @@ func NewContext(cli client.Client, instance *wfTypes.WorkflowInstance, step stri
 }
 
 // GenerateContextName generate context name
-func GenerateContextName(name, step string) string {
-	return fmt.Sprintf("%s-%s-debug", name, step)
+func GenerateContextName(name, step, suffix string) string {
+	if len(suffix) > 5 {
+		suffix = suffix[len(suffix)-5:]
+	}
+	return fmt.Sprintf("%s-%s-debug-%s", name, step, suffix)
 }
