@@ -89,8 +89,8 @@ You can either run a WorkflowRun directly or from a Workflow Template.
 
 Please refer to the following examples:
 
-- [Control the delivery process of multiple resources(e.g. your Applications)](./examples/multiple-apps)
-- [Request a specified URL and then use the response as a message to notify](./examples/request-and-notify)
+- [Control the delivery process of multiple resources(e.g. your Applications)](./examples/multiple-apps.md)
+- [Request a specified URL and then use the response as a message to notify](./examples/request-and-notify.md)
 
 ### Run a WorkflowRun from a Workflow Template
 

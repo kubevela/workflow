@@ -151,8 +151,6 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseRunning)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
-	case subStepCounts[string(v1alpha1.WorkflowStepPhaseStopped)] > 0:
-		status.Phase = v1alpha1.WorkflowStepPhaseStopped
 	case subStepCounts[string(v1alpha1.WorkflowStepPhasePending)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhasePending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseFailed)] > 0:
