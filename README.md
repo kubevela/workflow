@@ -85,6 +85,8 @@ Checkout this [doc](https://kubevela.io/docs/end-user/workflow/built-in-workflow
 
 You can either run a WorkflowRun directly or from a Workflow Template.
 
+> Please checkout the [WorkflowRun Specification](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#workflowrun) and [WorkflowRun Status](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#status) for more details.
+
 ### Run a WorkflowRun directly
 
 Please refer to the following examples:
@@ -100,15 +102,23 @@ Please refer to the following examples:
 
 <h2 align="center">Features</h2>
 
-KubeVela uses Workflow as a SDK to control the process of application delivery. Therefor, all the features of Workflow are also available in KubeVela Workflow.
-
-Please checkout the [KubeVela Workflow documentation](https://kubevela.io/docs/end-user/workflow/overview) for more details.
+- [Operate WorkflowRun](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#operate-workflowrun)
+- [Suspend and Resume](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#suspend-and-resume)
+- [Sub Steps](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#sub-steps)
+- [Dependency](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#dependency)
+- [Data Passing](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#data-passing)
+- [Timeout](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#timeout)
+- [If Conditions](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#if-conditions)
+- [Custom Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#custom-context-data)
+- [Built-in Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#built-in-context-data)
 
 <h2 align="center">How to write custom steps</h2>
 
 If you're not familiar with CUE, please checkout the [CUE documentation](https://kubevela.io/docs/platform-engineers/cue/basic) first.
 
 You can customize your steps with CUE and some [built-in operations](https://kubevela.io/docs/platform-engineers/workflow/cue-actions). Please checkout the [tutorial](https://kubevela.io/docs/platform-engineers/workflow/workflow) for more details.
+
+> Note that you cannot use the [application operations](https://kubevela.io/docs/next/platform-engineers/workflow/cue-actions#application-operations) since there're no application data like components/traits/policy in the WorkflowRun.
 
 <h2 align="center">Contributing</h2>
 
