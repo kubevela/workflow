@@ -134,23 +134,6 @@ func TestStepGroupStep(t *testing.T) {
 			expectedPhase: v1alpha1.WorkflowStepPhaseRunning,
 		},
 		{
-			name: "stop",
-			engine: &testEngine{
-				stepStatus: v1alpha1.WorkflowStepStatus{
-					SubStepsStatus: []v1alpha1.StepStatus{
-						{
-							Phase: v1alpha1.WorkflowStepPhaseStopped,
-						},
-						{
-							Phase: v1alpha1.WorkflowStepPhaseFailed,
-						},
-					},
-				},
-				operation: &types.Operation{},
-			},
-			expectedPhase: v1alpha1.WorkflowStepPhaseStopped,
-		},
-		{
 			name: "fail",
 			engine: &testEngine{
 				stepStatus: v1alpha1.WorkflowStepStatus{

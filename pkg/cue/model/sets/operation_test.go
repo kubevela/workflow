@@ -687,6 +687,34 @@ operations: [{
 `,
 			options: []UnifyOption{UnifyByJSONPatch{}},
 		},
+		{
+			base: `
+spec: containers: [{
+	name: "c1"
+	envs:[{name: "e1",value: "v1"}]
+}]
+`,
+			patch: `
+// +patchKey=name
+spec: {
+	containers: [{
+		name: "c1"
+		// +patchStrategy=replace
+		envs:[{name: "e1",value: "v2"}]
+}]}
+`,
+			result: `spec: {
+	// +patchKey=name
+	containers: [{
+		name: "c1"
+		// +patchStrategy=replace
+		envs: [{
+			name:  "e1"
+			value: "v2"
+		}]
+	}, ...]
+}
+`},
 	}
 
 	for i, tcase := range testCase {

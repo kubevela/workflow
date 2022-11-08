@@ -247,8 +247,6 @@ const (
 	WorkflowStepPhaseFailed WorkflowStepPhase = "failed"
 	// WorkflowStepPhaseSkipped will make the controller skip the step.
 	WorkflowStepPhaseSkipped WorkflowStepPhase = "skipped"
-	// WorkflowStepPhaseStopped will make the controller stop the workflow.
-	WorkflowStepPhaseStopped WorkflowStepPhase = "stopped"
 	// WorkflowStepPhaseRunning will make the controller continue the workflow.
 	WorkflowStepPhaseRunning WorkflowStepPhase = "running"
 	// WorkflowStepPhasePending will make the controller wait for the step to run.
