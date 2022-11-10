@@ -276,6 +276,8 @@ const (
 const (
 	// AnnotationWorkflowRunDebug is the annotation for debug
 	AnnotationWorkflowRunDebug = "workflowrun.oam.dev/debug"
+	// AnnotationControllerRequirement indicates the controller version that can process the workflow run
+	AnnotationControllerRequirement = "workflowrun.oam.dev/controller-version-require"
 )
 
 // IsStepFinish will decide whether step is finish.
