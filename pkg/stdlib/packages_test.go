@@ -23,6 +23,7 @@ import (
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/parser"
+	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,11 +33,9 @@ func TestGetPackages(t *testing.T) {
 	pkg, err := GetPackages()
 	r.NoError(err)
 	cuectx := cuecontext.New()
-	file, err := parser.ParseFile(builtinPackageName, pkg[builtinPackageName])
-	r.NoError(err)
-	_ = cuectx.BuildFile(file)
+	_ = cuectx.BuildFile(pkg[builtinPackageName])
 
-	file, err = parser.ParseFile("-", `
+	file, err := parser.ParseFile("-", `
 import "vela/custom"
 out: custom.context`)
 	r.NoError(err)
@@ -54,9 +53,7 @@ out: custom.context`)
 	//test vela/op/v1
 	testVersion := "vela/op/v1"
 	cuectx1 := cuecontext.New()
-	file, err = parser.ParseFile(testVersion, pkg[testVersion])
-	r.NoError(err)
-	_ = cuectx1.BuildFile(file)
+	_ = cuectx1.BuildFile(pkg[testVersion])
 
 	file, err = parser.ParseFile("-", `
 import "vela/op/v1"
@@ -74,4 +71,37 @@ out: v1.#Break & {
 	str1, err := inst1.LookupPath(cue.ParsePath("out.message")).String()
 	r.NoError(err)
 	r.Equal(str1, "break")
+}
+
+func TestSetupBuiltinImports(t *testing.T) {
+	//test vela/op
+	r := require.New(t)
+	err := SetupBuiltinImports(map[string]string{"vela/op": "test: kube.#Apply"})
+	r.NoError(err)
+	file, err := parser.ParseFile("-", `
+import "vela/op"
+step: op.#Steps
+apply: op.test`)
+	r.NoError(err)
+	builder := &build.Instance{}
+	err = builder.AddSyntax(file)
+	r.NoError(err)
+	err = AddImportsFor(builder, "")
+	r.NoError(err)
+
+	cuectx := cuecontext.New()
+	inst := cuectx.BuildInstance(builder)
+	r.NoError(inst.Value().Err())
+	v := inst.LookupPath(cue.ParsePath("step"))
+	r.NoError(err)
+	r.NoError(v.Err())
+	s, err := sets.ToString(v)
+	r.NoError(err)
+	r.Equal(s, "#do: \"steps\"\n")
+	v = inst.LookupPath(cue.ParsePath("apply"))
+	r.NoError(err)
+	r.NoError(v.Err())
+	s, err = sets.ToString(v)
+	r.NoError(err)
+	r.Equal(s, "#do:       \"apply\"\n#provider: \"kube\"\n\n// +usage=The cluster to use\ncluster: *\"\" | string\n// +usage=The resource to apply\nvalue: {}\n")
 }
