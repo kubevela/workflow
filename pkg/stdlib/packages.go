@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/parser"
 	"k8s.io/klog/v2"
@@ -30,7 +31,12 @@ import (
 
 func init() {
 	var err error
-	builtinImport, err = initBuiltinImports()
+	pkgs, err := GetPackages()
+	if err != nil {
+		klog.ErrorS(err, "Unable to init builtin packages for imports")
+		os.Exit(1)
+	}
+	builtinImport, err = InitBuiltinImports(pkgs)
 	if err != nil {
 		klog.ErrorS(err, "Unable to init builtin imports")
 		os.Exit(1)
@@ -42,8 +48,6 @@ var (
 	fs embed.FS
 	// builtinImport is the builtin import for cue
 	builtinImport []*build.Instance
-	// GeneralImports is the general imports for cue
-	GeneralImports []*build.Instance
 )
 
 const (
@@ -53,18 +57,37 @@ const (
 	defaultVersion     = "v1"
 )
 
-// SetupGeneralImports setup general imports
-func SetupGeneralImports(general []*build.Instance) {
-	GeneralImports = general
+// SetupBuiltinImports setup builtin imports
+func SetupBuiltinImports(pkgs map[string]string) error {
+	builtin, err := GetPackages()
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgs {
+		file, err := parser.ParseFile("-", v, parser.ParseComments)
+		if err != nil {
+			return err
+		}
+		if original, ok := builtin[k]; ok {
+			builtin[k] = mergeFiles(original, file)
+		} else {
+			builtin[k] = file
+		}
+	}
+	builtinImport, err = InitBuiltinImports(builtin)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetPackages Get Stdlib packages
-func GetPackages() (map[string]string, error) {
+func GetPackages() (map[string]*ast.File, error) {
 	versions, err := fs.ReadDir(builtinActionPath)
 	if err != nil {
 		return nil, err
 	}
-	ret := make(map[string]string)
+	ret := make(map[string]*ast.File)
 
 	for _, dirs := range versions {
 		pathPrefix := fmt.Sprintf("%s/%s", builtinActionPath, dirs.Name())
@@ -85,35 +108,21 @@ func GetPackages() (map[string]string, error) {
 			pkgContent := fmt.Sprintf("%s: {\n%s\n}\n", strings.TrimSuffix(file.Name(), ".cue"), string(body))
 			opContent += pkgContent
 		}
-		if dirs.Name() == defaultVersion {
-			ret[builtinPackageName] = opContent
+		f, err := parser.ParseFile("-", opContent, parser.ParseComments)
+		if err != nil {
+			return nil, err
 		}
-		ret[filepath.Join(builtinPackageName, dirs.Name())] = opContent
+		if dirs.Name() == defaultVersion {
+			ret[builtinPackageName] = f
+		}
+		ret[filepath.Join(builtinPackageName, dirs.Name())] = f
 	}
 	return ret, nil
 }
 
 // AddImportsFor install imports for build.Instance.
 func AddImportsFor(inst *build.Instance, tagTempl string) error {
-	inst.Imports = append(inst.Imports, GeneralImports...)
-	addDefault := make(map[string]bool)
-	for _, builtin := range builtinImport {
-		addDefault[builtin.PkgName] = true
-	}
-
-	for _, a := range inst.Imports {
-		for _, builtin := range builtinImport {
-			if a.PkgName == builtin.PkgName {
-				addDefault[builtin.PkgName] = false
-			}
-		}
-	}
-
-	for _, builtin := range builtinImport {
-		if add := addDefault[builtin.PkgName]; add {
-			inst.Imports = append(inst.Imports, builtin)
-		}
-	}
+	inst.Imports = append(inst.Imports, builtinImport...)
 	if tagTempl != "" {
 		p := &build.Instance{
 			PkgName:    filepath.Base("vela/custom"),
@@ -131,25 +140,23 @@ func AddImportsFor(inst *build.Instance, tagTempl string) error {
 	return nil
 }
 
-func initBuiltinImports() ([]*build.Instance, error) {
+// InitBuiltinImports init built in imports
+func InitBuiltinImports(pkgs map[string]*ast.File) ([]*build.Instance, error) {
 	imports := make([]*build.Instance, 0)
-	pkgs, err := GetPackages()
-	if err != nil {
-		return nil, err
-	}
 	for path, content := range pkgs {
 		p := &build.Instance{
 			PkgName:    filepath.Base(path),
 			ImportPath: path,
 		}
-		file, err := parser.ParseFile("-", content, parser.ParseComments)
-		if err != nil {
-			return nil, err
-		}
-		if err := p.AddSyntax(file); err != nil {
+		if err := p.AddSyntax(content); err != nil {
 			return nil, err
 		}
 		imports = append(imports, p)
 	}
 	return imports, nil
+}
+
+func mergeFiles(base, file *ast.File) *ast.File {
+	base.Decls = append(base.Decls, file.Decls...)
+	return base
 }

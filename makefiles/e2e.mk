@@ -5,14 +5,14 @@ e2e-setup-controller-pre-hook:
 
 .PHONY: e2e-setup-controller
 e2e-setup-controller:
-	helm upgrade --install            \
-          --create-namespace          \
-          --namespace vela-system     \
-          --set image.repository=oamdev/vela-workflow \
-          --set image.tag=latest      \
-          --set image.pullPolicy=IfNotPresent         \
-		  --wait vela-workflow                        \
-          ./charts/vela-workflow
+	helm upgrade --install            						\
+		--create-namespace         									\
+		--namespace vela-system     								\
+		--set image.repository=oamdev/vela-workflow \
+		--set image.tag=latest      								\
+		--set image.pullPolicy=IfNotPresent         \
+		--wait vela-workflow                        \
+		./charts/vela-workflow
 
 .PHONY: end-e2e
 end-e2e:
