@@ -9,6 +9,8 @@ systemDefinitionNamespace:
 
 ## @param concurrentReconciles concurrentReconciles is the concurrent reconcile number of the controller
 concurrentReconciles: 4
+## @param ignoreWorkflowWithoutControllerRequirement will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation
+ignoreWorkflowWithoutControllerRequirement: false
 
 ## @section KubeVela workflow parameters
 

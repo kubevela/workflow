@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/kubevela/workflow/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/oam-dev/kubevela/pkg/oam/util"
+	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/pkg/utils"
 )
 
 var _ = Describe("Test the workflow run with the built-in definitions", func() {
@@ -45,7 +45,7 @@ var _ = Describe("Test the workflow run with the built-in definitions", func() {
 
 		Eventually(func() error {
 			return k8sClient.Create(ctx, &ns)
-		}, time.Second*3, time.Microsecond*300).Should(SatisfyAny(BeNil(), &util.AlreadyExistMatcher{}))
+		}, time.Second*3, time.Microsecond*300).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 	})
 
 	It("Test the workflow with config definition", func() {

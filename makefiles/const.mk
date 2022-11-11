@@ -47,8 +47,8 @@ VELA_VERSION ?= master
 # Repo info
 GIT_COMMIT          ?= git-$(shell git rev-parse --short HEAD)
 GIT_COMMIT_LONG     ?= $(shell git rev-parse HEAD)
-VELA_VERSION_KEY    := github.com/oam-dev/kubevela/version.VelaVersion
-VELA_GITVERSION_KEY := github.com/oam-dev/kubevela/version.GitRevision
+VELA_VERSION_KEY    := github.com/kubevela/workflow/version.VelaVersion
+VELA_GITVERSION_KEY := github.com/kubevela/workflow/version.GitRevision
 LDFLAGS             ?= "-s -w -X $(VELA_VERSION_KEY)=$(VELA_VERSION) -X $(VELA_GITVERSION_KEY)=$(GIT_COMMIT)"
 
 

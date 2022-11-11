@@ -95,6 +95,7 @@ func main() {
 		"The duration the LeaderElector clients should wait between tries of actions")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "admission webhook listen address")
 	flag.IntVar(&controllerArgs.ConcurrentReconciles, "concurrent-reconciles", 4, "concurrent-reconciles is the concurrent reconcile number of the controller. The default value is 4")
+	flag.BoolVar(&controllerArgs.IgnoreWorkflowWithoutControllerRequirement, "ignore-workflow-without-controller-requirement", false, "If true, workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation")
 	flag.Float64Var(&qps, "kube-api-qps", 50, "the qps for reconcile clients. Low qps may lead to low throughput. High qps may give stress to api-server. Raise this value if concurrent-reconciles is set to be high.")
 	flag.IntVar(&burst, "kube-api-burst", 100, "the burst for reconcile clients. Recommend setting it qps*2.")
 	flag.StringVar(&pprofAddr, "pprof-addr", "", "The address for pprof to use while exporting profiling results. The default value is empty which means do not expose it. Set it to address like :6666 to expose it.")
@@ -201,11 +202,12 @@ func main() {
 	kubeClient := mgr.GetClient()
 
 	if err = (&controllers.WorkflowRunReconciler{
-		Client:          kubeClient,
-		Scheme:          mgr.GetScheme(),
-		PackageDiscover: pd,
-		Recorder:        event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
-		Args:            controllerArgs,
+		Client:            kubeClient,
+		Scheme:            mgr.GetScheme(),
+		PackageDiscover:   pd,
+		Recorder:          event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
+		ControllerVersion: version.VelaVersion,
+		Args:              controllerArgs,
 	}).SetupWithManager(mgr); err != nil {
 		klog.Error(err, "unable to create controller", "controller", "WorkflowRun")
 		os.Exit(1)

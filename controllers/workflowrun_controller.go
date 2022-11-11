@@ -49,14 +49,17 @@ import (
 type Args struct {
 	// ConcurrentReconciles is the concurrent reconcile number of the controller
 	ConcurrentReconciles int
+	// IgnoreWorkflowWithoutControllerRequirement indicates that workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation.
+	IgnoreWorkflowWithoutControllerRequirement bool
 }
 
 // WorkflowRunReconciler reconciles a WorkflowRun object
 type WorkflowRunReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	PackageDiscover *packages.PackageDiscover
-	Recorder        event.Recorder
+	Scheme            *runtime.Scheme
+	PackageDiscover   *packages.PackageDiscover
+	Recorder          event.Recorder
+	ControllerVersion string
 	Args
 }
 
@@ -88,6 +91,11 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !r.matchControllerRequirement(run) {
+		logCtx.Info("skip workflowrun: not match the controller requirement of workflowrun")
+		return ctrl.Result{}, nil
 	}
 
 	timeReporter := timeReconcile(run)
@@ -161,6 +169,18 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *WorkflowRunReconciler) matchControllerRequirement(wr *v1alpha1.WorkflowRun) bool {
+	if wr.Annotations != nil {
+		if requireVersion, ok := wr.Annotations[types.AnnotationControllerRequirement]; ok {
+			return requireVersion == r.ControllerVersion
+		}
+	}
+	if r.IgnoreWorkflowWithoutControllerRequirement {
+		return false
+	}
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.

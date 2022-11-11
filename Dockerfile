@@ -20,9 +20,10 @@ COPY version/ version/
 
 # Build
 ARG TARGETARCH
-
+ARG VERSION
+ARG GITVERSION
 RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -a -ldflags "-s -w" \
+    go build -a -ldflags "-s -w -X github.com/kubevela/workflow/version.VelaVersion=${VERSION:-undefined} -X github.com/kubevela/workflow/version.GitRevision=${GITVERSION:-undefined}" \
     -o vela-workflow-${TARGETARCH} cmd/main.go
 
 FROM ${BASE_IMAGE:-alpine:3.15}
