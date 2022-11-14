@@ -29,7 +29,6 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
-	"cuelang.org/go/cue/token"
 	"github.com/cue-exp/kubevelafix"
 	"github.com/pkg/errors"
 
@@ -291,42 +290,11 @@ func (val *Value) FillRaw(x string, paths ...string) error {
 
 // FillValueByScript unify the value x at the given script path.
 func (val *Value) FillValueByScript(x *Value, path string) error {
-	if !strings.Contains(path, "[") {
-		newV := val.v.FillPath(FieldPath(path), x.v)
-		if err := newV.Err(); err != nil {
-			return err
-		}
-		val.v = newV
-		return nil
-	}
-	s, err := x.String()
-	if err != nil {
+	newV := val.v.FillPath(FieldPath(path), x.v)
+	if err := newV.Err(); err != nil {
 		return err
 	}
-	return val.fillRawByScript(s, path)
-}
-
-func (val *Value) fillRawByScript(x string, path string) error {
-	a := newAssembler(x)
-	pathExpr, err := parser.ParseExpr("path", path)
-	if err != nil {
-		return errors.WithMessage(err, "parse path")
-	}
-	if err := a.installTo(pathExpr); err != nil {
-		return err
-	}
-	raw, err := val.String(sets.ListOpen)
-	if err != nil {
-		return err
-	}
-	v, err := val.MakeValue(raw + "\n" + a.v)
-	if err != nil {
-		return errors.WithMessage(err, "remake value")
-	}
-	if err := v.Error(); err != nil {
-		return err
-	}
-	*val = *v
+	val.v = newV
 	return nil
 }
 
@@ -677,69 +645,6 @@ func (val *Value) OpenCompleteValue() error {
 }
 func isDef(s string) bool {
 	return strings.HasPrefix(s, "#")
-}
-
-// assembler put value under parsed expression as path.
-type assembler struct {
-	v string
-}
-
-func newAssembler(v string) *assembler {
-	return &assembler{v: v}
-}
-
-func (a *assembler) fill2Path(p string) {
-	a.v = fmt.Sprintf("%s: %s", p, a.v)
-}
-
-func (a *assembler) fill2Array(i int) {
-	s := ""
-	for j := 0; j < i; j++ {
-		s += "_,"
-	}
-	if strings.Contains(a.v, ":") && !strings.HasPrefix(a.v, "{") {
-		a.v = fmt.Sprintf("{ %s }", a.v)
-	}
-	a.v = fmt.Sprintf("[%s%s]", s, strings.TrimSpace(a.v))
-}
-
-func (a *assembler) installTo(expr ast.Expr) error {
-	switch v := expr.(type) {
-	case *ast.IndexExpr:
-		if err := a.installTo(v.Index); err != nil {
-			return err
-		}
-		if err := a.installTo(v.X); err != nil {
-			return err
-		}
-	case *ast.SelectorExpr:
-		if ident, ok := v.Sel.(*ast.Ident); ok {
-			if err := a.installTo(ident); err != nil {
-				return err
-			}
-		} else {
-			return errors.New("invalid sel type in selector")
-		}
-		if err := a.installTo(v.X); err != nil {
-			return err
-		}
-
-	case *ast.Ident:
-		a.fill2Path(v.String())
-	case *ast.BasicLit:
-		switch v.Kind {
-		case token.STRING:
-			a.fill2Path(v.Value)
-		case token.INT:
-			idex, _ := strconv.Atoi(v.Value)
-			a.fill2Array(idex)
-		default:
-			return errors.New("invalid path")
-		}
-	default:
-		return errors.New("invalid path")
-	}
-	return nil
 }
 
 // makePath creates a Path from a sequence of string.

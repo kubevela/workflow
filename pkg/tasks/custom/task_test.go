@@ -260,12 +260,18 @@ close({
 		r.NoError(err)
 		run, err := gen(step, &types.TaskGeneratorOptions{})
 		r.NoError(err)
-		status, operation, err := run.Run(wfCtx, &types.TaskRunOptions{})
+		status, operation, _ := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
 		case "input-err":
-			r.Equal(err.Error(), "do preStartHook: parameter.score.x: conflicting values 100 and 101")
+			r.Equal(status.Message, "parameter.score.x: conflicting values 100 and 101")
+			r.Equal(operation.Waiting, false)
+			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)
+			r.Equal(status.Reason, types.StatusReasonInput)
 		case "input":
-			r.Equal(err.Error(), "do preStartHook: get input from [podIP]: failed to lookup value: var(path=podIP) not exist")
+			r.Equal(status.Message, "get input from [podIP]: failed to lookup value: var(path=podIP) not exist")
+			r.Equal(operation.Waiting, false)
+			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)
+			r.Equal(status.Reason, types.StatusReasonInput)
 		case "output-var-conflict":
 			r.Contains(status.Message, "conflict")
 			r.Equal(operation.Waiting, false)
