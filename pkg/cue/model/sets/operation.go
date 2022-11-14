@@ -281,7 +281,7 @@ func strategyUnify(base cue.Value, patch cue.Value, params *UnifyParams, patchOp
 	} else if params.PatchStrategy == StrategyJSONPatch {
 		return jsonPatch(base, patch.LookupPath(cue.ParsePath("operations")))
 	}
-	openBase, err := openListLit(base)
+	openBase, err := OpenListLit(base)
 	if err != nil {
 		return cue.Value{}, errors.Wrapf(err, "failed to open list it for merge")
 	}

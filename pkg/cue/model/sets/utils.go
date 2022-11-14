@@ -311,8 +311,9 @@ func OpenBaiscLit(val cue.Value) (*ast.File, error) {
 	return f, err
 }
 
+// OpenListLit make that the listLit can be modified.
 // nolint:staticcheck
-func openListLit(val cue.Value) (*ast.File, error) {
+func OpenListLit(val cue.Value) (*ast.File, error) {
 	f, err := ToFile(val.Syntax(cue.Docs(true), cue.ResolveReferences(true)))
 	if err != nil {
 		return nil, err

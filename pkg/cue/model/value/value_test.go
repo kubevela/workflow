@@ -944,6 +944,13 @@ func TestFillByScript(t *testing.T) {
 	}{
 		{
 			name: "insert array",
+			raw:  `a: ["hello"]`,
+			path: "a[1]",
+			v:    `"world"`,
+			expected: `a: ["hello", "world", ...]
+`},
+		{
+			name: "insert array",
 			raw:  `a: b: [{x: 100},...]`,
 			path: "a.b[1]",
 			v:    `{name: "foo"}`,
@@ -970,7 +977,7 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 			x: 101
 		}, {
 			x: 102
-		}]
+		}, ...]
 	}
 }
 `,
@@ -986,9 +993,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 			y: [{
 				name:  "key"
 				value: "foo"
-			}]
+			}, ...]
 		}
-	}]
+	}, ...]
 }
 `,
 		},
@@ -1002,9 +1009,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 		x: {
 			y: [{
 				name: "key"
-			}]
+			}, ...]
 		}
-	}]
+	}, ...]
 	c: {
 		x: "foo"
 	}
@@ -1021,9 +1028,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 		x: {
 			y: [{
 				name: "key"
-			}]
+			}, ...]
 		}
-	}]
+	}, ...]
 	c: {
 		x: "foo"
 	}
@@ -1072,13 +1079,6 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 			path: "a.b[0].x.y[0].name",
 			v:    `"foo"`,
 			err:  "a.b.0.x.y.0.name: conflicting values \"foo\" and \"key\"",
-		},
-		{
-			name: "filled value with incompatible list lengths",
-			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
-			path: "a.b[3].x.y[0].value",
-			v:    `"foo"`,
-			err:  "a.b: incompatible list lengths (1 and 5)",
 		},
 	}
 
