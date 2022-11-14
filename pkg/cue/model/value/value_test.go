@@ -952,7 +952,26 @@ func TestFillByScript(t *testing.T) {
 		x: 100
 	}, {
 		name: "foo"
-	}]
+	}, ...]
+}
+`},
+		{
+			name: "insert array to array",
+			raw: `
+a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
+			path: "a.b.c[0].value",
+			v:    `"foo"`,
+			expected: `a: {
+	b: {
+		c: [{
+			x:     100
+			value: "foo"
+		}, {
+			x: 101
+		}, {
+			x: 102
+		}, ...]
+	}
 }
 `,
 		},
@@ -967,9 +986,9 @@ func TestFillByScript(t *testing.T) {
 			y: [{
 				name:  "key"
 				value: "foo"
-			}]
+			}, ...]
 		}
-	}]
+	}, ...]
 }
 `,
 		},
@@ -1052,7 +1071,7 @@ func TestFillByScript(t *testing.T) {
 			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
 			path: "a.b[0].x.y[0].value",
 			v:    `foo`,
-			err:  "remake value: a.b.x.y.value: reference \"foo\" not found",
+			err:  "remake assembler value: a.b.x.y.value: reference \"foo\" not found",
 		},
 		{
 			name: "conflict merge",
@@ -1066,7 +1085,7 @@ func TestFillByScript(t *testing.T) {
 			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
 			path: "a.b[0].x.y[0].value",
 			v:    `*+-`,
-			err:  "remake value: expected operand, found '}'",
+			err:  "remake assembler value: expected operand, found '}'",
 		},
 	}
 

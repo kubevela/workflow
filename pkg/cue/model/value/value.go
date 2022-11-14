@@ -319,7 +319,16 @@ func (val *Value) fillRawByScript(x string, path string) error {
 	if err != nil {
 		return err
 	}
-	v, err := val.MakeValue(raw + "\n" + a.v)
+	assemblerVal, err := val.MakeValue(a.v)
+	if err != nil {
+		return errors.WithMessage(err, "remake assembler value")
+	}
+	// open the list for assembler value
+	assemblerRaw, err := assemblerVal.String(sets.ListOpen)
+	if err != nil {
+		return err
+	}
+	v, err := val.MakeValue(raw + "\n" + assemblerRaw)
 	if err != nil {
 		return errors.WithMessage(err, "remake value")
 	}

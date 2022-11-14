@@ -194,7 +194,8 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			for _, hook := range options.PreStartHooks {
 				if err := hook(ctx, basicVal, wfStep); err != nil {
 					tracer.Error(err, "do preStartHook")
-					return v1alpha1.StepStatus{}, nil, errors.WithMessage(err, "do preStartHook")
+					exec.err(ctx, false, err, types.StatusReasonInput)
+					return exec.status(), exec.operation(), nil
 				}
 			}
 
