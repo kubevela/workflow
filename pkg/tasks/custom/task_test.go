@@ -260,7 +260,7 @@ close({
 		r.NoError(err)
 		run, err := gen(step, &types.TaskGeneratorOptions{})
 		r.NoError(err)
-		status, operation, err := run.Run(wfCtx, &types.TaskRunOptions{})
+		status, operation, _ := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
 		case "input-err":
 			r.Equal(status.Message, "parameter.score.x: conflicting values 100 and 101")

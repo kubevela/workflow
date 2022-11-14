@@ -958,7 +958,7 @@ func TestFillByScript(t *testing.T) {
 		{
 			name: "insert array to array",
 			raw: `
-a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
+a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 			path: "a.b.c[0].value",
 			v:    `"foo"`,
 			expected: `a: {
@@ -970,7 +970,7 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
 			x: 101
 		}, {
 			x: 102
-		}, ...]
+		}]
 	}
 }
 `,
@@ -986,9 +986,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
 			y: [{
 				name:  "key"
 				value: "foo"
-			}, ...]
+			}]
 		}
-	}, ...]
+	}]
 }
 `,
 		},
@@ -1021,9 +1021,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
 		x: {
 			y: [{
 				name: "key"
-			}, ...]
+			}]
 		}
-	}, ...]
+	}]
 	c: {
 		x: "foo"
 	}
@@ -1057,35 +1057,28 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
 			raw:  `a: b: [{x: 100},...]`,
 			path: "a.b[1]+1",
 			v:    `{name: "foo"}`,
-			err:  "invalid path",
+			err:  "invalid path: invalid label a.b[1]+1 ",
 		},
 		{
 			name: "invalid path [float]",
 			raw:  `a: b: [{x: 100},...]`,
 			path: "a.b[0.1]",
 			v:    `{name: "foo"}`,
-			err:  "invalid path",
-		},
-		{
-			name: "invalid value",
-			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
-			path: "a.b[0].x.y[0].value",
-			v:    `foo`,
-			err:  "remake assembler value: a.b.x.y.value: reference \"foo\" not found",
+			err:  "invalid path: invalid literal 0.1",
 		},
 		{
 			name: "conflict merge",
 			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
 			path: "a.b[0].x.y[0].name",
 			v:    `"foo"`,
-			err:  "remake value: a.b.0.x.y.0.name: conflicting values \"foo\" and \"key\"",
+			err:  "a.b.0.x.y.0.name: conflicting values \"foo\" and \"key\"",
 		},
 		{
-			name: "filled value with wrong cue format",
+			name: "filled value with incompatible list lengths",
 			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
-			path: "a.b[0].x.y[0].value",
-			v:    `*+-`,
-			err:  "remake assembler value: expected operand, found '}'",
+			path: "a.b[3].x.y[0].value",
+			v:    `"foo"`,
+			err:  "a.b: incompatible list lengths (1 and 5)",
 		},
 	}
 
@@ -1093,7 +1086,9 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}, ...]`,
 		r := require.New(t)
 		v, err := NewValue(errCase.raw, nil, "")
 		r.NoError(err)
-		err = v.fillRawByScript(errCase.v, errCase.path)
+		errV, err := v.MakeValue(errCase.v)
+		r.NoError(err)
+		err = v.FillValueByScript(errV, errCase.path)
 		r.Equal(errCase.err, err.Error())
 	}
 
