@@ -258,6 +258,8 @@ const (
 	StatusReasonTerminate = "Terminate"
 	// StatusReasonParameter is the reason of the workflow progress condition which is ProcessParameter.
 	StatusReasonParameter = "ProcessParameter"
+	// StatusReasonInput is the reason of the workflow progress condition which is Input.
+	StatusReasonInput = "Input"
 	// StatusReasonOutput is the reason of the workflow progress condition which is Output.
 	StatusReasonOutput = "Output"
 	// StatusReasonFailedAfterRetries is the reason of the workflow progress condition which is FailedAfterRetries.

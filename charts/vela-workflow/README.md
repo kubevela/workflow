@@ -29,10 +29,11 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 
 ### Core parameters
 
-| Name                        | Description                                                                                   | Value |
-| --------------------------- | --------------------------------------------------------------------------------------------- | ----- |
-| `systemDefinitionNamespace` | System definition namespace, if unspecified, will use built-in variable `.Release.Namespace`. | `nil` |
-| `concurrentReconciles`      | concurrentReconciles is the concurrent reconcile number of the controller                     | `4`   |
+| Name                                         | Description                                                                                                           | Value   |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------- |
+| `systemDefinitionNamespace`                  | System definition namespace, if unspecified, will use built-in variable `.Release.Namespace`.                         | `nil`   |
+| `concurrentReconciles`                       | concurrentReconciles is the concurrent reconcile number of the controller                                             | `4`     |
+| `ignoreWorkflowWithoutControllerRequirement` | will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation | `false` |
 
 
 ### KubeVela workflow parameters
