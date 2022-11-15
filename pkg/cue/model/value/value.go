@@ -290,7 +290,12 @@ func (val *Value) FillRaw(x string, paths ...string) error {
 
 // FillValueByScript unify the value x at the given script path.
 func (val *Value) FillValueByScript(x *Value, path string) error {
-	newV := val.v.FillPath(FieldPath(path), x.v)
+	f, err := sets.OpenListLit(val.v)
+	if err != nil {
+		return err
+	}
+	v := val.r.BuildFile(f)
+	newV := v.FillPath(FieldPath(path), x.v)
 	if err := newV.Err(); err != nil {
 		return err
 	}
