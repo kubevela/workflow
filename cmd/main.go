@@ -69,7 +69,7 @@ func init() {
 }
 
 func main() {
-	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock string
+	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent string
 	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
 	var enableLeaderElection, logDebug, backupCleanOnBackup bool
 	var qps float64
@@ -98,6 +98,7 @@ func main() {
 	flag.BoolVar(&controllerArgs.IgnoreWorkflowWithoutControllerRequirement, "ignore-workflow-without-controller-requirement", false, "If true, workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation")
 	flag.Float64Var(&qps, "kube-api-qps", 50, "the qps for reconcile clients. Low qps may lead to low throughput. High qps may give stress to api-server. Raise this value if concurrent-reconciles is set to be high.")
 	flag.IntVar(&burst, "kube-api-burst", 100, "the burst for reconcile clients. Recommend setting it qps*2.")
+	flag.StringVar(&userAgent, "user-agent", "vela-workflow", "the user agent of the client.")
 	flag.StringVar(&pprofAddr, "pprof-addr", "", "The address for pprof to use while exporting profiling results. The default value is empty which means do not expose it. Set it to address like :6666 to expose it.")
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
@@ -171,6 +172,7 @@ func main() {
 		"QPS", restConfig.QPS,
 		"Burst", restConfig.Burst,
 	)
+	restConfig.UserAgent = userAgent
 
 	leaderElectionID := fmt.Sprintf("workflow-%s", strings.ToLower(strings.ReplaceAll(version.VelaVersion, ".", "-")))
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{

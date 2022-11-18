@@ -80,23 +80,24 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 
 ### Common parameters
 
-| Name                         | Description                                                                                                                | Value   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `imagePullSecrets`           | Image pull secrets                                                                                                         | `[]`    |
-| `nameOverride`               | Override name                                                                                                              | `""`    |
-| `fullnameOverride`           | Fullname override                                                                                                          | `""`    |
-| `serviceAccount.create`      | Specifies whether a service account should be created                                                                      | `true`  |
-| `serviceAccount.annotations` | Annotations to add to the service account                                                                                  | `{}`    |
-| `serviceAccount.name`        | The name of the service account to use. If not set and create is true, a name is generated using the fullname template     | `nil`   |
-| `nodeSelector`               | Node selector                                                                                                              | `{}`    |
-| `tolerations`                | Tolerations                                                                                                                | `[]`    |
-| `affinity`                   | Affinity                                                                                                                   | `{}`    |
-| `rbac.create`                | Specifies whether a RBAC role should be created                                                                            | `true`  |
-| `logDebug`                   | Enable debug logs for development purpose                                                                                  | `false` |
-| `logFilePath`                | If non-empty, write log files in this path                                                                                 | `""`    |
-| `logFileMaxSize`             | Defines the maximum size a log file can grow to. Unit is megabytes. If the value is 0, the maximum file size is unlimited. | `1024`  |
-| `kubeClient.qps`             | The qps for reconcile clients, default is 50                                                                               | `500`   |
-| `kubeClient.burst`           | The burst for reconcile clients, default is 100                                                                            | `1000`  |
+| Name                         | Description                                                                                                                | Value           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `imagePullSecrets`           | Image pull secrets                                                                                                         | `[]`            |
+| `nameOverride`               | Override name                                                                                                              | `""`            |
+| `fullnameOverride`           | Fullname override                                                                                                          | `""`            |
+| `serviceAccount.create`      | Specifies whether a service account should be created                                                                      | `true`          |
+| `serviceAccount.annotations` | Annotations to add to the service account                                                                                  | `{}`            |
+| `serviceAccount.name`        | The name of the service account to use. If not set and create is true, a name is generated using the fullname template     | `nil`           |
+| `nodeSelector`               | Node selector                                                                                                              | `{}`            |
+| `tolerations`                | Tolerations                                                                                                                | `[]`            |
+| `affinity`                   | Affinity                                                                                                                   | `{}`            |
+| `rbac.create`                | Specifies whether a RBAC role should be created                                                                            | `true`          |
+| `logDebug`                   | Enable debug logs for development purpose                                                                                  | `false`         |
+| `logFilePath`                | If non-empty, write log files in this path                                                                                 | `""`            |
+| `logFileMaxSize`             | Defines the maximum size a log file can grow to. Unit is megabytes. If the value is 0, the maximum file size is unlimited. | `1024`          |
+| `kubeClient.qps`             | The qps for reconcile clients, default is 50                                                                               | `500`           |
+| `kubeClient.burst`           | The burst for reconcile clients, default is 100                                                                            | `1000`          |
+| `kubeClient.userAgent`       | The user agent of the client, default is vela-workflow                                                                     | `vela-workflow` |
 
 
 ## Uninstallation

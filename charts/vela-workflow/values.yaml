@@ -163,6 +163,8 @@ admissionWebhooks:
 
 ## @param kubeClient.qps The qps for reconcile clients, default is 50
 ## @param kubeClient.burst The burst for reconcile clients, default is 100
+## @param kubeClient.userAgent The user agent of the client, default is vela-workflow
 kubeClient:
   qps: 500
   burst: 1000
+  userAgent: vela-workflow
