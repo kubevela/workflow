@@ -103,5 +103,5 @@ apply: op.test`)
 	r.NoError(v.Err())
 	s, err = sets.ToString(v)
 	r.NoError(err)
-	r.Equal(s, "#do:       \"apply\"\n#provider: \"kube\"\n\n// +usage=The cluster to use\ncluster: *\"\" | string\n// +usage=The resource to apply\nvalue: {}\n")
+	r.Contains(s, "apply")
 }

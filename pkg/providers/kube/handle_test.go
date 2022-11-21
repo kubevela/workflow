@@ -190,20 +190,31 @@ cluster: ""
 		v, err := value.NewValue(fmt.Sprintf(`
 value: {%s}
 cluster: ""
-patch: metadata: name: "test-app-1"`, s), nil, "")
+patch: {
+	metadata: name: "test-app-1"
+	spec: containers: [{
+		// +patchStrategy=replace
+		env: [{
+			name: "APP"
+			value: "nginx-new"
+		}]
+	}]
+}`, s), nil, "")
 		Expect(err).ToNot(HaveOccurred())
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		err = p.Apply(mCtx, ctx, v, nil)
 		Expect(err).ToNot(HaveOccurred())
 
-		workload, err := component.Workload.Unstructured()
+		pod := &corev1.Pod{}
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
 			return k8sClient.Get(context.Background(), client.ObjectKey{
 				Namespace: "default",
 				Name:      "test-app-1",
-			}, workload)
+			}, pod)
 		}, time.Second*2, time.Millisecond*300).Should(BeNil())
+		Expect(pod.Name).To(Equal("test-app-1"))
+		Expect(pod.Spec.Containers[0].Env[0].Value).To(Equal("nginx-new"))
 	})
 
 	It("list", func() {
