@@ -6,6 +6,8 @@
 	cluster: *"" | string
 	// +usage=The resource to apply
 	value: {...}
+	// +usage=The patcher that will be applied to the resource, you can define the strategy of list merge through comments. Reference doc here: https://kubevela.io/docs/platform-engineers/traits/patch-trait#patch-in-workflow-step
+	patch?: {...}
 	...
 }
 
