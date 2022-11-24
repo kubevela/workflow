@@ -52,7 +52,7 @@ func (nwk *nodewalker) walk(node ast.Node) {
 	switch n := node.(type) {
 
 	case *ast.Field:
-		label := labelStr(n.Label)
+		label := LabelStr(n.Label)
 		if label == "" || strings.HasPrefix(label, "#") {
 			return
 		}
@@ -63,7 +63,7 @@ func (nwk *nodewalker) walk(node ast.Node) {
 			for k, v := range oriTags {
 				nwk.tags[k] = v
 			}
-			nwk.pos = append(nwk.pos, labelStr(n.Label))
+			nwk.pos = append(nwk.pos, LabelStr(n.Label))
 			tags := findCommentTag(n.Comments())
 			for tk, tv := range tags {
 				nwk.tags[tk] = tv

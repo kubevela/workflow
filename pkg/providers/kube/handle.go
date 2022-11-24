@@ -166,7 +166,7 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 	if err := h.handlers.Apply(deployCtx, cluster, WorkflowResourceCreator, workload); err != nil {
 		return err
 	}
-	return cue.FillUnstructuredObject(v, workload, "value")
+	return cue.SubstituteUnstructuredObject(v, workload, "value")
 }
 
 // ApplyInParallel create or update CRs in parallel.

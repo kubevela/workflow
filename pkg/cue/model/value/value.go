@@ -27,6 +27,7 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"github.com/cue-exp/kubevelafix"
@@ -80,6 +81,30 @@ func (val *Value) UnmarshalTo(x interface{}) error {
 		return err
 	}
 	return json.Unmarshal(data, x)
+}
+
+// SubstituteInStruct substitute expr in struct lit value
+// nolint:staticcheck
+func (val *Value) SubstituteInStruct(new ast.Expr, key string) error {
+	node := val.CueValue().Syntax(cue.ResolveReferences(true))
+	x, ok := node.(*ast.StructLit)
+	if !ok {
+		return errors.New("value is not a struct lit")
+	}
+	for i := range x.Elts {
+		if field, ok := x.Elts[i].(*ast.Field); ok {
+			if strings.Trim(sets.LabelStr(field.Label), `"`) == strings.Trim(key, `"`) {
+				x.Elts[i].(*ast.Field).Value = new
+				b, err := format.Node(node)
+				if err != nil {
+					return err
+				}
+				val.v = val.r.CompileBytes(b)
+				return nil
+			}
+		}
+	}
+	return errors.New("key not found in struct")
 }
 
 // NewValue new a value

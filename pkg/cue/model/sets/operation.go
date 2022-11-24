@@ -188,7 +188,7 @@ func strategyPatchHandle() interceptor {
 					}
 				}
 
-				paths := append(ctx.Pos(), labelStr(field.Label))
+				paths := append(ctx.Pos(), LabelStr(field.Label))
 				baseSubNode, err := lookUp(baseNode, paths...)
 				if err != nil {
 					if errors.Is(err, notFoundErr) {
@@ -217,14 +217,14 @@ func strategyPatchHandle() interceptor {
 					case *ast.StructLit:
 						for _, elt := range v.Elts {
 							if fe, ok := elt.(*ast.Field); ok &&
-								labelStr(fe.Label) == labelStr(field.Label) {
+								LabelStr(fe.Label) == LabelStr(field.Label) {
 								fe.Value = field.Value
 							}
 						}
 					case *ast.File: // For the top level element
 						for _, decl := range v.Decls {
 							if fe, ok := decl.(*ast.Field); ok &&
-								labelStr(fe.Label) == labelStr(field.Label) {
+								LabelStr(fe.Label) == LabelStr(field.Label) {
 								fe.Value = field.Value
 							}
 						}

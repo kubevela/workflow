@@ -78,3 +78,16 @@ func FillUnstructuredObject(v *value.Value, obj runtime.Unstructured, paths ...s
 	}
 	return v.FillObject(expr, paths...)
 }
+
+// SubstituteUnstructuredObject substitute runtime.Unstructured to *value.Value
+func SubstituteUnstructuredObject(v *value.Value, obj runtime.Unstructured, path string) error {
+	var buf bytes.Buffer
+	if err := unstructured.UnstructuredJSONScheme.Encode(obj, &buf); err != nil {
+		return v.FillObject(err.Error(), "err")
+	}
+	expr, err := json.Unmarshal(buf.Bytes())
+	if err != nil {
+		return v.FillObject(err.Error(), "err")
+	}
+	return v.SubstituteInStruct(expr, path)
+}
