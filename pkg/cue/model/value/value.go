@@ -85,7 +85,7 @@ func (val *Value) UnmarshalTo(x interface{}) error {
 
 // SubstituteInStruct substitute expr in struct lit value
 // nolint:staticcheck
-func (val *Value) SubstituteInStruct(new ast.Expr, key string) error {
+func (val *Value) SubstituteInStruct(expr ast.Expr, key string) error {
 	node := val.CueValue().Syntax(cue.ResolveReferences(true))
 	x, ok := node.(*ast.StructLit)
 	if !ok {
@@ -94,7 +94,7 @@ func (val *Value) SubstituteInStruct(new ast.Expr, key string) error {
 	for i := range x.Elts {
 		if field, ok := x.Elts[i].(*ast.Field); ok {
 			if strings.Trim(sets.LabelStr(field.Label), `"`) == strings.Trim(key, `"`) {
-				x.Elts[i].(*ast.Field).Value = new
+				x.Elts[i].(*ast.Field).Value = expr
 				b, err := format.Node(node)
 				if err != nil {
 					return err
