@@ -23,6 +23,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/format"
+	cuejson "cuelang.org/go/pkg/encoding/json"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
 
 	"github.com/pkg/errors"
@@ -1091,5 +1092,33 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 		err = v.FillValueByScript(errV, errCase.path)
 		r.Equal(errCase.err, err.Error())
 	}
+}
 
+func TestSubstituteInStruct(t *testing.T) {
+	base := `
+value: {
+	a: 1
+}
+`
+	r := require.New(t)
+	val, err := NewValue(base, nil, "")
+	r.NoError(err)
+	expr, err := cuejson.Unmarshal([]byte(`{"b": 2}`))
+	r.NoError(err)
+	err = val.SubstituteInStruct(expr, "value")
+	r.NoError(err)
+	s, err := val.String()
+	r.NoError(err)
+	r.Equal(s, `value: {
+	b: 2
+}
+`)
+	err = val.SubstituteInStruct(expr, "notfound")
+	r.Error(err)
+
+	errBase := `1`
+	val1, err := NewValue(errBase, nil, "")
+	r.NoError(err)
+	err = val1.SubstituteInStruct(expr, "value")
+	r.Error(err)
 }

@@ -104,3 +104,52 @@ func TestFillUnstructuredObject(t *testing.T) {
 		})
 	}
 }
+
+func TestSubstituteUnstructuredObject(t *testing.T) {
+	testcases := map[string]struct {
+		obj  *unstructured.Unstructured
+		json string
+	}{
+		"test unstructured object with nil value": {
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"spec": map[string]interface{}{
+						"template": map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"creationTimestamp": nil,
+							},
+						},
+					},
+				},
+			},
+			json: `{"object":{"apiVersion":"apps/v1","kind":"Deployment","spec":{"template":{"metadata":{"creationTimestamp":null}}}}}`,
+		},
+		"test unstructured object without nil value": {
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]interface{}{
+						"creationTimestamp": "2022-05-25T12:07:02Z",
+					},
+				},
+			},
+			json: `{"object":{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"creationTimestamp":"2022-05-25T12:07:02Z"}}}`,
+		},
+	}
+
+	for name, testcase := range testcases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			value, err := value.NewValue(`object:{"test": "test"}`, nil, "")
+			r.NoError(err)
+			err = SubstituteUnstructuredObject(value, testcase.obj, "object")
+			r.NoError(err)
+			json, err := value.CueValue().MarshalJSON()
+			r.NoError(err)
+			r.Equal(testcase.json, string(json))
+		})
+	}
+}

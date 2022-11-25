@@ -204,6 +204,9 @@ patch: {
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		err = p.Apply(mCtx, ctx, v, nil)
 		Expect(err).ToNot(HaveOccurred())
+		sub, err := v.LookupValue("value")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(sub.Error()).To(BeNil())
 
 		pod := &corev1.Pod{}
 		Expect(err).ToNot(HaveOccurred())
