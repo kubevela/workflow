@@ -22,6 +22,8 @@
 
 <h2 align="center">Why use KubeVela Workflow</h2>
 
+<h1 align="center"><a href="https://kubevela.io/docs/end-user/pipeline/workflowrun"><img src="https://static.kubevela.net/images/1.6/workflow-arch.png" alt="workflow arch" align="center" width="700px" /></a></h1>
+
 🌬️ **Lightweight Workflow Engine**: KubeVela Workflow won't create a pod or job for process control. Instead, everything can be done in steps and there will be no redundant resource consumption.
 
 ✨ **Flexible, Extensible and Programmable**: All the steps are based on the [CUE](https://cuelang.org/) language, which means if you want to customize a new step, you just need to write CUE codes and no need to compile or build anything, KubeVela Workflow will evaluate these codes.
