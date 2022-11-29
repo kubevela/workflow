@@ -701,6 +701,20 @@ func TestValidateIfValue(t *testing.T) {
 			expected:    false,
 		},
 		{
+			name: "input value is struct",
+			step: v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					If: `inputs["test-struct"].hello == "world"`,
+					Inputs: v1alpha1.StepInputs{
+						{
+							From: "test-struct",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
 			name: "dash in if",
 			step: v1alpha1.WorkflowStep{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -782,6 +796,9 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	v, err = value.NewValue(`"yes"`, nil, "")
 	r.NoError(err)
 	r.NoError(wfCtx.SetVar(v, "test"))
+	v, err = value.NewValue(`{hello: "world"}`, nil, "")
+	r.NoError(err)
+	r.NoError(wfCtx.SetVar(v, "test-struct"))
 	return wfCtx
 }
 

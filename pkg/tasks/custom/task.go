@@ -364,7 +364,7 @@ func getInputsTemplate(ctx wfContext.Context, step v1alpha1.WorkflowStep, basicV
 		if err != nil {
 			continue
 		}
-		inputsTempl += fmt.Sprintf("\ninputs: \"%s\": %s", input.From, s)
+		inputsTempl += fmt.Sprintf("\ninputs: \"%s\": {\n%s\n}", input.From, s)
 	}
 	return inputsTempl
 }
