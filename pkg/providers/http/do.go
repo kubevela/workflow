@@ -46,16 +46,11 @@ const (
 )
 
 var (
-	defaultClient *http.Client
-	rateLimiter   *ratelimiter.RateLimiter
+	rateLimiter *ratelimiter.RateLimiter
 )
 
 func init() {
 	rateLimiter = ratelimiter.NewRateLimiter(128)
-	defaultClient = &http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   time.Second * 3,
-	}
 }
 
 type provider struct {
@@ -79,7 +74,10 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 		header, trailer http.Header
 		r               io.Reader
 	)
-	initDefaultClient(defaultClient)
+	defaultClient := &http.Client{
+		Transport: http.DefaultTransport,
+		Timeout:   time.Second * 3,
+	}
 	if timeout, err := v.GetString("request", "timeout"); err == nil && timeout != "" {
 		duration, err := time.ParseDuration(timeout)
 		if err != nil {
@@ -210,11 +208,6 @@ func (h *provider) getTransport(ctx monitorContext.Context, v *value.Value) (htt
 	}
 	tr.TLSClientConfig.Certificates = []tls.Certificate{cliCrt}
 	return tr, nil
-}
-
-func initDefaultClient(c *http.Client) {
-	c.Transport = http.DefaultTransport
-	c.Timeout = time.Second * 3
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
