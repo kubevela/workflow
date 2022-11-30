@@ -101,8 +101,7 @@ type WorkflowRunStatus struct {
 
 // WorkflowSpec defines workflow steps and other attributes
 type WorkflowSpec struct {
-	Mode  *WorkflowExecuteMode `json:"mode,omitempty"`
-	Steps []WorkflowStep       `json:"steps,omitempty"`
+	Steps []WorkflowStep `json:"steps,omitempty"`
 }
 
 // WorkflowExecuteMode defines the mode of workflow execution
@@ -144,6 +143,7 @@ type Workflow struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`
 	WorkflowSpec `json:",inline"`
 }
 

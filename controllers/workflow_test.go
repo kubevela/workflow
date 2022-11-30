@@ -96,10 +96,10 @@ var _ = Describe("Test Workflow", func() {
 				Name:      "workflow",
 				Namespace: namespace,
 			},
+			Mode: &v1alpha1.WorkflowExecuteMode{
+				Steps: v1alpha1.WorkflowModeDAG,
+			},
 			WorkflowSpec: v1alpha1.WorkflowSpec{
-				Mode: &v1alpha1.WorkflowExecuteMode{
-					Steps: v1alpha1.WorkflowModeDAG,
-				},
 				Steps: []v1alpha1.WorkflowStep{
 					{
 						WorkflowStepBase: v1alpha1.WorkflowStepBase{
