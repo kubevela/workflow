@@ -344,7 +344,7 @@ func newCliForTest(t *testing.T, wfCm *corev1.ConfigMap) *test.MockClient {
 			}
 			return nil
 		},
-		MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+		MockPatch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {
 				if wfCm == nil {

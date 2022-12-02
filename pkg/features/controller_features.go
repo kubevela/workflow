@@ -27,11 +27,14 @@ const (
 	EnableSuspendOnFailure featuregate.Feature = "EnableSuspendOnFailure"
 	// EnableBackupWorkflowRecord enable backup workflow record
 	EnableBackupWorkflowRecord featuregate.Feature = "EnableBackupWorkflowRecord"
+	// EnablePatchStatusAtOnce enable patch status at once
+	EnablePatchStatusAtOnce featuregate.Feature = "EnablePatchStatusAtOnce"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableSuspendOnFailure:     {Default: false, PreRelease: featuregate.Alpha},
 	EnableBackupWorkflowRecord: {Default: false, PreRelease: featuregate.Alpha},
+	EnablePatchStatusAtOnce:    {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

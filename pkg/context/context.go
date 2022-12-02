@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/pkg/util/rand"
@@ -217,15 +218,19 @@ func (wf *WorkflowContext) writeToStore() error {
 
 func (wf *WorkflowContext) sync() error {
 	ctx := context.Background()
+	store := &corev1.ConfigMap{}
 	if EnableInMemoryContext {
 		MemStore.UpdateInMemoryContext(wf.store)
-	} else if err := wf.cli.Update(ctx, wf.store); err != nil {
+	} else if err := wf.cli.Get(ctx, types.NamespacedName{
+		Name:      wf.store.Name,
+		Namespace: wf.store.Namespace,
+	}, store); err != nil {
 		if kerrors.IsNotFound(err) {
 			return wf.cli.Create(ctx, wf.store)
 		}
 		return err
 	}
-	return nil
+	return wf.cli.Patch(ctx, wf.store, client.MergeFrom(store))
 }
 
 // LoadFromConfigMap recover workflow context from configMap.

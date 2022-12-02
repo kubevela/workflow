@@ -105,6 +105,9 @@ type PreCheckOptions struct {
 	BasicValue      *value.Value
 }
 
+// StatusPatcher is the interface to patch status
+type StatusPatcher func(ctx context.Context, status *v1alpha1.WorkflowRunStatus, isUpdate bool) error
+
 // TaskPreCheckHook is the hook for pre check.
 type TaskPreCheckHook func(step v1alpha1.WorkflowStep, options *PreCheckOptions) (*PreCheckResult, error)
 
