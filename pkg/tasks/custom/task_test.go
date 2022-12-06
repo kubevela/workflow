@@ -784,7 +784,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 			}
 			return nil
 		},
-		MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+		MockPatch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 			return nil
 		},
 	}

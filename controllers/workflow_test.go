@@ -589,6 +589,72 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
 	})
 
+	It("test reconcile with patch status at once", func() {
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)()
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-failed-after-retries"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step1",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step2-failed",
+					Type:       "apply-object",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"value":[{"apiVersion":"v1","kind":"invalid","metadata":{"name":"test1"}}]}`)},
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		expDeployment := &appsv1.Deployment{}
+		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
+		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(BeNil())
+
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		By("verify the first ten reconciles")
+		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
+			tryReconcile(reconciler, wr.Name, wr.Namespace)
+			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
+			Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		}
+
+		By("workflowrun should be suspended after failed max reconciles")
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(wfTypes.MessageSuspendFailedAfterRetries))
+		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
+
+		By("resume the suspended workflow run")
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		checkRun.Status.Suspend = false
+		Expect(k8sClient.Status().Patch(ctx, checkRun, client.Merge)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
+		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+	})
+
 	It("test failed after retries in dag mode with running step and suspend on failure", func() {
 		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
 		wr := wrTemplate.DeepCopy()

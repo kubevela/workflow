@@ -17,6 +17,7 @@ limitations under the License.
 package executor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -60,13 +61,15 @@ type workflowExecutor struct {
 	instance *types.WorkflowInstance
 	cli      client.Client
 	wfCtx    wfContext.Context
+	patcher  types.StatusPatcher
 }
 
 // New returns a Workflow Executor implementation.
-func New(instance *types.WorkflowInstance, cli client.Client) WorkflowExecutor {
+func New(instance *types.WorkflowInstance, cli client.Client, patcher types.StatusPatcher) WorkflowExecutor {
 	return &workflowExecutor{
 		instance: instance,
 		cli:      cli,
+		patcher:  patcher,
 	}
 }
 
@@ -102,11 +105,11 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.instance.Name, w.instance.Namespace)
 
-	allTasksDone, allTasksSucceeded := w.allDone(taskRunners)
+	allRunnersDone, allRunnersSucceeded := checkRunners(taskRunners, w.instance.Status)
 	if status.Finished {
 		StepStatusCache.Delete(cacheKey)
 	}
-	if checkWorkflowTerminated(status, allTasksDone) {
+	if checkWorkflowTerminated(status, allRunnersDone) {
 		if isTerminatedManually(status) {
 			return v1alpha1.WorkflowStateTerminated, nil
 		}
@@ -115,7 +118,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	if checkWorkflowSuspended(status) {
 		return v1alpha1.WorkflowStateSuspending, nil
 	}
-	if allTasksSucceeded {
+	if allRunnersSucceeded {
 		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 
@@ -133,7 +136,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	}
 	w.wfCtx = wfCtx
 
-	e := newEngine(ctx, wfCtx, w, status)
+	e := newEngine(ctx, wfCtx, w, status, taskRunners)
 
 	err = e.Run(ctx, taskRunners, dagMode)
 	if err != nil {
@@ -142,27 +145,11 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return v1alpha1.WorkflowStateExecuting, err
 	}
 
-	e.checkWorkflowStatusMessage(status)
 	StepStatusCache.Store(cacheKey, len(status.Steps))
-	allTasksDone, allTasksSucceeded = w.allDone(taskRunners)
-	if status.Terminated {
-		e.cleanBackoffTimesForTerminated()
-		if checkWorkflowTerminated(status, allTasksDone) {
-			wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
-			if isTerminatedManually(status) {
-				return v1alpha1.WorkflowStateTerminated, nil
-			}
-			return v1alpha1.WorkflowStateFailed, nil
-		}
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnablePatchStatusAtOnce) {
+		return e.status.Phase, nil
 	}
-	if status.Suspend {
-		wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
-		return v1alpha1.WorkflowStateSuspending, nil
-	}
-	if allTasksSucceeded {
-		return v1alpha1.WorkflowStateSucceeded, nil
-	}
-	return v1alpha1.WorkflowStateExecuting, nil
+	return e.checkWorkflowPhase(), nil
 }
 
 func isTerminatedManually(status *v1alpha1.WorkflowRunStatus) bool {
@@ -201,7 +188,7 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 	return status.Suspend
 }
 
-func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus) *engine {
+func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus, taskRunners []types.TaskRunner) *engine {
 	stepStatus := make(map[string]v1alpha1.StepStatus)
 	setStepStatus(stepStatus, wfStatus.Steps)
 	stepDependsOn := make(map[string][]string)
@@ -215,7 +202,6 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 	}
 	return &engine{
 		status:        wfStatus,
-		monitorCtx:    ctx,
 		instance:      w.instance,
 		wfCtx:         wfCtx,
 		cli:           w.cli,
@@ -223,6 +209,8 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 		stepStatus:    stepStatus,
 		stepDependsOn: stepDependsOn,
 		stepTimeout:   make(map[string]time.Time),
+		taskRunners:   taskRunners,
+		statusPatcher: w.patcher,
 	}
 }
 
@@ -314,9 +302,8 @@ func (w *workflowExecutor) GetBackoffWaitTime() time.Duration {
 	return time.Second
 }
 
-func (w *workflowExecutor) allDone(taskRunners []types.TaskRunner) (bool, bool) {
+func checkRunners(taskRunners []types.TaskRunner, status v1alpha1.WorkflowRunStatus) (bool, bool) {
 	success := true
-	status := w.instance.Status
 	for _, t := range taskRunners {
 		done := false
 		for _, ss := range status.Steps {
@@ -456,16 +443,16 @@ func (e *engine) getNextTimeout() int64 {
 	return int64(math.Ceil(min.Seconds()))
 }
 
-func (e *engine) setNextExecuteTime() {
+func (e *engine) setNextExecuteTime(ctx monitorContext.Context) {
 	backoff := e.getBackoffWaitTime()
 	lastExecuteTime, ok := e.wfCtx.GetValueInMemory(types.ContextKeyLastExecuteTime)
 	if !ok {
-		e.monitorCtx.Error(fmt.Errorf("failed to get last execute time"), "workflow run", e.instance.Name)
+		ctx.Error(fmt.Errorf("failed to get last execute time"), "workflow run", e.instance.Name)
 	}
 
 	last, ok := lastExecuteTime.(int64)
 	if !ok {
-		e.monitorCtx.Error(fmt.Errorf("failed to parse last execute time to int64"), "lastExecuteTime", lastExecuteTime)
+		ctx.Error(fmt.Errorf("failed to parse last execute time to int64"), "lastExecuteTime", lastExecuteTime)
 	}
 	interval := int64(backoff)
 	if timeout := e.getNextTimeout(); timeout > 0 && timeout < interval {
@@ -495,7 +482,9 @@ func (e *engine) runAsDAG(ctx monitorContext.Context, taskRunners []types.TaskRu
 			if pending, status := tRunner.Pending(ctx, wfCtx, e.stepStatus); pending {
 				if pendingRunners {
 					wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
-					e.updateStepStatus(status)
+					if err := e.updateStepStatus(ctx, status); err != nil {
+						return err
+					}
 				}
 				pendingTasks = append(pendingTasks, tRunner)
 				continue
@@ -538,11 +527,11 @@ func (e *engine) Run(ctx monitorContext.Context, taskRunners []types.TaskRunner,
 	}
 
 	e.checkFailedAfterRetries()
-	e.setNextExecuteTime()
+	e.setNextExecuteTime(ctx)
 	return err
 }
 
-func (e *engine) checkWorkflowStatusMessage(wfStatus *v1alpha1.WorkflowRunStatus) {
+func (e *engine) checkWorkflowStatusMessage() {
 	switch {
 	case !e.waiting && e.failedAfterRetries && feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure):
 		e.status.Message = types.MessageSuspendFailedAfterRetries
@@ -561,23 +550,26 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 		}
 		if pending, status := runner.Pending(ctx, wfCtx, e.stepStatus); pending {
 			wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
-			e.updateStepStatus(status)
+			if err := e.updateStepStatus(ctx, status); err != nil {
+				return err
+			}
 			if dag {
 				continue
 			}
 			return nil
 		}
-		options := e.generateRunOptions(e.findDependPhase(taskRunners, index, dag))
+		options := e.generateRunOptions(ctx, e.findDependPhase(taskRunners, index, dag))
 
 		status, operation, err := runner.Run(wfCtx, options)
 		if err != nil {
 			return err
 		}
+		e.finishStep(operation)
+		e.checkFailedAfterRetries()
+		if err := e.updateStepStatus(ctx, status); err != nil {
+			return err
+		}
 
-		e.updateStepStatus(status)
-
-		e.failedAfterRetries = e.failedAfterRetries || operation.FailedAfterRetries
-		e.waiting = e.waiting || operation.Waiting
 		// for the suspend step with duration, there's no need to increase the backoff time in reconcile when it's still running
 		if !types.IsStepFinish(status.Phase, status.Reason) && !isWaitSuspendStep(status) {
 			if err := handleBackoffTimes(wfCtx, status, false); err != nil {
@@ -593,7 +585,6 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 			return err
 		}
 
-		e.finishStep(operation)
 		if dag {
 			continue
 		}
@@ -604,10 +595,10 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 	return nil
 }
 
-func (e *engine) generateRunOptions(dependsOnPhase v1alpha1.WorkflowStepPhase) *types.TaskRunOptions {
+func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v1alpha1.WorkflowStepPhase) *types.TaskRunOptions {
 	options := &types.TaskRunOptions{
 		GetTracer: func(id string, stepStatus v1alpha1.WorkflowStep) monitorContext.Context {
-			return e.monitorCtx.Fork(id, monitorContext.DurationMetric(func(v float64) {
+			return ctx.Fork(id, monitorContext.DurationMetric(func(v float64) {
 				metrics.WorkflowRunStepDurationHistogram.WithLabelValues("workflowrun", stepStatus.Type).Observe(v)
 			}))
 		},
@@ -678,7 +669,6 @@ type engine struct {
 	waiting            bool
 	debug              bool
 	status             *v1alpha1.WorkflowRunStatus
-	monitorCtx         monitorContext.Context
 	wfCtx              wfContext.Context
 	instance           *types.WorkflowInstance
 	cli                client.Client
@@ -686,16 +676,20 @@ type engine struct {
 	stepStatus         map[string]v1alpha1.StepStatus
 	stepTimeout        map[string]time.Time
 	stepDependsOn      map[string][]string
+	taskRunners        []types.TaskRunner
+	statusPatcher      types.StatusPatcher
 }
 
 func (e *engine) finishStep(operation *types.Operation) {
 	if operation != nil {
 		e.status.Suspend = operation.Suspend
 		e.status.Terminated = e.status.Terminated || operation.Terminated
+		e.failedAfterRetries = e.failedAfterRetries || operation.FailedAfterRetries
+		e.waiting = e.waiting || operation.Waiting
 	}
 }
 
-func (e *engine) updateStepStatus(status v1alpha1.StepStatus) {
+func (e *engine) updateStepStatus(ctx context.Context, status v1alpha1.StepStatus) error {
 	var (
 		conditionUpdated bool
 		now              = metav1.NewTime(time.Now())
@@ -748,6 +742,41 @@ func (e *engine) updateStepStatus(status v1alpha1.StepStatus) {
 		}
 	}
 	e.stepStatus[status.Name] = status
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnablePatchStatusAtOnce) {
+		isUpdate := false
+		orig := e.status.Message
+		e.status.Phase = e.checkWorkflowPhase()
+		if orig != "" && e.status.Message == "" {
+			// patch can not set empty string
+			isUpdate = true
+		}
+		return e.statusPatcher(ctx, e.status, isUpdate)
+	}
+	return nil
+}
+
+func (e *engine) checkWorkflowPhase() v1alpha1.WorkflowRunPhase {
+	status := e.status
+	e.checkWorkflowStatusMessage()
+	allRunnersDone, allRunnersSucceeded := checkRunners(e.taskRunners, e.instance.Status)
+	if status.Terminated {
+		e.cleanBackoffTimesForTerminated()
+		if checkWorkflowTerminated(status, allRunnersDone) {
+			wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
+			if isTerminatedManually(status) {
+				return v1alpha1.WorkflowStateTerminated
+			}
+			return v1alpha1.WorkflowStateFailed
+		}
+	}
+	if status.Suspend {
+		wfContext.CleanupMemoryStore(e.instance.Name, e.instance.Namespace)
+		return v1alpha1.WorkflowStateSuspending
+	}
+	if allRunnersSucceeded {
+		return v1alpha1.WorkflowStateSucceeded
+	}
+	return v1alpha1.WorkflowStateExecuting
 }
 
 func (e *engine) checkFailedAfterRetries() {
@@ -760,9 +789,6 @@ func (e *engine) checkFailedAfterRetries() {
 }
 
 func (e *engine) needStop() bool {
-	if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
-		e.checkFailedAfterRetries()
-	}
 	// if the workflow is terminated, we still need to execute all the remaining steps
 	return e.status.Suspend
 }

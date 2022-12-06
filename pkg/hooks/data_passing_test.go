@@ -110,7 +110,7 @@ func mockContext(t *testing.T) wfContext.Context {
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
 		},
-		MockUpdate: func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+		MockPatch: func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 			return nil
 		},
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
