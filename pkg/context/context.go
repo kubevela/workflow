@@ -230,7 +230,7 @@ func (wf *WorkflowContext) sync() error {
 		}
 		return err
 	}
-	return wf.cli.Patch(ctx, wf.store, client.MergeFrom(store))
+	return wf.cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy()))
 }
 
 // LoadFromConfigMap recover workflow context from configMap.
@@ -334,8 +334,8 @@ func (comp *ComponentManifest) unmarshal(v string) error {
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (Context, error) {
-	wfCtx, err := newContext(cli, ns, name, owner)
+func NewContext(ctx context.Context, cli client.Client, ns, name string, owner []metav1.OwnerReference) (Context, error) {
+	wfCtx, err := newContext(ctx, cli, ns, name, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -348,35 +348,41 @@ func CleanupMemoryStore(name, ns string) {
 	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", name, ns))
 }
 
-func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
-	var (
-		ctx   = context.Background()
-		store corev1.ConfigMap
-	)
-	store.Name = generateStoreName(name)
-	store.Namespace = ns
-	store.SetOwnerReferences(owner)
+func newContext(ctx context.Context, cli client.Client, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
+	store := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            generateStoreName(name),
+			Namespace:       ns,
+			OwnerReferences: owner,
+		},
+		Data: map[string]string{},
+	}
+
+	kindConfigMap := reflect.TypeOf(corev1.ConfigMap{}).Name()
 	if EnableInMemoryContext {
-		MemStore.GetOrCreateInMemoryContext(&store)
-	} else if err := cli.Get(ctx, client.ObjectKey{Name: store.Name, Namespace: store.Namespace}, &store); err != nil {
+		MemStore.GetOrCreateInMemoryContext(store)
+	} else if err := cli.Get(ctx, client.ObjectKey{Name: store.Name, Namespace: store.Namespace}, store); err != nil {
 		if kerrors.IsNotFound(err) {
-			if err := cli.Create(ctx, &store); err != nil {
+			if err := cli.Create(ctx, store); err != nil {
 				return nil, err
 			}
+			store.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind(kindConfigMap))
 		} else {
 			return nil, err
 		}
 	} else if !reflect.DeepEqual(store.OwnerReferences, owner) {
-		store = corev1.ConfigMap{
+		store = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            fmt.Sprintf("%s-%s", generateStoreName(name), rand.RandomString(5)),
 				Namespace:       ns,
 				OwnerReferences: owner,
 			},
+			Data: make(map[string]string),
 		}
-		if err := cli.Create(ctx, &store); err != nil {
+		if err := cli.Create(ctx, store); err != nil {
 			return nil, err
 		}
+		store.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind(kindConfigMap))
 	}
 	store.Annotations = map[string]string{
 		AnnotationStartTimestamp: time.Now().String(),
@@ -384,7 +390,7 @@ func newContext(cli client.Client, ns, name string, owner []metav1.OwnerReferenc
 	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
 		cli:         cli,
-		store:       &store,
+		store:       store,
 		memoryStore: memCache,
 		components:  map[string]*ComponentManifest{},
 		modified:    true,

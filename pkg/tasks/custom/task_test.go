@@ -788,7 +788,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 			return nil
 		},
 	}
-	wfCtx, err := wfContext.NewContext(cli, "default", "app-v1", nil)
+	wfCtx, err := wfContext.NewContext(context.Background(), cli, "default", "app-v1", nil)
 	r.NoError(err)
 	v, err := value.NewValue(`name: "app"`, nil, "")
 	r.NoError(err)
