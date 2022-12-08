@@ -129,7 +129,7 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		}
 	}
 
-	wfCtx, err := w.makeContext(w.instance.Name)
+	wfCtx, err := w.makeContext(ctx, w.instance.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
 		return v1alpha1.WorkflowStateExecuting, err
@@ -320,7 +320,7 @@ func checkRunners(taskRunners []types.TaskRunner, status v1alpha1.WorkflowRunSta
 	return true, success
 }
 
-func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
+func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfContext.Context, error) {
 	status := &w.instance.Status
 	if status.ContextBackend != nil {
 		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, w.instance.Name, w.instance.Status.ContextBackend.Name)
@@ -330,7 +330,7 @@ func (w *workflowExecutor) makeContext(name string) (wfContext.Context, error) {
 		return wfCtx, nil
 	}
 
-	wfCtx, err := wfContext.NewContext(w.cli, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
+	wfCtx, err := wfContext.NewContext(ctx, w.cli, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new context")
 	}
