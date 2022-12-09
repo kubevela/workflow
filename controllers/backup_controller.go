@@ -48,12 +48,11 @@ type BackupReconciler struct {
 
 // BackupArgs is the args for backup
 type BackupArgs struct {
-	PersistType    string
+	Persister      backup.PersistWorkflowRecord
 	BackupStrategy string
 	IgnoreStrategy string
 	GroupByLabel   string
 	CleanOnBackup  bool
-	PersistConfig  map[string][]byte
 }
 
 const (
@@ -131,9 +130,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *BackupReconciler) backup(ctx monitorContext.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
-	persister := backup.NewPersister(r.PersistType, r.PersistConfig)
-	if persister != nil {
-		if err := persister.Store(ctx, run); err != nil {
+	if r.Persister != nil {
+		if err := r.Persister.Store(ctx, run); err != nil {
 			return err
 		}
 	}

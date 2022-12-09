@@ -1,44 +1,100 @@
 package backup
 
 import (
-	"reflect"
+	"context"
 	"testing"
 
-	"github.com/kubevela/workflow/pkg/backup/sls"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestNewPersister(t *testing.T) {
-	type args struct {
+	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+	ctx := context.Background()
+	testCases := map[string]struct {
 		persistType string
-		config      map[string][]byte
-	}
-	tests := []struct {
-		name string
-		args args
-		want persistWorkflowRecord
+		configName  string
+		expectedErr string
+		secret      *corev1.Secret
 	}{
-		{
-			name: "Empty config",
-			args: args{
-				persistType: "sls",
-				config:      nil,
-			},
-			want: nil,
+		"no config": {
+			persistType: "sls",
+			configName:  "invalid",
+			expectedErr: "not found",
 		},
-		{
-			name: "Success",
-			args: args{
-				persistType: "sls",
-				config:      make(map[string][]byte),
+		"empty config": {
+			persistType: "sls",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid",
+					Namespace: "default",
+				},
 			},
-			want: &sls.Handler{},
+			configName:  "valid",
+			expectedErr: "empty config",
+		},
+		"invalid type": {
+			persistType: "invalid",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"accessKeyID": []byte("accessKeyID"),
+				},
+			},
+			configName:  "valid",
+			expectedErr: "unsupported persist type",
+		},
+		"sls-not-complete": {
+			persistType: "sls",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"accessKeyID": []byte("accessKeyID"),
+				},
+			},
+			configName:  "valid",
+			expectedErr: "invalid SLS config",
+		},
+		"sls-success": {
+			persistType: "sls",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "valid",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"AccessKeyID":     []byte("accessKeyID"),
+					"AccessKeySecret": []byte("accessKeySecret"),
+					"Endpoint":        []byte("endpoint"),
+					"ProjectName":     []byte("project"),
+					"LogStoreName":    []byte("logstore"),
+				},
+			},
+			configName: "valid",
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewPersister(tt.args.persistType, tt.args.config); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewPersister() = %v, want %v", got, tt.want)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			if tc.secret != nil {
+				r.NoError(cli.Create(ctx, tc.secret))
+				defer cli.Delete(ctx, tc.secret)
 			}
+			_, err := NewPersister(ctx, cli, tc.persistType, tc.configName, "default")
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
 		})
 	}
 }
