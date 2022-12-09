@@ -171,7 +171,7 @@ type WorkflowStepMeta struct {
 // WorkflowStepBase defines the workflow step base
 type WorkflowStepBase struct {
 	// Name is the unique name of the workflow step.
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 	// Type is the type of the workflow step.
 	Type string `json:"type"`
 	// Meta is the meta data of the workflow step.
@@ -260,7 +260,7 @@ type StepOutputs []outputItem
 type StepInputs []inputItem
 
 type inputItem struct {
-	ParameterKey string `json:"parameterKey"`
+	ParameterKey string `json:"parameterKey,omitempty"`
 	From         string `json:"from"`
 }
 

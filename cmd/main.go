@@ -21,9 +21,11 @@ import (
 	"errors"
 	goflag "flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -53,12 +55,15 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/pkg/webhook"
 	"github.com/kubevela/workflow/version"
 	//+kubebuilder:scaffold:imports
 )
 
 var (
-	scheme = runtime.NewScheme()
+	scheme             = runtime.NewScheme()
+	waitSecretTimeout  = 90 * time.Second
+	waitSecretInterval = 2 * time.Second
 )
 
 func init() {
@@ -69,9 +74,9 @@ func init() {
 }
 
 func main() {
-	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent string
+	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent, certDir string
 	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
-	var enableLeaderElection, logDebug, backupCleanOnBackup bool
+	var enableLeaderElection, useWebhook, logDebug, backupCleanOnBackup bool
 	var qps float64
 	var logFileMaxSize uint64
 	var burst, webhookPort int
@@ -93,6 +98,8 @@ func main() {
 		"The duration that the acting controlplane will retry refreshing leadership before giving up")
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", 2*time.Second,
 		"The duration the LeaderElector clients should wait between tries of actions")
+	flag.BoolVar(&useWebhook, "use-webhook", false, "Enable Admission Webhook")
+	flag.StringVar(&certDir, "webhook-cert-dir", "/k8s-webhook-server/serving-certs", "Admission webhook cert/key dir.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "admission webhook listen address")
 	flag.IntVar(&controllerArgs.ConcurrentReconciles, "concurrent-reconciles", 4, "concurrent-reconciles is the concurrent reconcile number of the controller. The default value is 4")
 	flag.BoolVar(&controllerArgs.IgnoreWorkflowWithoutControllerRequirement, "ignore-workflow-without-controller-requirement", false, "If true, workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation")
@@ -187,6 +194,7 @@ func main() {
 		RenewDeadline:              &renewDeadline,
 		RetryPeriod:                &retryPeriod,
 		NewClient:                  velaclient.DefaultNewControllerClient,
+		CertDir:                    certDir,
 	})
 	if err != nil {
 		klog.Error(err, "unable to start manager")
@@ -200,13 +208,22 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	controllerArgs.PackageDiscover = pd
+
+	if useWebhook {
+		klog.InfoS("Enable webhook", "server port", strconv.Itoa(webhookPort))
+		webhook.Register(mgr, controllerArgs)
+		if err := waitWebhookSecretVolume(certDir, waitSecretTimeout, waitSecretInterval); err != nil {
+			klog.ErrorS(err, "Unable to get webhook secret")
+			os.Exit(1)
+		}
+	}
 
 	kubeClient := mgr.GetClient()
 
 	if err = (&controllers.WorkflowRunReconciler{
 		Client:            kubeClient,
 		Scheme:            mgr.GetScheme(),
-		PackageDiscover:   pd,
 		Recorder:          event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
 		ControllerVersion: version.VelaVersion,
 		Args:              controllerArgs,
@@ -273,4 +290,51 @@ func main() {
 		klog.Flush()
 	}
 	klog.Info("Safely stops Program...")
+}
+
+// waitWebhookSecretVolume waits for webhook secret ready to avoid mgr running crash
+func waitWebhookSecretVolume(certDir string, timeout, interval time.Duration) error {
+	start := time.Now()
+	for {
+		time.Sleep(interval)
+		if time.Since(start) > timeout {
+			return fmt.Errorf("getting webhook secret timeout after %s", timeout.String())
+		}
+		klog.InfoS("Wait webhook secret", "time consumed(second)", int64(time.Since(start).Seconds()),
+			"timeout(second)", int64(timeout.Seconds()))
+		if _, err := os.Stat(certDir); !os.IsNotExist(err) {
+			ready := func() bool {
+				f, err := os.Open(filepath.Clean(certDir))
+				if err != nil {
+					return false
+				}
+				defer func() {
+					if err := f.Close(); err != nil {
+						klog.Error(err, "Failed to close file")
+					}
+				}()
+				// check if dir is empty
+				if _, err := f.Readdir(1); errors.Is(err, io.EOF) {
+					return false
+				}
+				// check if secret files are empty
+				err = filepath.Walk(certDir, func(path string, info os.FileInfo, err error) error {
+					// even Cert dir is created, cert files are still empty for a while
+					if info.Size() == 0 {
+						return errors.New("secret is not ready")
+					}
+					return nil
+				})
+				if err == nil {
+					klog.InfoS("Webhook secret is ready", "time consumed(second)",
+						int64(time.Since(start).Seconds()))
+					return true
+				}
+				return false
+			}()
+			if ready {
+				return nil
+			}
+		}
+	}
 }

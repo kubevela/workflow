@@ -66,7 +66,6 @@ spec:
                         type: string
                     required:
                     - from
-                    - parameterKey
                     type: object
                   type: array
                 meta:
@@ -117,7 +116,6 @@ spec:
                               type: string
                           required:
                           - from
-                          - parameterKey
                           type: object
                         type: array
                       meta:
@@ -153,7 +151,6 @@ spec:
                         description: Type is the type of the workflow step.
                         type: string
                     required:
-                    - name
                     - type
                     type: object
                   type: array
@@ -164,7 +161,6 @@ spec:
                   description: Type is the type of the workflow step.
                   type: string
               required:
-              - name
               - type
               type: object
             type: array
