@@ -28,10 +28,6 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,6 +44,7 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/controllers"
+	"github.com/kubevela/workflow/pkg/backup"
 	"github.com/kubevela/workflow/pkg/common"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/features"
@@ -216,18 +213,13 @@ func main() {
 	}
 
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnableBackupWorkflowRecord) {
-		configSecret := &corev1.Secret{}
-		reader := mgr.GetAPIReader()
-		if err := reader.Get(context.Background(), client.ObjectKey{
-			Name:      backupConfigSecretName,
-			Namespace: backupConfigSecretNamespace,
-		}, configSecret); err != nil && !kerrors.IsNotFound(err) {
-			klog.Error(err, "unable to find secret")
-			os.Exit(1)
+		if backupPersistType == "" {
+			klog.Warning("Backup persist type is empty, workflow record won't be persisted")
 		}
-		configData := configSecret.Data
-		if configData == nil {
-			configData = make(map[string][]byte)
+		persister, err := backup.NewPersister(context.Background(), kubeClient, backupPersistType, backupConfigSecretName, backupConfigSecretNamespace)
+		if err != nil {
+			klog.Error(err, "unable to create persister")
+			os.Exit(1)
 		}
 		if err = (&controllers.BackupReconciler{
 			Client: kubeClient,
@@ -237,8 +229,7 @@ func main() {
 				IgnoreStrategy: backupIgnoreStrategy,
 				CleanOnBackup:  backupCleanOnBackup,
 				GroupByLabel:   groupByLabel,
-				PersistType:    backupPersistType,
-				PersistConfig:  configData,
+				Persister:      persister,
 			},
 			Args: controllerArgs,
 		}).SetupWithManager(mgr); err != nil {
