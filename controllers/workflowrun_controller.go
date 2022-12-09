@@ -51,13 +51,14 @@ type Args struct {
 	ConcurrentReconciles int
 	// IgnoreWorkflowWithoutControllerRequirement indicates that workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation.
 	IgnoreWorkflowWithoutControllerRequirement bool
+	// PackageDiscover discover the packages
+	PackageDiscover *packages.PackageDiscover
 }
 
 // WorkflowRunReconciler reconciles a WorkflowRun object
 type WorkflowRunReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
-	PackageDiscover   *packages.PackageDiscover
 	Recorder          event.Recorder
 	ControllerVersion string
 	Args

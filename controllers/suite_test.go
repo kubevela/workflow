@@ -86,10 +86,12 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	reconciler = &WorkflowRunReconciler{
-		Client:          k8sClient,
-		Scheme:          testScheme,
-		PackageDiscover: pd,
-		Recorder:        event.NewAPIRecorder(recorder),
+		Client:   k8sClient,
+		Scheme:   testScheme,
+		Recorder: event.NewAPIRecorder(recorder),
+		Args: Args{
+			PackageDiscover: pd,
+		},
 	}
 
 }, 60)
