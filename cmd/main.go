@@ -32,6 +32,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	flag "github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	velaclient "github.com/kubevela/pkg/controller/client"
@@ -233,7 +236,16 @@ func main() {
 		if backupPersistType == "" {
 			klog.Warning("Backup persist type is empty, workflow record won't be persisted")
 		}
-		persister, err := backup.NewPersister(context.Background(), kubeClient, backupPersistType, backupConfigSecretName, backupConfigSecretNamespace)
+		configSecret := &corev1.Secret{}
+		reader := mgr.GetAPIReader()
+		if err := reader.Get(context.Background(), client.ObjectKey{
+			Name:      backupConfigSecretName,
+			Namespace: backupConfigSecretNamespace,
+		}, configSecret); err != nil && !kerrors.IsNotFound(err) {
+			klog.Error(err, "unable to find secret")
+			os.Exit(1)
+		}
+		persister, err := backup.NewPersister(configSecret.Data, backupPersistType)
 		if err != nil {
 			klog.Error(err, "unable to create persister")
 			os.Exit(1)

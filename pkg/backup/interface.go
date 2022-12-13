@@ -1,11 +1,7 @@
 package backup
 
 import (
-	"context"
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -18,12 +14,7 @@ const (
 )
 
 // NewPersister is a factory method for creating a persister.
-func NewPersister(ctx context.Context, cli client.Client, persistType, configName, configNamespace string) (PersistWorkflowRecord, error) {
-	secret := &corev1.Secret{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: configName, Namespace: configNamespace}, secret); err != nil {
-		return nil, err
-	}
-	config := secret.Data
+func NewPersister(config map[string][]byte, persistType string) (PersistWorkflowRecord, error) {
 	if config == nil {
 		return nil, fmt.Errorf("empty config")
 	}

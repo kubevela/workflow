@@ -178,7 +178,7 @@ func isLatestFailedRecord(ctx context.Context, cli client.Client, run *v1alpha1.
 	}
 	runs := &v1alpha1.WorkflowRunList{}
 	listOpt := &client.ListOptions{}
-	if groupByLabel != "" {
+	if groupByLabel != "" && run.Labels != nil && run.Labels[groupByLabel] != "" {
 		labels := &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				groupByLabel: run.Labels[groupByLabel],
