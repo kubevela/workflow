@@ -13,9 +13,14 @@ import (
 
 // Handler is sls config.
 type Handler struct {
-	LogStoreName string
-	ProjectName  string
-	Producer     *producer.Producer
+	LogStoreName   string
+	ProjectName    string
+	ProducerConfig *producer.ProducerConfig
+}
+
+// Callback is for sls callback
+type Callback struct {
+	ctx monitorContext.Context
 }
 
 // NewSLSHandler create a new sls handler
@@ -34,22 +39,27 @@ func NewSLSHandler(config map[string][]byte) (*Handler, error) {
 	producerConfig.AccessKeySecret = accessKeySecret
 
 	return &Handler{
-		Producer:     producer.InitProducer(producerConfig),
-		LogStoreName: logStoreName,
-		ProjectName:  projectName,
+		ProducerConfig: producerConfig,
+		LogStoreName:   logStoreName,
+		ProjectName:    projectName,
 	}, nil
+}
+
+// Fail is fail callback
+func (callback *Callback) Fail(result *producer.Result) {
+	callback.ctx.Error(fmt.Errorf("failed to send log to sls"), result.GetErrorMessage(), "errorCode", result.GetErrorCode(), "requestId", result.GetRequestId())
+}
+
+// Success is success callback
+func (callback *Callback) Success(result *producer.Result) {
 }
 
 // Store is store workflowRun to sls
 func (s *Handler) Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) error {
 	ctx.Info("Start Send workflow record to SLS")
-	s.Producer.Start()
-	defer func(producerInstance *producer.Producer, timeoutMs int64) {
-		err := producerInstance.Close(timeoutMs)
-		if err != nil {
-			ctx.Error(err, "Close SLS fail")
-		}
-	}(s.Producer, 60000)
+	p := producer.InitProducer(s.ProducerConfig)
+	p.Start()
+	defer p.SafeClose()
 
 	data, err := json.Marshal(run)
 	if err != nil {
@@ -57,8 +67,9 @@ func (s *Handler) Store(ctx monitorContext.Context, run *v1alpha1.WorkflowRun) e
 		return err
 	}
 
+	callback := &Callback{ctx: ctx}
 	log := producer.GenerateLog(uint32(time.Now().Unix()), map[string]string{"content": string(data)})
-	err = s.Producer.SendLog(s.ProjectName, s.LogStoreName, "topic", "", log)
+	err = p.SendLogWithCallBack(s.ProjectName, s.LogStoreName, "topic", "", log, callback)
 	if err != nil {
 		ctx.Error(err, "Send WorkflowRun Content to SLS fail")
 		return err

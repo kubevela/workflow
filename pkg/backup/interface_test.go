@@ -20,11 +20,6 @@ func TestNewPersister(t *testing.T) {
 		expectedErr string
 		secret      *corev1.Secret
 	}{
-		"no config": {
-			persistType: "sls",
-			configName:  "invalid",
-			expectedErr: "not found",
-		},
 		"empty config": {
 			persistType: "sls",
 			secret: &corev1.Secret{
@@ -33,7 +28,6 @@ func TestNewPersister(t *testing.T) {
 					Namespace: "default",
 				},
 			},
-			configName:  "valid",
 			expectedErr: "empty config",
 		},
 		"invalid type": {
@@ -47,7 +41,6 @@ func TestNewPersister(t *testing.T) {
 					"accessKeyID": []byte("accessKeyID"),
 				},
 			},
-			configName:  "valid",
 			expectedErr: "unsupported persist type",
 		},
 		"sls-not-complete": {
@@ -61,7 +54,6 @@ func TestNewPersister(t *testing.T) {
 					"accessKeyID": []byte("accessKeyID"),
 				},
 			},
-			configName:  "valid",
 			expectedErr: "invalid SLS config",
 		},
 		"sls-success": {
@@ -79,7 +71,6 @@ func TestNewPersister(t *testing.T) {
 					"LogStoreName":    []byte("logstore"),
 				},
 			},
-			configName: "valid",
 		},
 	}
 	for name, tc := range testCases {
@@ -89,7 +80,7 @@ func TestNewPersister(t *testing.T) {
 				r.NoError(cli.Create(ctx, tc.secret))
 				defer cli.Delete(ctx, tc.secret)
 			}
-			_, err := NewPersister(ctx, cli, tc.persistType, tc.configName, "default")
+			_, err := NewPersister(tc.secret.Data, tc.persistType)
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return

@@ -245,8 +245,8 @@ func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr
 }
 
 func (r *workflowRunPatcher) patchStatus(ctx context.Context, status *v1alpha1.WorkflowRunStatus, isUpdate bool) error {
-	wr := r.run
 	r.run.Status = *status
+	wr := r.run
 	if isUpdate {
 		if err := r.Status().Update(ctx, wr); err != nil {
 			executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
