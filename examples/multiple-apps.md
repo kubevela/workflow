@@ -1,9 +1,5 @@
 # Control the delivery process of multiple applications
 
-> Note: The example uses the following definitions, please make sure the following definitions are installed. If not, you can use `vela def apply <filename>` to install them first.
-> - [Definition `read-app`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/read-app.cue)
-> - [Definition `apply-app`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/apply-app.cue)
-
 Apply the following workflow to control the delivery process of multiple applications:
 
 ```yaml

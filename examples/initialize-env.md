@@ -1,12 +1,5 @@
 # Automatically initialize the environment with terraform
 
-> Note: The example uses the following definitions, please make sure the following definitions are installed. If not, you can use `vela def apply <filename>` to install them first.
-> - [Definition `apply-terraform-provider`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/apply-terraform-provider.cue)
-> - [Definition `apply-terraform-config`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/apply-terraform-config.cue)
-> - [Definition `vela-cli`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/veka-cli.cue)
-> - [Definition `clean-jobs`](https://github.com/kubevela/catalog/blob/master/addons/vela-workflow/definitions/clean-jobs.cue)
-> - [Definition `apply-object`](https://github.com/kubevela/kubevela/blob/master/vela-templates/definitions/internal/workflowstep/apply-object.cue)
-
 You can use Workflow together with Terraform to initialize your environment automatically.
 
 > Note: please make sure that you have enabled the KubeVela Terraform Addon first: 
