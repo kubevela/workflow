@@ -60,8 +60,9 @@ spec:
     - name: clean-cli-jobs
       type: clean-jobs
       properties:
+        namespace: vela-system
         labelSelector:
-          "workflowrun.oam.dev/step-name": apply-terraform-resource-add-cluster
+          "workflow.oam.dev/step-name": apply-terraform-resource-add-cluster
     - name: distribute-config
       type: apply-object
       properties:

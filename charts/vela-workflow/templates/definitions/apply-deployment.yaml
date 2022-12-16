@@ -13,6 +13,8 @@ spec:
     cue:
       template: |
         import (
+        	"strconv"
+        	"strings"
         	"vela/op"
         )
 
@@ -25,9 +27,9 @@ spec:
         			namespace: context.namespace
         		}
         		spec: {
-        			selector: matchLabels: wr: context.stepName
+        			selector: matchLabels: "workflow.oam.dev/step-name": "\(context.name)-\(context.stepName)"
         			template: {
-        				metadata: labels: wr: context.stepName
+        				metadata: labels: "workflow.oam.dev/step-name": "\(context.name)-\(context.stepName)"
         				spec: containers: [{
         					name:  context.stepName
         					image: parameter.image
