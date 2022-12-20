@@ -26,17 +26,17 @@ spec:
         			name:      context.name + "-" + context.stepSessionID
         			namespace: "vela-system"
         			labels: "enable-addon.oam.dev":          context.name
-        			annotations: "workflowrun.oam.dev/step": context.stepName
+        			annotations: "workflow.oam.dev/step": context.stepName
         		}
         		spec: {
         			backoffLimit: 3
         			template: {
         				metadata: {
         					labels: {
-        						"workflowrun.oam.dev/name":    context.name
-        						"workflowrun.oam.dev/session": context.stepSessionID
+        						"workflow.oam.dev/name":    context.name
+        						"workflow.oam.dev/session": context.stepSessionID
         					}
-        					annotations: "workflowrun.oam.dev/step": context.stepName
+        					annotations: "workflow.oam.dev/step": context.stepName
         				}
         				spec: {
         					containers: [
@@ -62,8 +62,8 @@ spec:
         }
         log: op.#Log & {
         	source: resources: [{labelSelector: {
-        		"workflowrun.oam.dev/name":    context.name
-        		"workflowrun.oam.dev/session": context.stepSessionID
+        		"workflow.oam.dev/name":    context.name
+        		"workflow.oam.dev/session": context.stepSessionID
         	}}]
         }
         fail: op.#Steps & {

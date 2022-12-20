@@ -10,6 +10,7 @@
 <h2 align="center">Table of Contents</h2>
 
 * [Why use KubeVela Workflow?](#why-use-kubevela-workflow)
+* [Try KubeVela Workflow](#try-kubevela-workflow)
 * [Quick Start](#quick-start)
 * [Installation](#installation)
 * [Features](#features)
@@ -32,6 +33,62 @@
 
 🔐 **Safe execution with schema checksum checking**: Every step will be checked with the schema, which means you can't run a step with a wrong parameter. This will ensure the safety of the workflow execution.
 
+<h2 align="center">Try KubeVela Workflow</h2>
+
+Run your first WorkflowRun to distribute secrets, build and push your image, and apply the resources in the cluster! Image build can take some time, you can use `vela workflow logs build-push-image --step build-push` to check the logs of building.
+
+```
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: build-push-image
+  namespace: default
+spec:
+  workflowSpec:
+   steps:
+   # or use kubectl create secret generic git-token --from-literal='GIT_TOKEN=<your-token>'
+    - name: create-git-secret
+      type: export2secret
+      properties:
+        secretName: git-secret
+        data:
+          token: <git token>
+    # or use kubectl create secret docker-registry docker-regcred \
+    # --docker-server=https://index.docker.io/v1/ \
+    # --docker-username=<your-username> \
+    # --docker-password=<your-password> 
+    - name: create-image-secret
+      type: export2secret
+      properties:
+        secretName: image-secret
+        kind: docker-registry
+        dockerRegistry:
+          username: <docker username>
+          password: <docker password>
+    - name: build-push
+      type: build-push-image
+      properties:
+        # use your kaniko executor image like below, if not set, it will use default image oamdev/kaniko-executor:v1.9.1
+        # kanikoExecutor: gcr.io/kaniko-project/executor:latest
+        # you can use context with git and branch or directly specify the context, please refer to https://github.com/GoogleContainerTools/kaniko#kaniko-build-contexts
+        context:
+          git: github.com/FogDong/simple-web-demo
+          branch: main
+        image: fogdong/simple-web-demo:v1
+        # specify your dockerfile, if not set, it will use default dockerfile ./Dockerfile
+        # dockerfile: ./Dockerfile
+        credentials:
+          image:
+            name: image-secret
+        # buildArgs:
+        #   - key="value"
+        # platform: linux/arm
+    - name: apply-deploy
+      type: apply-deployment
+      properties:
+        image: fogdong/simple-web-demo:v1
+```
+
 <h2 align="center">Quick Start</h2>
 
 After installation, you can either run a WorkflowRun directly or from a Workflow Template. Every step in the workflow should have a type and some parameters, in which defines how this step works. You can use the [built-in step type definitions](./examples/built-in-workflow-def.md) or [write your own custom step types](#how-to-write-custom-steps).
@@ -40,7 +97,7 @@ After installation, you can either run a WorkflowRun directly or from a Workflow
 
 ### Run a WorkflowRun directly
 
-Please refer to the following examples:
+For more, please refer to the following examples:
 
 - [Control the delivery process of multiple resources(e.g. your Applications)](./examples/multiple-apps.md)
 - [Request a specified URL and then use the response as a message to notify](./examples/request-and-notify.md)

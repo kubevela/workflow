@@ -69,7 +69,7 @@ spec:
         		spec: {
         			backoffLimit: 3
         			template: {
-        				labels: "workflowrun.oam.dev/step-name": "\(context.name)-\(context.stepName)"
+        				labels: "workflow.oam.dev/step-name": "\(context.name)-\(context.stepName)"
         				spec: {
         					containers: [
         						{
@@ -88,7 +88,7 @@ spec:
         	}
         }
         log: op.#Log & {
-        	source: resources: [{labelSelector: "workflowrun.oam.dev/step-name": "\(context.name)-\(context.stepName)"}]
+        	source: resources: [{labelSelector: "workflow.oam.dev/step-name": "\(context.name)-\(context.stepName)"}]
         }
         fail: op.#Steps & {
         	if job.value.status.failed != _|_ {

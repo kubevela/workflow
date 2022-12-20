@@ -83,7 +83,7 @@ spec:
       if: always
       properties:
         labelSelector:
-          "workflowrun.oam.dev/step-name": apply-terraform-resource-add-cluster
+          "workflow.oam.dev/step-name": apply-terraform-resource-add-cluster
     # apply the configmap in the created cluster
     - name: distribute-config
       type: apply-object

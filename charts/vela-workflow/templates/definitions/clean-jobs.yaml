@@ -4,9 +4,7 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
-    definition.oam.dev/description: clean workflow run applied jobs
-  labels:
-    custom.definition.oam.dev/scope: WorkflowRun
+    definition.oam.dev/description: clean applied jobs in the cluster
   name: clean-jobs
   namespace: {{ include "systemDefinitionNamespace" . }}
 spec:
@@ -17,23 +15,26 @@ spec:
         	"vela/op"
         )
 
-        parameter: labelselector?: {...}
+        parameter: {
+        	labelselector?: {...}
+        	namespace: *context.namespace | string
+        }
         cleanJobs: op.#Delete & {
         	value: {
         		apiVersion: "batch/v1"
         		kind:       "Job"
         		metadata: {
         			name:      context.name
-        			namespace: context.namespace
+        			namespace: parameter.namespace
         		}
         	}
         	filter: {
-        		namespace: context.namespace
+        		namespace: parameter.namespace
         		if parameter.labelselector != _|_ {
         			matchingLabels: parameter.labelselector
         		}
         		if parameter.labelselector == _|_ {
-        			matchingLabels: "workflowrun.oam.dev/name": context.name
+        			matchingLabels: "workflow.oam.dev/name": context.name
         		}
         	}
         }
@@ -43,16 +44,16 @@ spec:
         		kind:       "pod"
         		metadata: {
         			name:      context.name
-        			namespace: context.namespace
+        			namespace: parameter.namespace
         		}
         	}
         	filter: {
-        		namespace: context.namespace
+        		namespace: parameter.namespace
         		if parameter.labelselector != _|_ {
         			matchingLabels: parameter.labelselector
         		}
         		if parameter.labelselector == _|_ {
-        			matchingLabels: "workflowrun.oam.dev/name": context.name
+        			matchingLabels: "workflow.oam.dev/name": context.name
         		}
         	}
         }
