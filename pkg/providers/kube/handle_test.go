@@ -38,7 +38,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -61,9 +60,7 @@ var p *provider
 func TestProvider(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Test Definition Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Test Definition Suite")
 }
 
 var _ = BeforeSuite(func(done Done) {
