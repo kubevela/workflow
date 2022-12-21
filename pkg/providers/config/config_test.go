@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,9 +31,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-
-	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -49,9 +47,7 @@ var p *provider
 func TestProvider(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Test Config Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Test Config Suite")
 }
 
 var _ = BeforeSuite(func(done Done) {
