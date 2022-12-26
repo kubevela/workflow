@@ -216,9 +216,7 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	if !run.Status.EndTime.IsZero() {
 		run.Status.EndTime = metav1.Time{}
 	}
-	stepStatus := run.Status.Steps
 	mode := run.Status.Mode
-	found := false
 
 	var steps []v1alpha1.WorkflowStep
 	if run.Spec.WorkflowSpec != nil {
@@ -231,28 +229,56 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 		steps = workflow.Steps
 	}
 
+	cm := &corev1.ConfigMap{}
+	if run.Status.ContextBackend != nil {
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: run.Namespace, Name: run.Status.ContextBackend.Name}, cm); err != nil {
+			return err
+		}
+	}
+	stepStatus, cm, err := CleanStatusFromStep(steps, run.Status.Steps, mode, cm, stepName)
+	if err != nil {
+		return err
+	}
+	run.Status.Steps = stepStatus
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return cli.Status().Update(ctx, run)
+	}); err != nil {
+		return err
+	}
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return cli.Update(ctx, cm)
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CleanStatusFromStep cleans status and context data from a specified step
+func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode v1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
+	found := false
 	dependency := make([]string, 0)
 	for i, step := range stepStatus {
 		if step.Name == stepName {
 			if step.Phase != v1alpha1.WorkflowStepPhaseFailed {
-				return fmt.Errorf("can not restart from a non-failed step")
+				return nil, nil, fmt.Errorf("can not restart from a non-failed step")
 			}
-			dependency = getStepDependency(ctx, cli, steps, stepName, mode.Steps == v1alpha1.WorkflowModeDAG)
-			run.Status.Steps = deleteStepStatus(dependency, stepStatus, stepName, false)
+			dependency = getStepDependency(steps, stepName, mode.Steps == v1alpha1.WorkflowModeDAG)
+			stepStatus = deleteStepStatus(dependency, stepStatus, stepName, false)
 			found = true
 			break
 		}
 		for _, sub := range step.SubStepsStatus {
 			if sub.Name == stepName {
 				if sub.Phase != v1alpha1.WorkflowStepPhaseFailed {
-					return fmt.Errorf("can not restart from a non-failed step")
+					return nil, nil, fmt.Errorf("can not restart from a non-failed step")
 				}
-				subDependency := getStepDependency(ctx, cli, steps, stepName, mode.SubSteps == v1alpha1.WorkflowModeDAG)
-				run.Status.Steps[i].SubStepsStatus = deleteSubStepStatus(subDependency, step.SubStepsStatus, stepName)
-				run.Status.Steps[i].Phase = v1alpha1.WorkflowStepPhaseRunning
-				run.Status.Steps[i].Reason = ""
-				stepDependency := getStepDependency(ctx, cli, steps, step.Name, mode.Steps == v1alpha1.WorkflowModeDAG)
-				run.Status.Steps = deleteStepStatus(stepDependency, stepStatus, stepName, true)
+				subDependency := getStepDependency(steps, stepName, mode.SubSteps == v1alpha1.WorkflowModeDAG)
+				stepStatus[i].SubStepsStatus = deleteSubStepStatus(subDependency, step.SubStepsStatus, stepName)
+				stepStatus[i].Phase = v1alpha1.WorkflowStepPhaseRunning
+				stepStatus[i].Reason = ""
+				stepDependency := getStepDependency(steps, step.Name, mode.Steps == v1alpha1.WorkflowModeDAG)
+				stepStatus = deleteStepStatus(stepDependency, stepStatus, stepName, true)
 				dependency = mergeUniqueStringSlice(subDependency, stepDependency)
 				found = true
 				break
@@ -260,35 +286,20 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 		}
 	}
 	if !found {
-		return fmt.Errorf("failed step %s not found", stepName)
+		return nil, nil, fmt.Errorf("failed step %s not found", stepName)
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return cli.Status().Update(ctx, run)
-	}); err != nil {
-		return err
-	}
-
-	if run.Status.ContextBackend != nil {
-		cm := &corev1.ConfigMap{}
-		if err := cli.Get(ctx, client.ObjectKey{Namespace: run.Namespace, Name: run.Status.ContextBackend.Name}, cm); err != nil {
-			return err
-		}
-		v, err := value.NewValue(cm.Data[wfContext.ConfigMapKeyVars], nil, "")
+	if contextCM != nil && contextCM.Data != nil {
+		v, err := value.NewValue(contextCM.Data[wfContext.ConfigMapKeyVars], nil, "")
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 		s, err := clearContextVars(steps, v, stepName, dependency)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
-		cm.Data[wfContext.ConfigMapKeyVars] = s
-		if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			return cli.Update(ctx, cm)
-		}); err != nil {
-			return err
-		}
+		contextCM.Data[wfContext.ConfigMapKeyVars] = s
 	}
-	return nil
+	return stepStatus, contextCM, nil
 }
 
 // nolint:staticcheck
@@ -363,7 +374,7 @@ func stringsContain(items []string, source string) bool {
 	return false
 }
 
-func getStepDependency(ctx context.Context, cli client.Client, steps []v1alpha1.WorkflowStep, stepName string, dag bool) []string {
+func getStepDependency(steps []v1alpha1.WorkflowStep, stepName string, dag bool) []string {
 	if !dag {
 		dependency := make([]string, 0)
 		for i, step := range steps {
