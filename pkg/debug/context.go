@@ -38,7 +38,7 @@ type ContextImpl interface {
 type Context struct {
 	cli      client.Client
 	instance *wfTypes.WorkflowInstance
-	step     string
+	id       string
 }
 
 // Set sets debug content into context
@@ -47,7 +47,7 @@ func (d *Context) Set(v *value.Value) error {
 	if err != nil {
 		return err
 	}
-	err = setStore(context.Background(), d.cli, d.instance, d.step, data)
+	err = setStore(context.Background(), d.cli, d.instance, d.id, data)
 	if err != nil {
 		return err
 	}
@@ -55,14 +55,14 @@ func (d *Context) Set(v *value.Value) error {
 	return nil
 }
 
-func setStore(ctx context.Context, cli client.Client, instance *wfTypes.WorkflowInstance, step, data string) error {
+func setStore(ctx context.Context, cli client.Client, instance *wfTypes.WorkflowInstance, id, data string) error {
 	cm := &corev1.ConfigMap{}
 	if err := cli.Get(ctx, types.NamespacedName{
 		Namespace: instance.Namespace,
-		Name:      GenerateContextName(instance.Name, step, string(instance.UID)),
+		Name:      GenerateContextName(instance.Name, id, string(instance.UID)),
 	}, cm); err != nil {
 		if errors.IsNotFound(err) {
-			cm.Name = GenerateContextName(instance.Name, step, string(instance.UID))
+			cm.Name = GenerateContextName(instance.Name, id, string(instance.UID))
 			cm.Namespace = instance.Namespace
 			cm.Data = map[string]string{
 				"debug": data,
@@ -87,18 +87,18 @@ func setStore(ctx context.Context, cli client.Client, instance *wfTypes.Workflow
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, instance *wfTypes.WorkflowInstance, step string) ContextImpl {
+func NewContext(cli client.Client, instance *wfTypes.WorkflowInstance, id string) ContextImpl {
 	return &Context{
 		cli:      cli,
 		instance: instance,
-		step:     step,
+		id:       id,
 	}
 }
 
 // GenerateContextName generate context name
-func GenerateContextName(name, step, suffix string) string {
+func GenerateContextName(name, id, suffix string) string {
 	if len(suffix) > 5 {
 		suffix = suffix[len(suffix)-5:]
 	}
-	return fmt.Sprintf("%s-%s-debug-%s", name, step, suffix)
+	return fmt.Sprintf("%s-%s-debug-%s", name, id, suffix)
 }

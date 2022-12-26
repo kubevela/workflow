@@ -1596,11 +1596,11 @@ var _ = Describe("Test Workflow", func() {
 		By("Check debug Config Map is created")
 		debugCM := &corev1.ConfigMap{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{
-			Name:      debug.GenerateContextName(wr.Name, "step1", string(curRun.UID)),
+			Name:      debug.GenerateContextName(wr.Name, curRun.Status.Steps[0].ID, string(curRun.UID)),
 			Namespace: wr.Namespace,
 		}, debugCM)).Should(BeNil())
 		Expect(k8sClient.Get(ctx, types.NamespacedName{
-			Name:      debug.GenerateContextName(wr.Name, "step2-sub", string(curRun.UID)),
+			Name:      debug.GenerateContextName(wr.Name, curRun.Status.Steps[1].SubStepsStatus[0].ID, string(curRun.UID)),
 			Namespace: wr.Namespace,
 		}, debugCM)).Should(BeNil())
 	})
