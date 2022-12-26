@@ -304,15 +304,7 @@ func MakeBasicValue(ctx monitorContext.Context, wfCtx wfContext.Context, pd *pac
 }
 
 func getContextTemplate(ctx monitorContext.Context, wfCtx wfContext.Context, step, id string, pCtx process.Context) string {
-	var contextTempl string
-	meta, _ := wfCtx.GetVar(types.ContextKeyMetadata)
-	if meta != nil {
-		ms, err := meta.String()
-		if err != nil {
-			return ""
-		}
-		contextTempl = fmt.Sprintf("\ncontext: {%s}\ncontext: stepSessionID: \"%s\"", ms, id)
-	}
+	contextTempl := fmt.Sprintf("\ncontext: stepSessionID: \"%s\"", id)
 	if pCtx == nil {
 		return ""
 	}
