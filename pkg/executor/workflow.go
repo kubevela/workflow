@@ -18,7 +18,6 @@ package executor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
@@ -335,32 +334,11 @@ func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfCont
 		return nil, errors.WithMessage(err, "new context")
 	}
 
-	if err = w.setMetadataToContext(wfCtx); err != nil {
-		return nil, err
-	}
 	if err = wfCtx.Commit(); err != nil {
 		return nil, err
 	}
 	status.ContextBackend = wfCtx.StoreRef()
 	return wfCtx, nil
-}
-
-func (w *workflowExecutor) setMetadataToContext(wfCtx wfContext.Context) error {
-	copierMeta := types.WorkflowMeta{
-		Name:        w.instance.Name,
-		Namespace:   w.instance.Namespace,
-		Annotations: w.instance.Annotations,
-		Labels:      w.instance.Labels,
-	}
-	b, err := json.Marshal(copierMeta)
-	if err != nil {
-		return err
-	}
-	metadata, err := value.NewValue(string(b), nil, "")
-	if err != nil {
-		return err
-	}
-	return wfCtx.SetVar(metadata, types.ContextKeyMetadata)
 }
 
 func (e *engine) getBackoffTimes(stepID string) int {

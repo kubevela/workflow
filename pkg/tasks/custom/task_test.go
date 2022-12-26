@@ -790,10 +790,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	}
 	wfCtx, err := wfContext.NewContext(context.Background(), cli, "default", "app-v1", nil)
 	r.NoError(err)
-	v, err := value.NewValue(`name: "app"`, nil, "")
-	r.NoError(err)
-	r.NoError(wfCtx.SetVar(v, types.ContextKeyMetadata))
-	v, err = value.NewValue(`"yes"`, nil, "")
+	v, err := value.NewValue(`"yes"`, nil, "")
 	r.NoError(err)
 	r.NoError(wfCtx.SetVar(v, "test"))
 	v, err = value.NewValue(`{hello: "world"}`, nil, "")
@@ -848,7 +845,7 @@ ok: {
 var (
 	testCaseYaml = `apiVersion: v1
 data:
-  components: '{"server":"{\"Scopes\":null,\"StandardWorkload\":\"{\\\"apiVersion\\\":\\\"v1\\\",\\\"kind\\\":\\\"Pod\\\",\\\"metadata\\\":{\\\"labels\\\":{\\\"app\\\":\\\"nginx\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"env\\\":[{\\\"name\\\":\\\"APP\\\",\\\"value\\\":\\\"nginx\\\"}],\\\"image\\\":\\\"nginx:1.14.2\\\",\\\"imagePullPolicy\\\":\\\"IfNotPresent\\\",\\\"name\\\":\\\"main\\\",\\\"ports\\\":[{\\\"containerPort\\\":8080,\\\"protocol\\\":\\\"TCP\\\"}]}]}}\",\"Traits\":[\"{\\\"apiVersion\\\":\\\"v1\\\",\\\"kind\\\":\\\"Service\\\",\\\"metadata\\\":{\\\"name\\\":\\\"my-service\\\"},\\\"spec\\\":{\\\"ports\\\":[{\\\"port\\\":80,\\\"protocol\\\":\\\"TCP\\\",\\\"targetPort\\\":8080}],\\\"selector\\\":{\\\"app\\\":\\\"nginx\\\"}}}\"]}"}'
+  test: ""
 kind: ConfigMap
 metadata:
   name: app-v1
