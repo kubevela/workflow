@@ -653,8 +653,8 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 		PostStopHooks: []types.TaskPostStopHook{hooks.Output},
 	}
 	if e.debug {
-		options.Debug = func(step string, v *value.Value) error {
-			debugContext := debug.NewContext(e.cli, e.instance, step)
+		options.Debug = func(id string, v *value.Value) error {
+			debugContext := debug.NewContext(e.cli, e.instance, id)
 			if err := debugContext.Set(v); err != nil {
 				return err
 			}

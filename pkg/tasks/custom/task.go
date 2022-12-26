@@ -157,7 +157,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 					}
 				}
 				if options.Debug != nil {
-					if err := options.Debug(exec.wfStatus.Name, taskv); err != nil {
+					if err := options.Debug(exec.wfStatus.ID, taskv); err != nil {
 						tracer.Error(err, "failed to debug")
 					}
 				}
