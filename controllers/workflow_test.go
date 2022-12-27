@@ -228,6 +228,70 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
+	It("test workflow suspend in sub steps", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "test-wr-sub-suspend"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "group",
+					Type: "step-group",
+				},
+				SubSteps: []v1alpha1.WorkflowStepBase{
+					{
+						Name: "suspend",
+						Type: "suspend",
+					},
+					{
+						Name:       "step1",
+						Type:       "test-apply",
+						Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					},
+				},
+			}}
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		wrObj := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr.Name,
+			Namespace: wr.Namespace,
+		}, wrObj)).Should(BeNil())
+
+		Expect(wrObj.Status.Suspend).Should(BeTrue())
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(wrObj.Status.Steps[0].SubStepsStatus[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
+		Expect(wrObj.Status.Steps[0].SubStepsStatus[0].ID).ShouldNot(BeEquivalentTo(""))
+		// resume
+		wrObj.Status.Suspend = false
+		wrObj.Status.Steps[0].SubStepsStatus[0].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+		Expect(k8sClient.Status().Patch(ctx, wrObj, client.Merge)).Should(BeNil())
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr.Name,
+			Namespace: wr.Namespace,
+		}, wrObj)).Should(BeNil())
+		Expect(wrObj.Status.Suspend).Should(BeFalse())
+		expDeployment := &appsv1.Deployment{}
+		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
+		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		expDeployment.Status.Conditions = []appsv1.DeploymentCondition{{
+			Message: "hello",
+		}}
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr.Name,
+			Namespace: wr.Namespace,
+		}, wrObj)).Should(BeNil())
+		Expect(wrObj.Status.Suspend).Should(BeFalse())
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+	})
+
 	It("test workflow terminate a suspend workflow", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "test-terminate-suspend-wr"

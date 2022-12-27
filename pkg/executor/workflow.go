@@ -544,12 +544,12 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 		}
 		e.finishStep(operation)
 		e.checkFailedAfterRetries()
-		if err := e.updateStepStatus(ctx, status); err != nil {
-			return err
-		}
 
 		// for the suspend step with duration, there's no need to increase the backoff time in reconcile when it's still running
 		if !types.IsStepFinish(status.Phase, status.Reason) && !isWaitSuspendStep(status) {
+			if err := e.updateStepStatus(ctx, status); err != nil {
+				return err
+			}
 			if err := handleBackoffTimes(wfCtx, status, false); err != nil {
 				return err
 			}
@@ -560,6 +560,10 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 		}
 		// clear the backoff time when the step is finished
 		if err := handleBackoffTimes(wfCtx, status, true); err != nil {
+			return err
+		}
+		e.status.Suspend = operation.Suspend
+		if err := e.updateStepStatus(ctx, status); err != nil {
 			return err
 		}
 
@@ -660,7 +664,6 @@ type engine struct {
 
 func (e *engine) finishStep(operation *types.Operation) {
 	if operation != nil {
-		e.status.Suspend = operation.Suspend
 		e.status.Terminated = e.status.Terminated || operation.Terminated
 		e.failedAfterRetries = e.failedAfterRetries || operation.FailedAfterRetries
 		e.waiting = e.waiting || operation.Waiting
