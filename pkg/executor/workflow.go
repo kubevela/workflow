@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -320,6 +321,8 @@ func checkRunners(taskRunners []types.TaskRunner, status v1alpha1.WorkflowRunSta
 }
 
 func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfContext.Context, error) {
+	// clear the user info in context
+	ctx = request.WithUser(ctx, nil)
 	status := &w.instance.Status
 	if status.ContextBackend != nil {
 		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, w.instance.Name, w.instance.Status.ContextBackend.Name)
