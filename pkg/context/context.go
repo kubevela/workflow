@@ -221,7 +221,7 @@ func NewContext(ctx context.Context, cli client.Client, ns, name string, owner [
 		return nil, err
 	}
 
-	return wfCtx, wfCtx.Commit()
+	return wfCtx, nil
 }
 
 // CleanupMemoryStore cleans up memory store.
@@ -236,7 +236,9 @@ func newContext(ctx context.Context, cli client.Client, ns, name string, owner [
 			Namespace:       ns,
 			OwnerReferences: owner,
 		},
-		Data: map[string]string{},
+		Data: map[string]string{
+			ConfigMapKeyVars: "",
+		},
 	}
 
 	kindConfigMap := reflect.TypeOf(corev1.ConfigMap{}).Name()
@@ -258,7 +260,9 @@ func newContext(ctx context.Context, cli client.Client, ns, name string, owner [
 				Namespace:       ns,
 				OwnerReferences: owner,
 			},
-			Data: make(map[string]string),
+			Data: map[string]string{
+				ConfigMapKeyVars: "",
+			},
 		}
 		if err := cli.Create(ctx, store); err != nil {
 			return nil, err
