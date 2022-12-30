@@ -41,8 +41,13 @@ func Input(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.Workflo
 			}
 		}
 		if input.ParameterKey != "" {
-			if err := paramValue.FillValueByScript(inputValue, strings.Join([]string{"parameter", input.ParameterKey}, ".")); err != nil {
-				return err
+			if err := paramValue.SetValueByScript(inputValue, strings.Join([]string{"parameter", input.ParameterKey}, ".")); err != nil || paramValue.Error() != nil {
+				if err != nil {
+					return err
+				}
+				if paramValue.Error() != nil {
+					return paramValue.Error()
+				}
 			}
 		}
 	}
