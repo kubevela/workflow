@@ -1094,6 +1094,151 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 	}
 }
 
+func TestSetByScript(t *testing.T) {
+	testCases := []struct {
+		name     string
+		raw      string
+		path     string
+		v        string
+		expected string
+	}{
+		{
+			name: "insert array",
+			raw:  `a: ["hello"]`,
+			path: "a[0]",
+			v:    `"world"`,
+			expected: `a: ["world"]
+`},
+		{
+			name: "insert array2",
+			raw:  `a: ["hello"]`,
+			path: "a[1]",
+			v:    `"world"`,
+			expected: `a: ["hello", "world"]
+`},
+		{
+			name: "insert array3",
+			raw:  `a: b: [{x: 100}]`,
+			path: "a.b[0]",
+			v:    `{name: "foo"}`,
+			expected: `a: {
+	b: [{
+		name: "foo"
+	}]
+}
+`},
+		{
+			name: "insert struct",
+			raw:  `a: {b: "hello"}`,
+			path: "a.b",
+			v:    `"world"`,
+			expected: `a: {
+	b: "world"
+}
+`},
+		{
+			name: "insert struct2",
+			raw:  `a: {b: "hello"}, c: {d: "world"}`,
+			path: "c.d",
+			v:    `"hello"`,
+			expected: `a: {
+	b: "hello"
+}
+c: {
+	d: "hello"
+}
+`},
+		{
+			name: "insert array to array",
+			raw: `
+a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
+			path: "a.b.c[0].value",
+			v:    `"foo"`,
+			expected: `a: {
+	b: {
+		c: [{
+			x:     100
+			value: "foo"
+		}, {
+			x: 101
+		}, {
+			x: 102
+		}]
+	}
+}
+`,
+		},
+		{
+			name: "insert nest array ",
+			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
+			path: "a.b[0].x.y[0].value",
+			v:    `"foo"`,
+			expected: `a: {
+	b: [{
+		x: {
+			y: [{
+				name:  "key"
+				value: "foo"
+			}]
+		}
+	}]
+}
+`,
+		},
+		{
+			name: "insert without array",
+			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
+			path: "a.c.x",
+			v:    `"foo"`,
+			expected: `a: {
+	b: [{
+		x: {
+			y: [{
+				name: "key"
+			}]
+		}
+	}]
+	c: {
+		x: "foo"
+	}
+}
+`,
+		},
+		{
+			name: "path with string index",
+			raw:  `a: b: [{x: y:[{name: "key"}]}]`,
+			path: "a.c[\"x\"]",
+			v:    `"foo"`,
+			expected: `a: {
+	b: [{
+		x: {
+			y: [{
+				name: "key"
+			}]
+		}
+	}]
+	c: {
+		x: "foo"
+	}
+}
+`,
+		},
+	}
+
+	for _, tCase := range testCases {
+		r := require.New(t)
+		v, err := NewValue(tCase.raw, nil, "")
+		r.NoError(err)
+		val, err := v.MakeValue(tCase.v)
+		r.NoError(err)
+		err = v.SetValueByScript(val, tCase.path)
+		r.NoError(err, tCase.name)
+		s, err := v.String()
+		r.NoError(err)
+		r.Equal(s, tCase.expected, tCase.name)
+	}
+}
+
 func TestSubstituteInStruct(t *testing.T) {
 	base := `
 value: {

@@ -145,7 +145,7 @@ func TestSubstituteUnstructuredObject(t *testing.T) {
 			r := require.New(t)
 			value, err := value.NewValue(`object:{"test": "test"}`, nil, "")
 			r.NoError(err)
-			err = SubstituteUnstructuredObject(value, testcase.obj, "object")
+			err = SetUnstructuredObject(value, testcase.obj, "object")
 			r.NoError(err)
 			json, err := value.CueValue().MarshalJSON()
 			r.NoError(err)

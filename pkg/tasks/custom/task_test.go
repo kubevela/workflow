@@ -205,7 +205,7 @@ close({
 	steps := []v1alpha1.WorkflowStep{
 		{
 			WorkflowStepBase: v1alpha1.WorkflowStepBase{
-				Name: "input-err",
+				Name: "input-replace",
 				Type: "ok",
 				Properties: &runtime.RawExtension{Raw: []byte(`
 {"score": {"x": 101}}
@@ -262,11 +262,11 @@ close({
 		r.NoError(err)
 		status, operation, _ := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
-		case "input-err":
-			r.Equal(status.Message, "parameter.score.x: conflicting values 100 and 101")
+		case "input-replace":
+			r.Equal(status.Message, "")
 			r.Equal(operation.Waiting, false)
-			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)
-			r.Equal(status.Reason, types.StatusReasonInput)
+			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseSucceeded)
+			r.Equal(status.Reason, "")
 		case "input":
 			r.Equal(status.Message, "get input from [podIP]: failed to lookup value: var(path=podIP) not exist")
 			r.Equal(operation.Waiting, false)

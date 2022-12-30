@@ -328,6 +328,79 @@ func (val *Value) FillValueByScript(x *Value, path string) error {
 	return nil
 }
 
+func setValue(orig ast.Node, expr ast.Expr, selectors []cue.Selector) error {
+	if len(selectors) == 0 {
+		return nil
+	}
+	key := selectors[0]
+	selectors = selectors[1:]
+	switch x := orig.(type) {
+	case *ast.ListLit:
+		if key.Type() != cue.IndexLabel {
+			return fmt.Errorf("invalid key type %s in list lit", key.Type())
+		}
+		if len(selectors) == 0 {
+			for key.Index() >= len(x.Elts) {
+				x.Elts = append(x.Elts, ast.NewStruct())
+			}
+			x.Elts[key.Index()] = expr
+			return nil
+		}
+		return setValue(x.Elts[key.Index()], expr, selectors)
+	case *ast.StructLit:
+		if len(x.Elts) == 0 || (key.Type() == cue.StringLabel && len(sets.LookUpAll(x, key.String())) == 0) {
+			if len(selectors) == 0 {
+				x.Elts = append(x.Elts, &ast.Field{
+					Label: ast.NewString(key.String()),
+					Value: expr,
+				})
+			} else {
+				x.Elts = append(x.Elts, &ast.Field{
+					Label: ast.NewString(key.String()),
+					Value: ast.NewStruct(),
+				})
+			}
+			return setValue(x.Elts[len(x.Elts)-1].(*ast.Field).Value, expr, selectors)
+		}
+		for i := range x.Elts {
+			switch elem := x.Elts[i].(type) {
+			case *ast.Field:
+				if len(selectors) == 0 {
+					if key.Type() == cue.StringLabel && strings.Trim(sets.LabelStr(elem.Label), `"`) == strings.Trim(key.String(), `"`) {
+						x.Elts[i].(*ast.Field).Value = expr
+						return nil
+					}
+				}
+				if key.Type() == cue.StringLabel && strings.Trim(sets.LabelStr(elem.Label), `"`) == strings.Trim(key.String(), `"`) {
+					return setValue(x.Elts[i].(*ast.Field).Value, expr, selectors)
+				}
+			default:
+				return fmt.Errorf("not support type %T", elem)
+			}
+		}
+	default:
+		return fmt.Errorf("not support type %T", orig)
+	}
+	return nil
+}
+
+// SetValueByScript set the value v at the given script path.
+// nolint:staticcheck
+func (val *Value) SetValueByScript(v *Value, path ...string) error {
+	cuepath := FieldPath(path...)
+	selectors := cuepath.Selectors()
+	node := val.CueValue().Syntax(cue.ResolveReferences(true))
+	if err := setValue(node, v.CueValue().Syntax(cue.ResolveReferences(true)).(ast.Expr), selectors); err != nil {
+		return err
+	}
+	b, err := format.Node(node)
+	if err != nil {
+		return err
+	}
+	val.v = val.r.CompileBytes(b)
+	return nil
+}
+
 // CueValue return cue.Value
 func (val *Value) CueValue() cue.Value {
 	return val.v
@@ -346,6 +419,26 @@ func (val *Value) FillObject(x interface{}, paths ...string) error {
 	// do not check newV.Err() error here, because the value may be filled later
 	val.v = newV
 	return nil
+}
+
+// SetObject set the value with object x at the given path.
+func (val *Value) SetObject(x interface{}, paths ...string) error {
+	insert := &Value{
+		r: val.r,
+	}
+	switch v := x.(type) {
+	case *Value:
+		if v.r != val.r {
+			return errors.New("filled value not created with same Runtime")
+		}
+		insert.v = v.v
+	case ast.Expr:
+		cueV := val.r.BuildExpr(v)
+		insert.v = cueV
+	default:
+		return fmt.Errorf("not support type %T", x)
+	}
+	return val.SetValueByScript(insert, paths...)
 }
 
 // LookupValue reports the value at a path starting from val

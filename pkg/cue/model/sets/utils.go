@@ -70,7 +70,8 @@ func lookUp(node ast.Node, paths ...string) (ast.Node, error) {
 	return nil, notFoundErr
 }
 
-func lookUpAll(node ast.Node, paths ...string) []ast.Node {
+// LookUpAll look up all the nodes by paths
+func LookUpAll(node ast.Node, paths ...string) []ast.Node {
 	if len(paths) == 0 {
 		return []ast.Node{node}
 	}
@@ -81,7 +82,7 @@ func lookUpAll(node ast.Node, paths ...string) []ast.Node {
 		for _, decl := range x.Decls {
 			nnode := lookField(decl, key)
 			if nnode != nil {
-				nodes = append(nodes, lookUpAll(nnode, paths[1:]...)...)
+				nodes = append(nodes, LookUpAll(nnode, paths[1:]...)...)
 			}
 		}
 
@@ -89,13 +90,13 @@ func lookUpAll(node ast.Node, paths ...string) []ast.Node {
 		for _, elt := range x.Elts {
 			nnode := lookField(elt, key)
 			if nnode != nil {
-				nodes = append(nodes, lookUpAll(nnode, paths[1:]...)...)
+				nodes = append(nodes, LookUpAll(nnode, paths[1:]...)...)
 			}
 		}
 	case *ast.ListLit:
 		for index, elt := range x.Elts {
 			if strconv.Itoa(index) == key {
-				return lookUpAll(elt, paths[1:]...)
+				return LookUpAll(elt, paths[1:]...)
 			}
 		}
 	}
@@ -136,7 +137,7 @@ func doBuiltinFunc(root ast.Node, pathSel ast.Expr, do func(values []ast.Node) (
 	if len(paths) == 0 {
 		return nil, errors.New("path resolve error")
 	}
-	values := lookUpAll(root, paths...)
+	values := LookUpAll(root, paths...)
 	return do(values)
 }
 

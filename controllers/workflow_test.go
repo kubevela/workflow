@@ -361,7 +361,7 @@ var _ = Describe("Test Workflow", func() {
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
-					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox","message":"test"}`)},
 					Inputs: v1alpha1.StepInputs{
 						{
 							From:         "message",
