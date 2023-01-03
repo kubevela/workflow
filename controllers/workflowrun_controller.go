@@ -239,6 +239,7 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr *v1alpha1.WorkflowRun, condition condition.Condition) (ctrl.Result, error) {
 	wr.SetConditions(condition)
 	if err := r.Status().Patch(ctx, wr, client.Merge); err != nil {
+		executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
 		return ctrl.Result{}, errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return ctrl.Result{}, fmt.Errorf("reconcile WorkflowRun error, msg: %s", condition.Message)
