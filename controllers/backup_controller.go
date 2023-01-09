@@ -41,7 +41,8 @@ import (
 // BackupReconciler reconciles a WorkflowRun object
 type BackupReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme            *runtime.Scheme
+	ControllerVersion string
 	BackupArgs
 	Args
 }
@@ -85,6 +86,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !r.matchControllerRequirement(run) {
+		logCtx.Info("skip workflowrun: not match the controller requirement of workflowrun")
+		return ctrl.Result{}, nil
 	}
 
 	if !run.Status.Finished {
@@ -142,6 +148,18 @@ func (r *BackupReconciler) backup(ctx monitorContext.Context, cli client.Client,
 	}
 	ctx.Info("Successfully backup workflowrun", "workflowrun", run.Name)
 	return nil
+}
+
+func (r *BackupReconciler) matchControllerRequirement(wr *v1alpha1.WorkflowRun) bool {
+	if wr.Annotations != nil {
+		if requireVersion, ok := wr.Annotations[types.AnnotationControllerRequirement]; ok {
+			return requireVersion == r.ControllerVersion
+		}
+	}
+	if r.IgnoreWorkflowWithoutControllerRequirement {
+		return false
+	}
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
