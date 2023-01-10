@@ -5,33 +5,6 @@
 [![LICENSE](https://img.shields.io/github/license/kubevela/workflow.svg?style=flat-square)](/LICENSE)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/kubevela/workflow.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/kubevela/workflow/alerts/)
 
-<br/>
-<br/>
-
-## Table of Contents
-
-- [KubeVela Workflow](#kubevela-workflow)
-  - [Table of Contents](#table-of-contents)
-  - [What is KubeVela Workflow](#what-is-kubevela-workflow)
-  - [Why use KubeVela Workflow](#why-use-kubevela-workflow)
-  - [Try KubeVela Workflow](#try-kubevela-workflow)
-  - [Quick Start](#quick-start)
-    - [Run a WorkflowRun directly](#run-a-workflowrun-directly)
-    - [Run a WorkflowRun from a Workflow Template](#run-a-workflowrun-from-a-workflow-template)
-  - [Installation](#installation)
-    - [Install Workflow](#install-workflow)
-      - [Helm](#helm)
-      - [KubeVela Addon](#kubevela-addon)
-    - [Install Vela CLI(Optional)](#install-vela-clioptional)
-  - [Features](#features)
-  - [How to write custom steps](#how-to-write-custom-steps)
-  - [How can KubeVela Workflow be used](#how-can-kubevela-workflow-be-used)
-    - [As a standalone workflow engine](#as-a-standalone-workflow-engine)
-    - [As an SDK](#as-an-sdk)
-  - [Contributing](#contributing)
-
-<br/>
-<br/>
 
 ## What is KubeVela Workflow
 
