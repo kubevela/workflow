@@ -1,4 +1,4 @@
-<h1 align="center">KubeVela Workflow</h1>
+# KubeVela Workflow
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubevela/workflow)](https://goreportcard.com/report/github.com/kubevela/workflow)
 [![codecov](https://codecov.io/gh/kubevela/workflow/branch/main/graph/badge.svg)](https://codecov.io/gh/kubevela/workflow)
@@ -7,21 +7,45 @@
 
 <br/>
 <br/>
-<h2 align="center">Table of Contents</h2>
 
-* [Why use KubeVela Workflow?](#why-use-kubevela-workflow)
-* [Try KubeVela Workflow](#try-kubevela-workflow)
-* [Quick Start](#quick-start)
-* [Installation](#installation)
-* [Features](#features)
-* [How to write custom steps?](#how-to-write-custom-steps)
-* [How can KubeVela Workflow be used?](#how-can-kubevela-workflow-be-used)
-* [Contributing](#contributing)
+## Table of Contents
+
+- [KubeVela Workflow](#kubevela-workflow)
+  - [Table of Contents](#table-of-contents)
+  - [What is KubeVela Workflow](#what-is-kubevela-workflow)
+  - [Why use KubeVela Workflow](#why-use-kubevela-workflow)
+  - [Try KubeVela Workflow](#try-kubevela-workflow)
+  - [Quick Start](#quick-start)
+    - [Run a WorkflowRun directly](#run-a-workflowrun-directly)
+    - [Run a WorkflowRun from a Workflow Template](#run-a-workflowrun-from-a-workflow-template)
+  - [Installation](#installation)
+    - [Install Workflow](#install-workflow)
+      - [Helm](#helm)
+      - [KubeVela Addon](#kubevela-addon)
+    - [Install Vela CLI(Optional)](#install-vela-clioptional)
+  - [Features](#features)
+  - [How to write custom steps](#how-to-write-custom-steps)
+  - [How can KubeVela Workflow be used](#how-can-kubevela-workflow-be-used)
+    - [As a standalone workflow engine](#as-a-standalone-workflow-engine)
+    - [As an SDK](#as-an-sdk)
+  - [Contributing](#contributing)
 
 <br/>
 <br/>
 
-<h2 align="center">Why use KubeVela Workflow</h2>
+## What is KubeVela Workflow
+
+KubeVela Workflow is an open-source cloud-native workflow project that can use to orchestrate CI/CD process, terraform resources, multi-kubernetes-clusters management and even your own functional calls.
+
+You can [install](#installation) KubeVela Workflow and use it, or import the code as an [sdk](#how-can-kubevela-workflow-be-used) of an IaC-based workflow engine in your own repository.
+
+*The main differences between KubeVela Workflow and other cloud-native workflows are*:
+
+All the steps in the workflow is based on IaC(Cue): every step has a `type` for abstract and reuse, the `step-type` is programmed in [CUE](https://cuelang.org/) language and easy to customize. 
+
+That is to say, **you can use atomic capabilities like a function call in every step, instead of just creating a pod.**
+
+## Why use KubeVela Workflow
 
 <h1 align="center"><a href="https://kubevela.io/docs/end-user/pipeline/workflowrun"><img src="https://static.kubevela.net/images/1.6/workflow-arch.png" alt="workflow arch" align="center" width="700px" /></a></h1>
 
@@ -33,7 +57,7 @@
 
 🔐 **Safe execution with schema checksum checking**: Every step will be checked with the schema, which means you can't run a step with a wrong parameter. This will ensure the safety of the workflow execution.
 
-<h2 align="center">Try KubeVela Workflow</h2>
+## Try KubeVela Workflow
 
 Run your first WorkflowRun to distribute secrets, build and push your image, and apply the resources in the cluster! Image build can take some time, you can use `vela workflow logs build-push-image --step build-push` to check the logs of building.
 
@@ -89,7 +113,7 @@ spec:
         image: fogdong/simple-web-demo:v1
 ```
 
-<h2 align="center">Quick Start</h2>
+## Quick Start
 
 After installation, you can either run a WorkflowRun directly or from a Workflow Template. Every step in the workflow should have a type and some parameters, in which defines how this step works. You can use the [built-in step type definitions](./examples/built-in-workflow-def.md) or [write your own custom step types](#how-to-write-custom-steps).
 
@@ -109,7 +133,7 @@ Please refer to the following examples:
 
 - [Run the Workflow Template with different context to control the process](./examples/run-with-template.md)
 
-<h2 align="center">Installation</h2>
+## Installation
 
 ### Install Workflow
 
@@ -135,7 +159,7 @@ Please checkout: [Install Vela CLI](https://kubevela.io/docs/installation/kubern
 
 > Note that if you installed Workflow using KubeVela Addon, then the definitions in the addon will be installed automatically.
 
-<h2 align="center">Features</h2>
+## Features
 
 - [Operate WorkflowRun](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#operate-workflowrun)
 - [Suspend and Resume](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#suspend-and-resume)
@@ -147,7 +171,7 @@ Please checkout: [Install Vela CLI](https://kubevela.io/docs/installation/kubern
 - [Custom Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#custom-context-data)
 - [Built-in Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#built-in-context-data)
 
-<h2 align="center">How to write custom steps</h2>
+## How to write custom steps
 
 If you're not familiar with CUE, please checkout the [CUE documentation](https://kubevela.io/docs/platform-engineers/cue/basic) first.
 
@@ -155,7 +179,7 @@ You can customize your steps with CUE and some [built-in operations](https://kub
 
 > Note that you cannot use the [application operations](https://kubevela.io/docs/next/platform-engineers/workflow/cue-actions#application-operations) since there're no application data like components/traits/policy in the WorkflowRun.
 
-<h2 align="center">How can KubeVela Workflow be used</h2>
+## How can KubeVela Workflow be used
 
 During the evolution of the [OAM](https://oam.dev/) and [KubeVela project](https://github.com/kubevela/kubevela), **workflow**, as an important part to control the delivery process, has gradually matured. Therefore, we separated the workflow code from the KubeVela repository to make it standalone. As a general workflow engine, it can be used directly or as an SDK by other projects.
 
@@ -172,6 +196,6 @@ You can use KubeVela Workflow as an SDK to integrate it into your project. For e
 
 You just need to initialize a workflow instance and generate all the task runners with the instance, then execute the task runners. Please check out the example in [Workflow](https://github.com/kubevela/workflow/blob/main/controllers/workflowrun_controller.go#L101) or [KubeVela](https://github.com/kubevela/kubevela/blob/master/pkg/controller/core.oam.dev/v1alpha2/application/application_controller.go#L197).
 
-<h2 align="center">Contributing</h2>
+## Contributing
 
 Check out [CONTRIBUTING](https://kubevela.io/docs/contributor/overview) to see how to develop with KubeVela Workflow.
