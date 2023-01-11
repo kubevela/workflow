@@ -337,9 +337,6 @@ func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfCont
 		return nil, errors.WithMessage(err, "new context")
 	}
 
-	if err = wfCtx.Commit(); err != nil {
-		return nil, err
-	}
 	status.ContextBackend = wfCtx.StoreRef()
 	return wfCtx, nil
 }
