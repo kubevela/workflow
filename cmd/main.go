@@ -251,8 +251,9 @@ func main() {
 			os.Exit(1)
 		}
 		if err = (&controllers.BackupReconciler{
-			Client: kubeClient,
-			Scheme: mgr.GetScheme(),
+			Client:            kubeClient,
+			Scheme:            mgr.GetScheme(),
+			ControllerVersion: version.VelaVersion,
 			BackupArgs: controllers.BackupArgs{
 				BackupStrategy: backupStrategy,
 				IgnoreStrategy: backupIgnoreStrategy,
