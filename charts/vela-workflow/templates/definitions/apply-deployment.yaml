@@ -42,7 +42,7 @@ spec:
         	}
         }
         wait: op.#ConditionalWait & {
-        	continue: output.value.status.readyReplicas == 1
+        	continue: output.value.status != _|_ && output.value.status.updatedReplicas == output.value.status.availableReplicas && output.value.status.observedGeneration == output.value.metadata.generation
         }
         parameter: {
         	image: string
