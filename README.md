@@ -130,8 +130,6 @@ vela addon enable vela-workflow
 
 Please checkout: [Install Vela CLI](https://kubevela.io/docs/installation/kubernetes#install-vela-cli)
 
-> Note that if you installed Workflow using KubeVela Addon, then the definitions in the addon will be installed automatically.
-
 ## Features
 
 - [Operate WorkflowRun](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#operate-workflowrun)
