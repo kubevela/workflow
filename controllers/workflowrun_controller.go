@@ -175,7 +175,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, patcher.patchStatus(logCtx, &run.Status, isUpdate)
 	case v1alpha1.WorkflowStateSkipped:
 		logCtx.Info("Skip this reconcile")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: executor.GetBackoffWaitTime()}, nil
 	}
 
 	return ctrl.Result{}, nil
