@@ -142,7 +142,12 @@ Please checkout: [Install Vela CLI](https://kubevela.io/docs/installation/kubern
 - [Custom Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#custom-context-data)
 - [Built-in Context Data](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#built-in-context-data)
 
-## How to write custom steps
+## Step Types
+
+### Built-in Step Types
+
+Please checkout the [built-in step definitions](https://kubevela.io/docs/next/end-user/workflow/built-in-workflow-defs) with scope that valid in `WorkflowRun`.
+### Write Your Custom Step Types
 
 If you're not familiar with CUE, please checkout the [CUE documentation](https://kubevela.io/docs/platform-engineers/cue/basic) first.
 
