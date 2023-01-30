@@ -119,19 +119,19 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 
-	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
-		// handle cache resource
-		if len(status.Steps) < cacheValue.(int) {
-			return v1alpha1.WorkflowStateSkipped, nil
-		}
-	}
-
 	wfCtx, err := w.makeContext(w.instance.Name)
 	if err != nil {
 		ctx.Error(err, "make context")
 		return v1alpha1.WorkflowStateExecuting, err
 	}
 	w.wfCtx = wfCtx
+
+	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
+		// handle cache resource
+		if len(status.Steps) < cacheValue.(int) {
+			return v1alpha1.WorkflowStateSkipped, nil
+		}
+	}
 
 	e := newEngine(ctx, wfCtx, w, status)
 
