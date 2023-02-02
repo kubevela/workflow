@@ -259,11 +259,13 @@ type StepOutputs []OutputItem
 // StepInputs defines variable input of WorkflowStep
 type StepInputs []InputItem
 
+// InputItem defines an input variable of WorkflowStep
 type InputItem struct {
 	ParameterKey string `json:"parameterKey,omitempty"`
 	From         string `json:"from"`
 }
 
+// OutputItem defines an output variable of WorkflowStep
 type OutputItem struct {
 	ValueFrom string `json:"valueFrom"`
 	Name      string `json:"name"`
