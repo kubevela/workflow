@@ -254,17 +254,17 @@ const (
 )
 
 // StepOutputs defines output variable of WorkflowStep
-type StepOutputs []outputItem
+type StepOutputs []OutputItem
 
 // StepInputs defines variable input of WorkflowStep
-type StepInputs []inputItem
+type StepInputs []InputItem
 
-type inputItem struct {
+type InputItem struct {
 	ParameterKey string `json:"parameterKey,omitempty"`
 	From         string `json:"from"`
 }
 
-type outputItem struct {
+type OutputItem struct {
 	ValueFrom string `json:"valueFrom"`
 	Name      string `json:"name"`
 }
