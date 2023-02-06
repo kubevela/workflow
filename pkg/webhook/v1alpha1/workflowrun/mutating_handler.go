@@ -69,7 +69,7 @@ func (h *MutatingHandler) InjectDecoder(d *admission.Decoder) error {
 	return nil
 }
 
-// RegisterMutatingHandler will register component mutation handler to the webhook
+// RegisterMutatingHandler will register workflow mutation handler to the webhook
 func RegisterMutatingHandler(mgr manager.Manager) {
 	server := mgr.GetWebhookServer()
 	handler := &MutatingHandler{}
