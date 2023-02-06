@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/kubevela/pkg/controller/sharding"
 	flag "github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -119,6 +120,7 @@ func main() {
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
+	sharding.AddControllerFlags(flag.CommandLine)
 
 	// setup logging
 	klog.InitFlags(nil)
@@ -182,6 +184,7 @@ func main() {
 	restConfig.UserAgent = userAgent
 
 	leaderElectionID := fmt.Sprintf("workflow-%s", strings.ToLower(strings.ReplaceAll(version.VelaVersion, ".", "-")))
+	leaderElectionID += sharding.GetShardIDSuffix()
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                     scheme,
 		MetricsBindAddress:         metricsAddr,
@@ -194,6 +197,7 @@ func main() {
 		RenewDeadline:              &renewDeadline,
 		RetryPeriod:                &retryPeriod,
 		NewClient:                  velaclient.DefaultNewControllerClient,
+		NewCache:                   sharding.BuildCache(scheme, &v1alpha1.WorkflowRun{}),
 		CertDir:                    certDir,
 	})
 	if err != nil {
