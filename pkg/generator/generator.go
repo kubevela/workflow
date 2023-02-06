@@ -28,12 +28,13 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/util/rand"
 
+	"github.com/oam-dev/kubevela/pkg/config/provider"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
-	"github.com/kubevela/workflow/pkg/providers/config"
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/http"
 	"github.com/kubevela/workflow/pkg/providers/kube"
@@ -158,7 +159,7 @@ func installBuiltinProviders(instance *types.WorkflowInstance, client client.Cli
 	email.Install(providerHandlers)
 	util.Install(providerHandlers, pCtx)
 	http.Install(providerHandlers, client, instance.Namespace)
-	config.Install(providerHandlers, client)
+	provider.Install(providerHandlers, client, nil)
 	kube.Install(providerHandlers, client, map[string]string{
 		types.LabelWorkflowRunName:      instance.Name,
 		types.LabelWorkflowRunNamespace: instance.Namespace,
