@@ -27,12 +27,18 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	ctrlEvent "sigs.k8s.io/controller-runtime/pkg/event"
+	ctrlHandler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	triggerv1alpha1 "github.com/kubevela/kube-trigger/api/v1alpha1"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/condition"
@@ -40,6 +46,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/executor"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/generator"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/types"
@@ -195,7 +202,13 @@ func (r *WorkflowRunReconciler) matchControllerRequirement(wr *v1alpha1.Workflow
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	builder := ctrl.NewControllerManagedBy(mgr)
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableWatchEventListener) {
+		builder = builder.Watches(&source.Kind{
+			Type: &triggerv1alpha1.EventListener{},
+		}, ctrlHandler.EnqueueRequestsFromMapFunc(findObjectForEventListener))
+	}
+	return builder.
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.ConcurrentReconciles,
 		}).
@@ -203,8 +216,13 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// filter the changes in workflow status
 			// let workflow handle its reconcile
 			UpdateFunc: func(e ctrlEvent.UpdateEvent) bool {
-				new := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
-				old := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				new, isNewWR := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				old, isOldWR := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
+
+				// if the object is a event listener, reconcile the controller
+				if !isNewWR || !isOldWR {
+					return true
+				}
 
 				// if the workflow is finished, skip the reconcile
 				if new.Status.Finished {
@@ -277,4 +295,10 @@ func timeReconcile(wr *v1alpha1.WorkflowRun) func() {
 		v := time.Since(t).Seconds()
 		metrics.WorkflowRunReconcileTimeHistogram.WithLabelValues(beginPhase, string(wr.Status.Phase)).Observe(v)
 	}
+}
+
+func findObjectForEventListener(object client.Object) []reconcile.Request {
+	return []reconcile.Request{{
+		NamespacedName: k8stypes.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()},
+	}}
 }
