@@ -38,12 +38,14 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 
 ### KubeVela workflow parameters
 
-| Name                                   | Description                                            | Value   |
-| -------------------------------------- | ------------------------------------------------------ | ------- |
-| `workflow.enableSuspendOnFailure`      | Enable suspend on workflow failure                     | `false` |
-| `workflow.backoff.maxTime.waitState`   | The max backoff time of workflow in a wait condition   | `60`    |
-| `workflow.backoff.maxTime.failedState` | The max backoff time of workflow in a failed condition | `300`   |
-| `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step          | `10`    |
+| Name                                   | Description                                                                                                                                                                            | Value   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `workflow.enableSuspendOnFailure`      | Enable the capability of suspend an failed workflow automatically                                                                                                                      | `false` |
+| `workflow.enablePatchStatusAtOnce`     | Enable the capability of patch status at once                                                                                                                                          | `false` |
+| `workflow.enableWatchEventListener`    | Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature | `false` |
+| `workflow.backoff.maxTime.waitState`   | The max backoff time of workflow in a wait condition                                                                                                                                   | `60`    |
+| `workflow.backoff.maxTime.failedState` | The max backoff time of workflow in a failed condition                                                                                                                                 | `300`   |
+| `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step                                                                                                                                          | `10`    |
 
 
 ### KubeVela workflow backup parameters
