@@ -41,7 +41,7 @@ import (
 // WorkflowOperator is operation handler for workflow's suspend/resume/rollback/restart/terminate
 type WorkflowOperator interface {
 	Suspend(ctx context.Context) error
-	Resume(ctx context.Context) error
+	Resume(ctx context.Context, step string) error
 	Rollback(ctx context.Context) error
 	Restart(ctx context.Context, step string) error
 	Terminate(ctx context.Context) error
@@ -81,14 +81,14 @@ func (wo workflowRunOperator) Suspend(ctx context.Context) error {
 }
 
 // Resume resume a suspended workflow
-func (wo workflowRunOperator) Resume(ctx context.Context) error {
+func (wo workflowRunOperator) Resume(ctx context.Context, step string) error {
 	run := wo.run
 	if run.Status.Terminated {
 		return fmt.Errorf("can not resume a terminated workflow")
 	}
 
 	if run.Status.Suspend {
-		if err := ResumeWorkflow(ctx, wo.cli, run); err != nil {
+		if err := ResumeWorkflow(ctx, wo.cli, run, step); err != nil {
 			return err
 		}
 	}
@@ -96,18 +96,35 @@ func (wo workflowRunOperator) Resume(ctx context.Context) error {
 }
 
 // ResumeWorkflow resume workflow
-func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun, stepName string) error {
 	run.Status.Suspend = false
 	steps := run.Status.Steps
+	found := stepName == ""
+
 	for i, step := range steps {
 		if step.Type == wfTypes.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning {
-			steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+			if stepName == "" {
+				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+			} else if stepName == step.Name {
+				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				found = true
+				break
+			}
 		}
 		for j, sub := range step.SubStepsStatus {
 			if sub.Type == wfTypes.WorkflowStepTypeSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
-				steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				if stepName == "" {
+					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				} else if stepName == sub.Name {
+					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+					found = true
+					break
+				}
 			}
 		}
+	}
+	if !found {
+		return fmt.Errorf("can not find step %s", stepName)
 	}
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)

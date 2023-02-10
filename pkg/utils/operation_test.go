@@ -227,8 +227,10 @@ func TestResumeWorkflowRun(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := map[string]struct {
-		run      *v1alpha1.WorkflowRun
-		expected *v1alpha1.WorkflowRun
+		run         *v1alpha1.WorkflowRun
+		step        string
+		expected    *v1alpha1.WorkflowRun
+		expectedErr string
 	}{
 		"not suspend": {
 			run: &v1alpha1.WorkflowRun{
@@ -257,6 +259,18 @@ func TestResumeWorkflowRun(t *testing.T) {
 					Suspend: false,
 				},
 			},
+		},
+		"step not found": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+				},
+			},
+			step:        "not-found",
+			expectedErr: "can not find step not-found",
 		},
 		"suspend step": {
 			run: &v1alpha1.WorkflowRun{
@@ -300,6 +314,100 @@ func TestResumeWorkflowRun(t *testing.T) {
 				},
 			},
 		},
+		"resume the specific step": {
+			step: "step1",
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resume-specific-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step2",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step2",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+						},
+					},
+				},
+			},
+		},
+		"resume the specific sub step": {
+			step: "sub-step1",
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "resume-specific-sub-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub-step1",
+									Type:  wfTypes.WorkflowStepTypeSuspend,
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Type:  wfTypes.WorkflowStepTypeSuspend,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub-step1",
+									Type:  wfTypes.WorkflowStepTypeSuspend,
+									Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -311,13 +419,18 @@ func TestResumeWorkflowRun(t *testing.T) {
 				r.NoError(err)
 			}()
 			operator := NewWorkflowRunOperator(cli, nil, tc.run)
-			err = operator.Resume(ctx)
+			err = operator.Resume(ctx, tc.step)
+			if tc.expectedErr != "" {
+				r.Error(err)
+				r.Equal(tc.expectedErr, err.Error())
+				return
+			}
 			r.NoError(err)
 			run := &v1alpha1.WorkflowRun{}
 			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
 			r.NoError(err)
 			r.Equal(false, run.Status.Suspend)
-			r.Equal(tc.expected.Status, run.Status)
+			r.Equal(tc.expected.Status, run.Status, name)
 		})
 	}
 }
