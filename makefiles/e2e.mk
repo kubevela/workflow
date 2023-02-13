@@ -12,7 +12,8 @@ e2e-setup-controller:
 		--set image.tag=latest      								\
 		--set image.pullPolicy=IfNotPresent         \
 		--wait vela-workflow                        \
-		./charts/vela-workflow
+		./charts/vela-workflow											\
+		--debug
 
 .PHONY: end-e2e
 end-e2e:

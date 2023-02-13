@@ -418,12 +418,22 @@ func TestResumeWorkflowRun(t *testing.T) {
 				err = cli.Delete(ctx, tc.run)
 				r.NoError(err)
 			}()
-			operator := NewWorkflowRunOperator(cli, nil, tc.run)
-			err = operator.Resume(ctx, tc.step)
-			if tc.expectedErr != "" {
-				r.Error(err)
-				r.Equal(tc.expectedErr, err.Error())
-				return
+			if tc.step == "" {
+				operator := NewWorkflowRunOperator(cli, nil, tc.run)
+				err = operator.Resume(ctx)
+				if tc.expectedErr != "" {
+					r.Error(err)
+					r.Equal(tc.expectedErr, err.Error())
+					return
+				}
+			} else {
+				operator := NewWorkflowRunStepOperator(cli, nil, tc.run)
+				err = operator.Resume(ctx, tc.step)
+				if tc.expectedErr != "" {
+					r.Error(err)
+					r.Equal(tc.expectedErr, err.Error())
+					return
+				}
 			}
 			r.NoError(err)
 			run := &v1alpha1.WorkflowRun{}
@@ -1037,13 +1047,23 @@ func TestRestartRunStep(t *testing.T) {
 					r.NoError(err)
 				}()
 			}
-			operator := NewWorkflowRunOperator(cli, nil, tc.run)
-			err = operator.Restart(ctx, tc.stepName)
-			if tc.expectedErr != "" {
-				r.Contains(err.Error(), tc.expectedErr)
-				return
+			if tc.stepName == "" {
+				operator := NewWorkflowRunOperator(cli, nil, tc.run)
+				err = operator.Restart(ctx)
+				if tc.expectedErr != "" {
+					r.Contains(err.Error(), tc.expectedErr)
+					return
+				}
+				r.NoError(err)
+			} else {
+				operator := NewWorkflowRunStepOperator(cli, nil, tc.run)
+				err = operator.Restart(ctx, tc.stepName)
+				if tc.expectedErr != "" {
+					r.Contains(err.Error(), tc.expectedErr)
+					return
+				}
+				r.NoError(err)
 			}
-			r.NoError(err)
 			run := &v1alpha1.WorkflowRun{}
 			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
 			r.NoError(err)

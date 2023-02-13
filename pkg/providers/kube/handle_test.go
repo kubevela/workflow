@@ -192,6 +192,25 @@ patch: {
 		sub, err := v.LookupValue("value")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(sub.Error()).To(BeNil())
+		v, err = v.MakeValue(`
+		cluster: ""
+		patch: {
+			metadata: name: "test-app-1"
+			spec: {
+				containers: [{
+					// +patchStrategy=retainKeys
+					image: "nginx:latest"
+				}]
+			}
+		}`)
+		Expect(err).ToNot(HaveOccurred())
+		err = v.FillObject(sub, "value")
+		Expect(err).ToNot(HaveOccurred())
+		err = p.Apply(mCtx, ctx, v, nil)
+		Expect(err).ToNot(HaveOccurred())
+		sub2, err := v.LookupValue("value")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(sub2.Error()).To(BeNil())
 
 		pod := &corev1.Pod{}
 		Expect(err).ToNot(HaveOccurred())
