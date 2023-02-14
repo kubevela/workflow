@@ -109,6 +109,11 @@ spec:
           securityContext:
           {{- toYaml .Values.securityContext | nindent 12 }}
           args:
+            - "-test.coverprofile=/workspace/data/e2e-profile.out"
+            - "__DEVEL__E2E"
+            - "-test.run=E2EMain"
+            - "-test.coverpkg=$(go list ./pkg/...| tr '
+' ','| sed 's/,$//g')"
             {{ if .Values.admissionWebhooks.enabled }}
             - "--use-webhook=true"
             - "--webhook-port={{ .Values.webhookService.port }}"
@@ -132,8 +137,8 @@ spec:
             - "--max-workflow-wait-backoff-time={{ .Values.workflow.backoff.maxTime.waitState }}"
             - "--max-workflow-failed-backoff-time={{ .Values.workflow.backoff.maxTime.failedState }}"
             - "--max-workflow-step-error-retry-times={{ .Values.workflow.step.errorRetryTimes }}"
-            - "--feature-gates=EnableWatchEventListener={{- .Values.enableWatchEventListener | toString -}}"
-            - "--feature-gates=EnablePatchStatusAtOnce={{- .Values.enablePatchStatusAtOnce | toString -}}"
+            - "--feature-gates=EnableWatchEventListener={{- .Values.workflow.enableWatchEventListener | toString -}}"
+            - "--feature-gates=EnablePatchStatusAtOnce={{- .Values.workflow.enablePatchStatusAtOnce | toString -}}"
             - "--feature-gates=EnableSuspendOnFailure={{- .Values.workflow.enableSuspendOnFailure | toString -}}"
             - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
             {{ if .Values.backup.enable }}

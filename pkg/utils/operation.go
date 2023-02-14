@@ -43,8 +43,14 @@ type WorkflowOperator interface {
 	Suspend(ctx context.Context) error
 	Resume(ctx context.Context) error
 	Rollback(ctx context.Context) error
-	Restart(ctx context.Context, step string) error
+	Restart(ctx context.Context) error
 	Terminate(ctx context.Context) error
+}
+
+// WorkflowStepOperator is operation handler for workflow steps' operations
+type WorkflowStepOperator interface {
+	Resume(ctx context.Context, step string) error
+	Restart(ctx context.Context, step string) error
 }
 
 type workflowRunOperator struct {
@@ -53,9 +59,24 @@ type workflowRunOperator struct {
 	run          *v1alpha1.WorkflowRun
 }
 
-// NewWorkflowRunOperator get an workflow operator with k8sClient, ioWriter(optional, useful for cli) and application
+type workflowRunStepOperator struct {
+	cli          client.Client
+	outputWriter io.Writer
+	run          *v1alpha1.WorkflowRun
+}
+
+// NewWorkflowRunOperator get an workflow operator with k8sClient, ioWriter(optional, useful for cli) and workflow run
 func NewWorkflowRunOperator(cli client.Client, w io.Writer, run *v1alpha1.WorkflowRun) WorkflowOperator {
 	return workflowRunOperator{
+		cli:          cli,
+		outputWriter: w,
+		run:          run,
+	}
+}
+
+// NewWorkflowRunStepOperator get an workflow step operator with k8sClient, ioWriter(optional, useful for cli) and workflow run
+func NewWorkflowRunStepOperator(cli client.Client, w io.Writer, run *v1alpha1.WorkflowRun) WorkflowStepOperator {
+	return workflowRunStepOperator{
 		cli:          cli,
 		outputWriter: w,
 		run:          run,
@@ -77,7 +98,7 @@ func (wo workflowRunOperator) Suspend(ctx context.Context) error {
 		return err
 	}
 
-	return wo.writeOutputF("Successfully suspend workflow: %s\n", run.Name)
+	return writeOutputF(wo.outputWriter, "Successfully suspend workflow: %s\n", run.Name)
 }
 
 // Resume resume a suspended workflow
@@ -88,26 +109,61 @@ func (wo workflowRunOperator) Resume(ctx context.Context) error {
 	}
 
 	if run.Status.Suspend {
-		if err := ResumeWorkflow(ctx, wo.cli, run); err != nil {
+		if err := ResumeWorkflow(ctx, wo.cli, run, ""); err != nil {
 			return err
 		}
 	}
-	return wo.writeOutputF("Successfully resume workflow: %s\n", run.Name)
+	return writeOutputF(wo.outputWriter, "Successfully resume workflow: %s\n", run.Name)
+}
+
+// Resume resume a suspended workflow from a specific step
+func (wo workflowRunStepOperator) Resume(ctx context.Context, step string) error {
+	if step == "" {
+		return fmt.Errorf("step can not be empty")
+	}
+	run := wo.run
+	if run.Status.Terminated {
+		return fmt.Errorf("can not resume a terminated workflow")
+	}
+
+	if run.Status.Suspend {
+		if err := ResumeWorkflow(ctx, wo.cli, run, step); err != nil {
+			return err
+		}
+	}
+	return writeOutputF(wo.outputWriter, "Successfully resume workflow %s from step %s\n", run.Name, step)
 }
 
 // ResumeWorkflow resume workflow
-func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun, stepName string) error {
 	run.Status.Suspend = false
 	steps := run.Status.Steps
+	found := stepName == ""
+
 	for i, step := range steps {
 		if step.Type == wfTypes.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning {
-			steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+			if stepName == "" {
+				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+			} else if stepName == step.Name {
+				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				found = true
+				break
+			}
 		}
 		for j, sub := range step.SubStepsStatus {
 			if sub.Type == wfTypes.WorkflowStepTypeSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
-				steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				if stepName == "" {
+					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				} else if stepName == sub.Name {
+					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+					found = true
+					break
+				}
 			}
 		}
+	}
+	if !found {
+		return fmt.Errorf("can not find step %s", stepName)
 	}
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
@@ -123,12 +179,24 @@ func (wo workflowRunOperator) Rollback(ctx context.Context) error {
 }
 
 // Restart restart workflow
-func (wo workflowRunOperator) Restart(ctx context.Context, step string) error {
+func (wo workflowRunOperator) Restart(ctx context.Context) error {
+	run := wo.run
+	if err := RestartWorkflow(ctx, wo.cli, run, ""); err != nil {
+		return err
+	}
+	return writeOutputF(wo.outputWriter, "Successfully restart workflow: %s\n", run.Name)
+}
+
+// Restart restart workflow from a specific step
+func (wo workflowRunStepOperator) Restart(ctx context.Context, step string) error {
+	if step == "" {
+		return fmt.Errorf("step can not be empty")
+	}
 	run := wo.run
 	if err := RestartWorkflow(ctx, wo.cli, run, step); err != nil {
 		return err
 	}
-	return wo.writeOutputF("Successfully restart workflow: %s\n", run.Name)
+	return writeOutputF(wo.outputWriter, "Successfully restart workflow %s from step %s\n", run.Name, step)
 }
 
 // RestartWorkflow restart workflow
@@ -162,7 +230,7 @@ func (wo workflowRunOperator) Terminate(ctx context.Context) error {
 	if err := TerminateWorkflow(ctx, wo.cli, run); err != nil {
 		return err
 	}
-	return wo.writeOutputF("Successfully terminate workflow: %s\n", run.Name)
+	return writeOutputF(wo.outputWriter, "Successfully terminate workflow: %s\n", run.Name)
 }
 
 // TerminateWorkflow terminate workflow
@@ -448,10 +516,10 @@ func findDependency(stepName string, dependsOn map[string][]string) []string {
 	return dependency
 }
 
-func (wo workflowRunOperator) writeOutputF(format string, a ...interface{}) error {
-	if wo.outputWriter == nil {
+func writeOutputF(outputWriter io.Writer, format string, a ...interface{}) error {
+	if outputWriter == nil {
 		return nil
 	}
-	_, err := fmt.Fprintf(wo.outputWriter, format, a...)
+	_, err := fmt.Fprintf(outputWriter, format, a...)
 	return err
 }
