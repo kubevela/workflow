@@ -3,7 +3,7 @@ module github.com/kubevela/workflow
 go 1.19
 
 require (
-	cuelang.org/go v0.5.0-alpha.1
+	cuelang.org/go v0.5.0-beta.5
 	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.38
 	github.com/crossplane/crossplane-runtime v0.14.1-0.20210722005935-0b469fcc77cd
@@ -191,7 +191,7 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03 // indirect
 	google.golang.org/grpc v1.48.0 // indirect
