@@ -36,6 +36,8 @@ import (
 
 #Apply: kube.#Apply
 
+#Patch: kube.#Patch
+
 #ApplyInParallel: kube.#ApplyInParallel
 
 #Read: kube.#Read
