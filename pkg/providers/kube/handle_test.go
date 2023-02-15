@@ -173,44 +173,39 @@ cluster: ""
 		Expect(err).ToNot(HaveOccurred())
 
 		v, err := value.NewValue(fmt.Sprintf(`
-value: {%s}
-cluster: ""
-patch: {
+value:{
+	%s
 	metadata: name: "test-app-1"
-	spec: containers: [{
-		// +patchStrategy=replace
-		env: [{
-			name: "APP"
-			value: "nginx-new"
-		}]
-	}]
-}`, componentStr), nil, "")
+	metadata: labels: {
+		"test": "test"
+	}
+}
+cluster: ""
+`, componentStr), nil, "")
 		Expect(err).ToNot(HaveOccurred())
 		mCtx := monitorContext.NewTraceContext(context.Background(), "")
 		err = p.Apply(mCtx, ctx, v, nil)
 		Expect(err).ToNot(HaveOccurred())
-		sub, err := v.LookupValue("value")
+
+		v, err = value.NewValue(`
+value: {
+	apiVersion: "v1"
+	kind:       "Pod"
+	metadata: name: "test-app-1"
+}
+cluster: ""
+patch: {
+	metadata: name: "test-app-1"
+	spec: {
+		containers: [{
+			// +patchStrategy=retainKeys
+			image: "nginx:notfound"
+		}]
+	}
+}`, nil, "")
 		Expect(err).ToNot(HaveOccurred())
-		Expect(sub.Error()).To(BeNil())
-		v, err = v.MakeValue(`
-		cluster: ""
-		patch: {
-			metadata: name: "test-app-1"
-			spec: {
-				containers: [{
-					// +patchStrategy=retainKeys
-					image: "nginx:latest"
-				}]
-			}
-		}`)
+		err = p.Patch(mCtx, ctx, v, nil)
 		Expect(err).ToNot(HaveOccurred())
-		err = v.FillObject(sub, "value")
-		Expect(err).ToNot(HaveOccurred())
-		err = p.Apply(mCtx, ctx, v, nil)
-		Expect(err).ToNot(HaveOccurred())
-		sub2, err := v.LookupValue("value")
-		Expect(err).ToNot(HaveOccurred())
-		Expect(sub2.Error()).To(BeNil())
 
 		pod := &corev1.Pod{}
 		Expect(err).ToNot(HaveOccurred())
@@ -221,7 +216,7 @@ patch: {
 			}, pod)
 		}, time.Second*2, time.Millisecond*300).Should(BeNil())
 		Expect(pod.Name).To(Equal("test-app-1"))
-		Expect(pod.Spec.Containers[0].Env[0].Value).To(Equal("nginx-new"))
+		Expect(pod.Spec.Containers[0].Image).To(Equal("nginx:notfound"))
 	})
 
 	It("list", func() {
@@ -273,7 +268,7 @@ cluster: ""
 		expected := &metav1.PartialObjectMetadataList{}
 		err = result.UnmarshalTo(expected)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(len(expected.Items)).Should(Equal(3))
+		Expect(len(expected.Items)).Should(Equal(4))
 
 		By("List pods with labels index=test-1")
 		v, err = value.NewValue(`

@@ -11,6 +11,21 @@
 	...
 }
 
+#Patch: {
+	#do:       "patch"
+	#provider: "kube"
+
+	// +usage=The cluster to use
+	cluster: *"" | string
+	// +usage=The resource to patch, we'll first get the resource from the cluster, then apply the patcher to it
+	value: {...}
+	// +usage=The patcher that will be applied to the resource, you can define the strategy of list merge through comments. Reference doc here: https://kubevela.io/docs/platform-engineers/traits/patch-trait#patch-in-workflow-step
+	patch: {...}
+	// +usage=The resource after applied will be filled in this field after the action is executed
+	result?: {...}
+	...
+}
+
 #ApplyInParallel: {
 	#do:       "apply-in-parallel"
 	#provider: "kube"
