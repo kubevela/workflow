@@ -168,6 +168,7 @@ type Action interface {
 	Wait(message string)
 	Fail(message string)
 	Message(message string)
+	GetStatus() v1alpha1.StepStatus
 }
 
 // Parameter defines a parameter for cli from capability template

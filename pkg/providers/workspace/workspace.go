@@ -24,6 +24,7 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"sigs.k8s.io/kind/pkg/errors"
 
+	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -36,6 +37,8 @@ const (
 	ProviderName = "builtin"
 	// ResumeTimeStamp is resume time stamp.
 	ResumeTimeStamp = "resumeTimeStamp"
+	// SuspendTimeStamp is suspend time stamp.
+	SuspendTimeStamp = "suspendTimeStamp"
 )
 
 type provider struct {
@@ -151,6 +154,13 @@ func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, 
 		}
 		msg, _ = v.GetString("message")
 	}
+	if ts := wfCtx.GetMutableValue(stepID, v.FieldName(), SuspendTimeStamp); ts != "" {
+		if act.GetStatus().Phase == v1alpha1.WorkflowStepPhaseRunning {
+			// if it is already suspended before and has been resumed, we should not suspend it again.
+			return nil
+		}
+	}
+	wfCtx.SetMutableValue(time.Now().Format(time.RFC3339), stepID, v.FieldName(), SuspendTimeStamp)
 	act.Suspend(msg)
 	return nil
 }

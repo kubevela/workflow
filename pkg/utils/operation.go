@@ -49,6 +49,7 @@ type WorkflowOperator interface {
 
 // WorkflowStepOperator is operation handler for workflow steps' operations
 type WorkflowStepOperator interface {
+	Suspend(ctx context.Context, step string) error
 	Resume(ctx context.Context, step string) error
 	Restart(ctx context.Context, step string) error
 }
@@ -86,19 +87,32 @@ func NewWorkflowRunStepOperator(cli client.Client, w io.Writer, run *v1alpha1.Wo
 // Suspend suspend workflow
 func (wo workflowRunOperator) Suspend(ctx context.Context) error {
 	run := wo.run
-	runKey := client.ObjectKeyFromObject(run)
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if err := wo.cli.Get(ctx, runKey, run); err != nil {
-			return err
-		}
-		// set the workflow suspend to true
-		run.Status.Suspend = true
-		return wo.cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
+	if run.Status.Terminated {
+		return fmt.Errorf("can not suspend a terminated workflow")
+	}
+
+	if err := SuspendWorkflow(ctx, wo.cli, run, ""); err != nil {
 		return err
 	}
 
 	return writeOutputF(wo.outputWriter, "Successfully suspend workflow: %s\n", run.Name)
+}
+
+// Suspend suspend the workflow from a specific step
+func (wo workflowRunStepOperator) Suspend(ctx context.Context, step string) error {
+	if step == "" {
+		return fmt.Errorf("step can not be empty")
+	}
+	run := wo.run
+	if run.Status.Terminated {
+		return fmt.Errorf("can not suspend a terminated workflow")
+	}
+
+	if err := SuspendWorkflow(ctx, wo.cli, run, step); err != nil {
+		return err
+	}
+
+	return writeOutputF(wo.outputWriter, "Successfully suspend workflow %s from step %s\n", run.Name, step)
 }
 
 // Resume resume a suspended workflow
@@ -134,6 +148,59 @@ func (wo workflowRunStepOperator) Resume(ctx context.Context, step string) error
 	return writeOutputF(wo.outputWriter, "Successfully resume workflow %s from step %s\n", run.Name, step)
 }
 
+// SuspendWorkflow suspend workflow
+func SuspendWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun, stepName string) error {
+	run.Status.Suspend = true
+	steps := run.Status.Steps
+	found := stepName == ""
+
+	for i, step := range steps {
+		if step.Phase == v1alpha1.WorkflowStepPhaseRunning {
+			if stepName == "" {
+				OperateSteps(steps, i, -1, v1alpha1.WorkflowStepPhaseSuspending)
+			} else if stepName == step.Name {
+				OperateSteps(steps, i, -1, v1alpha1.WorkflowStepPhaseSuspending)
+				found = true
+				break
+			}
+		}
+		for j, sub := range step.SubStepsStatus {
+			if sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
+				if stepName == "" {
+					OperateSteps(steps, i, j, v1alpha1.WorkflowStepPhaseSuspending)
+				} else if stepName == sub.Name {
+					OperateSteps(steps, i, j, v1alpha1.WorkflowStepPhaseSuspending)
+					found = true
+					break
+				}
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("can not find step %s", stepName)
+	}
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return cli.Status().Patch(ctx, run, client.Merge)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// OperateSteps handles the operations to the steps
+func OperateSteps(status []v1alpha1.WorkflowStepStatus, i, j int, phase v1alpha1.WorkflowStepPhase) {
+	if j == -1 {
+		status[i].Phase = phase
+		for k, v := range status[i].SubStepsStatus {
+			if !wfTypes.IsStepFinish(v.Phase, v.Reason) {
+				status[i].SubStepsStatus[k].Phase = phase
+			}
+		}
+	} else {
+		status[i].SubStepsStatus[j].Phase = phase
+	}
+}
+
 // ResumeWorkflow resume workflow
 func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun, stepName string) error {
 	run.Status.Suspend = false
@@ -141,21 +208,21 @@ func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workfl
 	found := stepName == ""
 
 	for i, step := range steps {
-		if step.Type == wfTypes.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning {
+		if step.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 			if stepName == "" {
-				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				OperateSteps(steps, i, -1, v1alpha1.WorkflowStepPhaseRunning)
 			} else if stepName == step.Name {
-				steps[i].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+				OperateSteps(steps, i, -1, v1alpha1.WorkflowStepPhaseRunning)
 				found = true
 				break
 			}
 		}
 		for j, sub := range step.SubStepsStatus {
-			if sub.Type == wfTypes.WorkflowStepTypeSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
+			if sub.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 				if stepName == "" {
-					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+					OperateSteps(steps, i, j, v1alpha1.WorkflowStepPhaseRunning)
 				} else if stepName == sub.Name {
-					steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseSucceeded
+					OperateSteps(steps, i, j, v1alpha1.WorkflowStepPhaseRunning)
 					found = true
 					break
 				}

@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
+	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
@@ -222,6 +223,10 @@ type mockAction struct {
 	terminate bool
 	wait      bool
 	msg       string
+}
+
+func (act *mockAction) GetStatus() v1alpha1.StepStatus {
+	return v1alpha1.StepStatus{}
 }
 
 func (act *mockAction) Suspend(msg string) {
