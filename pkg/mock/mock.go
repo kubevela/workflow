@@ -30,6 +30,14 @@ func (act *Action) Suspend(message string) {
 	}
 }
 
+// Resume makes the step resume
+func (act *Action) Resume(message string) {
+	act.Phase = "Resume"
+	if message != "" {
+		act.Msg = message
+	}
+}
+
 // Terminate makes the step terminate
 func (act *Action) Terminate(message string) {
 	act.Phase = "Terminate"

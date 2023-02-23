@@ -206,6 +206,13 @@ func (act *mockAction) Suspend(msg string) {
 	}
 }
 
+func (act *mockAction) Resume(msg string) {
+	act.suspend = false
+	if msg != "" {
+		act.msg = msg
+	}
+}
+
 func (act *mockAction) Terminate(msg string) {
 	act.terminate = true
 	act.msg = msg

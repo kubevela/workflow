@@ -38,7 +38,7 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
-	"github.com/kubevela/workflow/pkg/tasks/builtin"
+	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -175,11 +175,11 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 	// if workflow is suspended and the suspended step is still running, return false to run the suspended step
 	if status.Suspend {
 		for _, step := range status.Steps {
-			if step.Type == types.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning {
+			if step.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 				return false
 			}
 			for _, sub := range step.SubStepsStatus {
-				if sub.Type == types.WorkflowStepTypeSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseRunning {
+				if sub.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 					return false
 				}
 			}
@@ -232,20 +232,16 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	max := time.Duration(1<<63 - 1)
 	min := max
 	for _, step := range w.instance.Steps {
-		if step.Type == types.WorkflowStepTypeSuspend || step.Type == types.WorkflowStepTypeStepGroup {
-			min = handleSuspendBackoffTime(step, stepStatus[step.Name], min)
-		}
+		min = handleSuspendBackoffTime(w.wfCtx, step, stepStatus[step.Name], min)
 		for _, sub := range step.SubSteps {
-			if sub.Type == types.WorkflowStepTypeSuspend {
-				min = handleSuspendBackoffTime(v1alpha1.WorkflowStep{
-					WorkflowStepBase: v1alpha1.WorkflowStepBase{
-						Name:       sub.Name,
-						Type:       sub.Type,
-						Timeout:    sub.Timeout,
-						Properties: sub.Properties,
-					},
-				}, stepStatus[sub.Name], min)
-			}
+			min = handleSuspendBackoffTime(w.wfCtx, v1alpha1.WorkflowStep{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       sub.Name,
+					Type:       sub.Type,
+					Timeout:    sub.Timeout,
+					Properties: sub.Properties,
+				},
+			}, stepStatus[sub.Name], min)
 		}
 	}
 	if min == max {
@@ -254,30 +250,33 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	return min
 }
 
-func handleSuspendBackoffTime(step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, min time.Duration) time.Duration {
-	if status.Phase == v1alpha1.WorkflowStepPhaseRunning {
-		if step.Timeout != "" {
-			duration, err := time.ParseDuration(step.Timeout)
-			if err != nil {
-				return min
-			}
-			timeout := status.FirstExecuteTime.Add(duration)
-			if time.Now().Before(timeout) {
-				d := time.Until(timeout)
-				if duration < min {
-					min = d
-				}
-			}
-		}
-
-		d, err := builtin.GetSuspendStepDurationWaiting(step)
+func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, min time.Duration) time.Duration {
+	if status.Phase != v1alpha1.WorkflowStepPhaseSuspending {
+		return min
+	}
+	if step.Timeout != "" {
+		duration, err := time.ParseDuration(step.Timeout)
 		if err != nil {
 			return min
 		}
-		if d != 0 && d < min {
+		timeout := status.FirstExecuteTime.Add(duration)
+		if time.Now().Before(timeout) {
+			d := time.Until(timeout)
+			if duration < min {
+				min = d
+			}
+		}
+	}
+
+	if ts := wfCtx.GetMutableValue(status.ID, workspace.ResumeTimeStamp); ts != "" {
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			return min
+		}
+		d := time.Until(t)
+		if d < min {
 			min = d
 		}
-
 	}
 	return min
 }
@@ -543,10 +542,9 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 			return err
 		}
 		e.finishStep(operation)
-		e.checkFailedAfterRetries()
 
 		// for the suspend step with duration, there's no need to increase the backoff time in reconcile when it's still running
-		if !types.IsStepFinish(status.Phase, status.Reason) && !isWaitSuspendStep(status) {
+		if !types.IsStepFinish(status.Phase, status.Reason) && status.Phase != v1alpha1.WorkflowStepPhaseSuspending {
 			if err := e.updateStepStatus(ctx, status); err != nil {
 				return err
 			}
@@ -562,7 +560,6 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 		if err := handleBackoffTimes(wfCtx, status, true); err != nil {
 			return err
 		}
-		e.status.Suspend = operation.Suspend
 		if err := e.updateStepStatus(ctx, status); err != nil {
 			return err
 		}
@@ -649,6 +646,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 type engine struct {
 	failedAfterRetries bool
 	waiting            bool
+	suspending         bool
 	debug              bool
 	status             *v1alpha1.WorkflowRunStatus
 	wfCtx              wfContext.Context
@@ -667,6 +665,14 @@ func (e *engine) finishStep(operation *types.Operation) {
 		e.status.Terminated = e.status.Terminated || operation.Terminated
 		e.failedAfterRetries = e.failedAfterRetries || operation.FailedAfterRetries
 		e.waiting = e.waiting || operation.Waiting
+		e.suspending = e.suspending || operation.Suspend
+	}
+	e.status.Suspend = e.suspending
+	if !e.waiting && e.failedAfterRetries && feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
+		e.status.Suspend = true
+	}
+	if e.failedAfterRetries && !feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
+		e.status.Terminated = true
 	}
 }
 
@@ -803,10 +809,6 @@ func (e *engine) findDependsOnPhase(name string) v1alpha1.WorkflowStepPhase {
 
 func isUnsuccessfulStep(phase v1alpha1.WorkflowStepPhase) bool {
 	return phase != v1alpha1.WorkflowStepPhaseSucceeded && phase != v1alpha1.WorkflowStepPhaseSkipped
-}
-
-func isWaitSuspendStep(step v1alpha1.StepStatus) bool {
-	return step.Type == types.WorkflowStepTypeSuspend && step.Phase == v1alpha1.WorkflowStepPhaseRunning
 }
 
 func handleBackoffTimes(wfCtx wfContext.Context, status v1alpha1.StepStatus, clear bool) error {

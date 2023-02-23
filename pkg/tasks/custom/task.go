@@ -376,12 +376,24 @@ type executor struct {
 
 // Suspend let workflow pause.
 func (exec *executor) Suspend(message string) {
+	if exec.wfStatus.Phase == v1alpha1.WorkflowStepPhaseFailed {
+		return
+	}
 	exec.suspend = true
-	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSucceeded
+	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSuspending
 	if message != "" {
 		exec.wfStatus.Message = message
 	}
 	exec.wfStatus.Reason = types.StatusReasonSuspend
+}
+
+// Resume let workflow resume.
+func (exec *executor) Resume(message string) {
+	exec.suspend = false
+	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSucceeded
+	if message != "" {
+		exec.wfStatus.Message = message
+	}
 }
 
 // Terminate let workflow terminate.

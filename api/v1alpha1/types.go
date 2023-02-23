@@ -251,6 +251,8 @@ const (
 	WorkflowStepPhaseRunning WorkflowStepPhase = "running"
 	// WorkflowStepPhasePending will make the controller wait for the step to run.
 	WorkflowStepPhasePending WorkflowStepPhase = "pending"
+	// WorkflowStepPhaseSuspending will make the controller suspend the workflow.
+	WorkflowStepPhaseSuspending WorkflowStepPhase = "suspending"
 )
 
 // StepOutputs defines output variable of WorkflowStep

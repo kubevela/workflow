@@ -24,6 +24,7 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
@@ -151,6 +152,8 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseRunning)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
+	case subStepCounts[string(v1alpha1.WorkflowStepPhaseSuspending)] > 0:
+		status.Phase = v1alpha1.WorkflowStepPhaseSuspending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhasePending)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhasePending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseFailed)] > 0:
@@ -172,4 +175,20 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 		status.Phase = v1alpha1.WorkflowStepPhaseSucceeded
 	}
 	return status, operation
+}
+
+func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal *value.Value) {
+	if len(step.Outputs) > 0 {
+		for _, hook := range postStopHooks {
+			if err := hook(ctx, basicVal, step, *stepStatus, nil); err != nil {
+				stepStatus.Phase = v1alpha1.WorkflowStepPhaseFailed
+				if stepStatus.Reason == "" {
+					stepStatus.Reason = types.StatusReasonOutput
+				}
+				operations.Terminated = true
+				stepStatus.Message = fmt.Sprintf("output error: %s", err.Error())
+				return
+			}
+		}
+	}
 }

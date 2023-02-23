@@ -37,7 +37,6 @@ type taskDiscover struct {
 func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOptions) types.TaskDiscover {
 	return &taskDiscover{
 		builtin: map[string]types.TaskGenerator{
-			types.WorkflowStepTypeSuspend:   builtin.Suspend,
 			types.WorkflowStepTypeStepGroup: builtin.StepGroup,
 		},
 		customTaskDiscover: custom.NewTaskLoader(options.TemplateLoader.LoadTemplate, options.PackageDiscover, options.Providers, options.LogLevel, options.ProcessCtx),
