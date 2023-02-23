@@ -19,12 +19,15 @@ package workspace
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/stretchr/testify/require"
 )
 
@@ -141,6 +144,28 @@ message: "terminate"
 	r.NoError(err)
 	r.Equal(act.terminate, true)
 	r.Equal(act.msg, "terminate")
+}
+
+func TestProvider_Suspend(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepSessionID, "test-id")
+	p := &provider{pCtx: pCtx}
+	r := require.New(t)
+	act := &mockAction{}
+	v, err := value.NewValue(`
+duration: "1s"
+message: "hello suspend"
+`, nil, "")
+	r.NoError(err)
+	err = p.Suspend(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.suspend, true)
+	r.Equal(act.msg, "hello suspend")
+	time.Sleep(time.Second)
+	err = p.Suspend(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.suspend, false)
 }
 
 func TestProvider_Fail(t *testing.T) {

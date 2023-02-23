@@ -67,6 +67,14 @@ myIP: value: "1.1.1.1"
 			act.Terminate("I am terminated")
 			return nil
 		},
+		"suspend": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
+			act.Terminate("I am suspended")
+			return nil
+		},
+		"resume": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
+			act.Terminate("I am resumed")
+			return nil
+		},
 		"executeFailed": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
 			return errors.New("execute error")
 		},
