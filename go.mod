@@ -33,6 +33,7 @@ require (
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 	sigs.k8s.io/controller-runtime v0.12.3
+	sigs.k8s.io/kind v0.9.0
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -239,7 +240,6 @@ require (
 	sigs.k8s.io/apiserver-runtime v1.1.2-0.20221102045245-fb656940062f // indirect
 	sigs.k8s.io/gateway-api v0.4.3 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
-	sigs.k8s.io/kind v0.9.0 // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.13.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect

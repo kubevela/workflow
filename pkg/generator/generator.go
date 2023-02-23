@@ -155,7 +155,7 @@ func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.Workfl
 }
 
 func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers, pCtx process.Context) {
-	workspace.Install(providerHandlers)
+	workspace.Install(providerHandlers, pCtx)
 	email.Install(providerHandlers)
 	util.Install(providerHandlers, pCtx)
 	http.Install(providerHandlers, client, instance.Namespace)

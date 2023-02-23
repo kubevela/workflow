@@ -13,6 +13,15 @@ import (
 	message?: string
 }
 
+#Suspend: {
+	#do: "suspend"
+
+	// +usage=Specify the wait duration time to resume automaticlly such as "30s", "1min" or "2m15s"
+	duration?: string
+	// +usage=Optional message that will be shown in workflow step status, note that the message might be override by other actions.
+	message?: string
+}
+
 #Break: {
 	#do: "break"
 

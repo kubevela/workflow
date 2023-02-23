@@ -43,6 +43,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/features"
+	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -1772,8 +1773,9 @@ var _ = Describe("Test Workflow", func() {
 			}, {
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s2",
+					ID:    "s2",
 					Type:  "suspend",
-					Phase: v1alpha1.WorkflowStepPhaseRunning,
+					Phase: v1alpha1.WorkflowStepPhaseSuspending,
 				},
 			}},
 		})).Should(BeEquivalentTo(""))
@@ -1804,6 +1806,7 @@ var _ = Describe("Test Workflow", func() {
 			}, {
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s2",
+					ID:    "s2",
 					Type:  "suspend",
 					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 				},
@@ -1873,7 +1876,7 @@ var _ = Describe("Test Workflow", func() {
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s2",
 					Type:  "step-group",
-					Phase: v1alpha1.WorkflowStepPhaseRunning,
+					Phase: v1alpha1.WorkflowStepPhaseSuspending,
 				},
 				SubStepsStatus: []v1alpha1.StepStatus{
 					{
@@ -1882,8 +1885,9 @@ var _ = Describe("Test Workflow", func() {
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 					}, {
 						Name:  "s2-sub2",
+						ID:    "s2-sub2",
 						Type:  "suspend",
-						Phase: v1alpha1.WorkflowStepPhaseRunning,
+						Phase: v1alpha1.WorkflowStepPhaseSuspending,
 					},
 				},
 			}},
@@ -2220,10 +2224,20 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 	switch step.Type {
 	case "suspend":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
+			if step.Properties != nil {
+				var v map[string]string
+				b, _ := json.Marshal(step.Properties)
+				_ = json.Unmarshal(b, &v)
+				if v["duration"] != "" {
+					d, _ := time.ParseDuration(v["duration"])
+					ctx.SetMutableValue(time.Now().Add(d).Format(time.RFC3339), step.Name, workspace.ResumeTimeStamp)
+				}
+			}
 			return v1alpha1.StepStatus{
 					Name:  step.Name,
 					Type:  "suspend",
-					Phase: v1alpha1.WorkflowStepPhaseRunning,
+					ID:    step.Name,
+					Phase: v1alpha1.WorkflowStepPhaseSuspending,
 				}, &types.Operation{
 					Suspend: true,
 				}, nil

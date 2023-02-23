@@ -163,6 +163,7 @@ type StepGeneratorOptions struct {
 // Action is that workflow provider can do.
 type Action interface {
 	Suspend(message string)
+	Resume(message string)
 	Terminate(message string)
 	Wait(message string)
 	Fail(message string)

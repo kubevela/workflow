@@ -298,11 +298,6 @@ func strategyUnify(base cue.Value, patch cue.Value, params *UnifyParams, patchOp
 	baseInst := cuecontext.New().BuildFile(openBase)
 	patchInst := cuecontext.New().BuildFile(patchFile)
 
-	// s, _ := ToString(patchInst)
-	// fmt.Println("======patch", s)
-	// s, _ = ToString(baseInst)
-	// fmt.Println("======base", s)
-
 	ret := baseInst.Unify(patchInst)
 
 	_, err = toString(ret, removeTmpVar)
