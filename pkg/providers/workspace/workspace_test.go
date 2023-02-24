@@ -163,6 +163,10 @@ message: "hello suspend"
 	r.NoError(err)
 	r.Equal(act.suspend, true)
 	r.Equal(act.msg, "hello suspend")
+	// test second time to check if the suspend is resumed in 1s
+	err = p.Suspend(nil, wfCtx, v, act)
+	r.NoError(err)
+	r.Equal(act.suspend, true)
 	time.Sleep(time.Second)
 	err = p.Suspend(nil, wfCtx, v, act)
 	r.NoError(err)
