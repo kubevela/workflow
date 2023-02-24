@@ -111,6 +111,8 @@ import (
 #ReadConfig:   config.#Read
 #ListConfig:   config.#List
 
+#PromCheck: metrics.#PromCheck
+
 #PatchK8sObject: util.#PatchK8sObject
 
 #Steps: {
