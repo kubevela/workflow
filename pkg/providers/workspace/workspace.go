@@ -127,6 +127,10 @@ func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
 	stepID := fmt.Sprint(h.pCtx.GetData(model.ContextStepSessionID))
 	timestamp := wfCtx.GetMutableValue(stepID, ResumeTimeStamp)
+	var msg string
+	if v != nil {
+		msg, _ = v.GetString("message")
+	}
 	if timestamp != "" {
 		t, err := time.Parse(time.RFC3339, timestamp)
 		if err != nil {
@@ -136,9 +140,9 @@ func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, 
 			act.Resume("")
 			return nil
 		}
+		act.Suspend(msg)
 		return nil
 	}
-	var msg string
 	if v != nil {
 		d, _ := v.LookupValue("duration")
 		if d != nil && d.CueValue().Exists() {
@@ -152,15 +156,15 @@ func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, 
 			}
 			wfCtx.SetMutableValue(time.Now().Add(duration).Format(time.RFC3339), stepID, ResumeTimeStamp)
 		}
-		msg, _ = v.GetString("message")
 	}
 	if ts := wfCtx.GetMutableValue(stepID, v.FieldName(), SuspendTimeStamp); ts != "" {
 		if act.GetStatus().Phase == v1alpha1.WorkflowStepPhaseRunning {
 			// if it is already suspended before and has been resumed, we should not suspend it again.
 			return nil
 		}
+	} else {
+		wfCtx.SetMutableValue(time.Now().Format(time.RFC3339), stepID, v.FieldName(), SuspendTimeStamp)
 	}
-	wfCtx.SetMutableValue(time.Now().Format(time.RFC3339), stepID, v.FieldName(), SuspendTimeStamp)
 	act.Suspend(msg)
 	return nil
 }

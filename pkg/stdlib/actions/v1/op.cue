@@ -20,8 +20,6 @@ import (
 	duration?: string
 	// +usage=Optional message that will be shown in workflow step status, note that the message might be override by other actions.
 	message?: string
-	// +usage=The time when the step is suspended, it will be set when the action is executed.
-	suspendedAt?: string
 }
 
 #Break: {
