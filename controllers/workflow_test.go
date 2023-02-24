@@ -72,7 +72,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		},
 	}
-	testDefinitions := []string{"test-apply", "apply-object", "failed-render", "suspend-and-deploy"}
+	testDefinitions := []string{"test-apply", "apply-object", "failed-render", "suspend-and-deploy", "multi-suspend"}
 
 	BeforeEach(func() {
 		setupNamespace(ctx, namespace)
@@ -209,13 +209,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSuspending))
 		Expect(wrObj.Status.Steps[0].ID).ShouldNot(BeEquivalentTo(""))
 		// resume
-		wrObj.Status.Suspend = false
-		wrObj.Status.Steps[0].Phase = v1alpha1.WorkflowStepPhaseSucceeded
-		Expect(k8sClient.Status().Patch(ctx, wrObj, client.Merge)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, client.ObjectKey{
-			Name:      wr.Name,
-			Namespace: wr.Namespace,
-		}, wrObj)).Should(BeNil())
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, wrObj, "")).Should(BeNil())
 		Expect(wrObj.Status.Suspend).Should(BeFalse())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
@@ -264,13 +258,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Steps[0].SubStepsStatus[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSuspending))
 		Expect(wrObj.Status.Steps[0].SubStepsStatus[0].ID).ShouldNot(BeEquivalentTo(""))
 		// resume
-		wrObj.Status.Suspend = false
-		wrObj.Status.Steps[0].SubStepsStatus[0].Phase = v1alpha1.WorkflowStepPhaseSucceeded
-		Expect(k8sClient.Status().Patch(ctx, wrObj, client.Merge)).Should(BeNil())
-		Expect(k8sClient.Get(ctx, client.ObjectKey{
-			Name:      wr.Name,
-			Namespace: wr.Namespace,
-		}, wrObj)).Should(BeNil())
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, wrObj, "")).Should(BeNil())
 		Expect(wrObj.Status.Suspend).Should(BeFalse())
 		expDeployment := &appsv1.Deployment{}
 		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
@@ -642,9 +630,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
 
 		By("resume the suspended workflow run")
-		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		checkRun.Status.Suspend = false
-		Expect(k8sClient.Status().Patch(ctx, checkRun, client.Merge)).Should(BeNil())
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, checkRun, "")).Should(BeNil())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
@@ -708,9 +694,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Steps[1].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
 
 		By("resume the suspended workflow run")
-		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		checkRun.Status.Suspend = false
-		Expect(k8sClient.Status().Patch(ctx, checkRun, client.Merge)).Should(BeNil())
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, checkRun, "")).Should(BeNil())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
@@ -1417,6 +1401,44 @@ var _ = Describe("Test Workflow", func() {
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+	})
+
+	It("test multiple suspend", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-multi-suspend"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "step1",
+					Type: "multi-suspend",
+				},
+			},
+		}
+		Expect(k8sClient.Create(context.Background(), wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, checkRun, "")).Should(BeNil())
+		Expect(checkRun.Status.Suspend).Should(BeFalse())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		// suspended by the second suspend
+		Expect(checkRun.Status.Suspend).Should(BeTrue())
+
+		Expect(utils.ResumeWorkflow(ctx, k8sClient, checkRun, "")).Should(BeNil())
+		Expect(checkRun.Status.Suspend).Should(BeFalse())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Suspend).Should(BeFalse())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 

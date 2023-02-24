@@ -16,6 +16,8 @@ limitations under the License.
 
 package mock
 
+import "github.com/kubevela/workflow/api/v1alpha1"
+
 // Action ...
 type Action struct {
 	Phase string
@@ -28,6 +30,11 @@ func (act *Action) Suspend(message string) {
 	if message != "" {
 		act.Msg = message
 	}
+}
+
+// GetStatus returns the step status
+func (act *Action) GetStatus() v1alpha1.StepStatus {
+	return v1alpha1.StepStatus{}
 }
 
 // Resume makes the step resume

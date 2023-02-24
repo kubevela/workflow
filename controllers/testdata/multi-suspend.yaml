@@ -1,0 +1,15 @@
+
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: multi-suspend
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+        	"vela/op"
+        )
+        suspend1: op.#Suspend & {}
+        suspend2: op.#Suspend & {}

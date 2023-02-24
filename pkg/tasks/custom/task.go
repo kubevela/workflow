@@ -84,13 +84,15 @@ func (tr *taskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Contex
 func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error) {
 	return func(wfStep v1alpha1.WorkflowStep, genOpt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
 
+		initialStatus := v1alpha1.StepStatus{
+			Name:  wfStep.Name,
+			Type:  wfStep.Type,
+			Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+		}
 		exec := &executor{
-			handlers: t.handlers,
-			wfStatus: v1alpha1.StepStatus{
-				Name:  wfStep.Name,
-				Type:  wfStep.Type,
-				Phase: v1alpha1.WorkflowStepPhaseSucceeded,
-			},
+			handlers:   t.handlers,
+			wfStatus:   initialStatus,
+			stepStatus: initialStatus,
 		}
 
 		var err error
@@ -206,6 +208,9 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				return exec.status(), exec.operation(), nil
 			}
 
+			if status, ok := options.StepStatus[wfStep.Name]; ok {
+				exec.stepStatus = status
+			}
 			taskv, err = value.NewValue(strings.Join([]string{templ, basicTemplate}, "\n"), t.pd, "", value.ProcessScript, value.TagFieldOrder)
 			if err != nil {
 				exec.err(ctx, false, err, types.StatusReasonRendering)
@@ -365,6 +370,7 @@ type executor struct {
 	handlers types.Providers
 
 	wfStatus           v1alpha1.StepStatus
+	stepStatus         v1alpha1.StepStatus
 	suspend            bool
 	terminated         bool
 	failedAfterRetries bool
@@ -440,6 +446,10 @@ func (exec *executor) Skip(message string) {
 	exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseSkipped
 	exec.wfStatus.Reason = types.StatusReasonSkip
 	exec.wfStatus.Message = message
+}
+
+func (exec *executor) GetStatus() v1alpha1.StepStatus {
+	return exec.stepStatus
 }
 
 func (exec *executor) timeout(message string) {

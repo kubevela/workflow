@@ -35,13 +35,32 @@ func TestSuspendWorkflowRun(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := map[string]struct {
-		run *v1alpha1.WorkflowRun
+		run         *v1alpha1.WorkflowRun
+		expected    *v1alpha1.WorkflowRun
+		step        string
+		expectedErr string
 	}{
+		"terminated": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "terminated",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Terminated: true,
+				},
+			},
+			expectedErr: "can not suspend a terminated workflow",
+		},
 		"already suspend": {
 			run: &v1alpha1.WorkflowRun{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "already-suspend",
 				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
 				Status: v1alpha1.WorkflowRunStatus{
 					Suspend: true,
 				},
@@ -56,6 +75,175 @@ func TestSuspendWorkflowRun(t *testing.T) {
 					Suspend: false,
 				},
 			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+				},
+			},
+		},
+		"step not found": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "step-not-found",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: false,
+				},
+			},
+			step:        "not-found",
+			expectedErr: "can not find",
+		},
+		"suspend all": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend-all",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step2",
+								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub2",
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
+								},
+							},
+						},
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step2",
+								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub2",
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"suspend specific step": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
+								},
+							},
+						},
+					},
+				},
+			},
+			step: "step1",
+		},
+		"suspend specific sub step": {
+			run: &v1alpha1.WorkflowRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "suspend-sub-step",
+				},
+				Status: v1alpha1.WorkflowRunStatus{
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.WorkflowRun{
+				Status: v1alpha1.WorkflowRunStatus{
+					Suspend: true,
+					Steps: []v1alpha1.WorkflowStepStatus{
+						{
+							StepStatus: v1alpha1.StepStatus{
+								Name:  "step1",
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
+							},
+							SubStepsStatus: []v1alpha1.StepStatus{
+								{
+									Name:  "sub1",
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
+								},
+							},
+						},
+					},
+				},
+			},
+			step: "sub1",
 		},
 	}
 	for name, tc := range testCases {
@@ -67,13 +255,23 @@ func TestSuspendWorkflowRun(t *testing.T) {
 				err = cli.Delete(ctx, tc.run)
 				r.NoError(err)
 			}()
-			operator := NewWorkflowRunOperator(cli, nil, tc.run)
-			err = operator.Suspend(ctx)
+			if tc.step != "" {
+				operator := NewWorkflowRunStepOperator(cli, nil, tc.run)
+				err = operator.Suspend(ctx, tc.step)
+			} else {
+				operator := NewWorkflowRunOperator(cli, nil, tc.run)
+				err = operator.Suspend(ctx)
+			}
+			if tc.expectedErr != "" {
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
 			r.NoError(err)
 			run := &v1alpha1.WorkflowRun{}
 			err = cli.Get(ctx, client.ObjectKey{Name: tc.run.Name}, run)
 			r.NoError(err)
 			r.Equal(true, run.Status.Suspend)
+			r.Equal(tc.expected.Status, run.Status)
 		})
 	}
 }
@@ -282,13 +480,11 @@ func TestResumeWorkflowRun(t *testing.T) {
 					Steps: []v1alpha1.WorkflowStepStatus{
 						{
 							StepStatus: v1alpha1.StepStatus{
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 							SubStepsStatus: []v1alpha1.StepStatus{
 								{
-									Type:  wfTypes.WorkflowStepTypeSuspend,
-									Phase: v1alpha1.WorkflowStepPhaseRunning,
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
 								},
 							},
 						},
@@ -300,13 +496,11 @@ func TestResumeWorkflowRun(t *testing.T) {
 					Steps: []v1alpha1.WorkflowStepStatus{
 						{
 							StepStatus: v1alpha1.StepStatus{
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
 							},
 							SubStepsStatus: []v1alpha1.StepStatus{
 								{
-									Type:  wfTypes.WorkflowStepTypeSuspend,
-									Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
 								},
 							},
 						},
@@ -326,15 +520,13 @@ func TestResumeWorkflowRun(t *testing.T) {
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step1",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 						},
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step2",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 						},
 					},
@@ -346,15 +538,13 @@ func TestResumeWorkflowRun(t *testing.T) {
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step1",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+								Phase: v1alpha1.WorkflowStepPhaseRunning,
 							},
 						},
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step2",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 						},
 					},
@@ -373,14 +563,12 @@ func TestResumeWorkflowRun(t *testing.T) {
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step1",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 							SubStepsStatus: []v1alpha1.StepStatus{
 								{
 									Name:  "sub-step1",
-									Type:  wfTypes.WorkflowStepTypeSuspend,
-									Phase: v1alpha1.WorkflowStepPhaseRunning,
+									Phase: v1alpha1.WorkflowStepPhaseSuspending,
 								},
 							},
 						},
@@ -393,14 +581,12 @@ func TestResumeWorkflowRun(t *testing.T) {
 						{
 							StepStatus: v1alpha1.StepStatus{
 								Name:  "step1",
-								Type:  wfTypes.WorkflowStepTypeSuspend,
-								Phase: v1alpha1.WorkflowStepPhaseRunning,
+								Phase: v1alpha1.WorkflowStepPhaseSuspending,
 							},
 							SubStepsStatus: []v1alpha1.StepStatus{
 								{
 									Name:  "sub-step1",
-									Type:  wfTypes.WorkflowStepTypeSuspend,
-									Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+									Phase: v1alpha1.WorkflowStepPhaseRunning,
 								},
 							},
 						},

@@ -45,6 +45,7 @@ const DefaultPackageHeader = "package main\n"
 type Value struct {
 	v          cue.Value
 	r          *cue.Context
+	field      string
 	addImports func(instance *build.Instance) error
 }
 
@@ -105,6 +106,11 @@ func (val *Value) SubstituteInStruct(expr ast.Expr, key string) error {
 		}
 	}
 	return errors.New("key not found in struct")
+}
+
+// FieldName return value's field name
+func (val *Value) FieldName() string {
+	return val.field
 }
 
 // NewValue new a value
@@ -447,9 +453,18 @@ func (val *Value) LookupValue(paths ...string) (*Value, error) {
 	if !v.Exists() {
 		return nil, errors.Errorf("failed to lookup value: var(path=%s) not exist", strings.Join(paths, "."))
 	}
+	var field string
+	if len(paths) > 0 {
+		index := len(paths) - 1
+		if index < 0 {
+			index = 0
+		}
+		field = paths[index]
+	}
 	return &Value{
 		v:          v,
 		r:          val.r,
+		field:      field,
 		addImports: val.addImports,
 	}, nil
 }
@@ -571,6 +586,7 @@ func (val *Value) StepByList(handle func(name string, in *Value) (bool, error)) 
 		stop, err := handle(iter.Label(), &Value{
 			v:          iter.Value(),
 			r:          val.r,
+			field:      iter.Label(),
 			addImports: val.addImports,
 		})
 		if err != nil {
@@ -664,6 +680,7 @@ func (iter *stepsIterator) value() *Value {
 	return &Value{
 		r:          iter.target.r,
 		v:          v,
+		field:      iter.name(),
 		addImports: iter.target.addImports,
 	}
 }
@@ -677,6 +694,7 @@ func (iter *stepsIterator) do(handle func(name string, in *Value) (bool, error))
 		return
 	}
 	v := iter.value()
+	v.field = iter.name()
 	stopped, err := handle(iter.name(), v)
 	if err != nil {
 		iter.err = err
