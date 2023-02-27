@@ -156,13 +156,12 @@ func TestProvider_Suspend(t *testing.T) {
 	act := &mockAction{}
 	v, err := value.NewValue(`
 duration: "1s"
-message: "hello suspend"
 `, nil, "")
 	r.NoError(err)
 	err = p.Suspend(nil, wfCtx, v, act)
 	r.NoError(err)
 	r.Equal(act.suspend, true)
-	r.Equal(act.msg, "hello suspend")
+	r.Equal(act.msg, "Suspended by field ")
 	// test second time to check if the suspend is resumed in 1s
 	err = p.Suspend(nil, wfCtx, v, act)
 	r.NoError(err)
