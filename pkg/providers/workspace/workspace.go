@@ -130,6 +130,9 @@ func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, 
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")
+		if msg == "" {
+			msg = fmt.Sprintf("Suspended by field %s", v.FieldName())
+		}
 	}
 	if timestamp != "" {
 		t, err := time.Parse(time.RFC3339, timestamp)
