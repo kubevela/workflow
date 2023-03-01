@@ -57,6 +57,7 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/pkg/utils"
 	"github.com/kubevela/workflow/pkg/webhook"
 	"github.com/kubevela/workflow/version"
 	//+kubebuilder:scaffold:imports
@@ -82,7 +83,7 @@ func main() {
 	var qps float64
 	var logFileMaxSize uint64
 	var burst, webhookPort int
-	var leaseDuration, renewDeadline, retryPeriod time.Duration
+	var leaseDuration, renewDeadline, retryPeriod, recycleDuration time.Duration
 	var controllerArgs controllers.Args
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -100,6 +101,9 @@ func main() {
 		"The duration that the acting controlplane will retry refreshing leadership before giving up")
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", 2*time.Second,
 		"The duration the LeaderElector clients should wait between tries of actions")
+	flag.DurationVar(&recycleDuration, "recycle-duration", 30*24*time.Hour,
+		"The recycle duration of a completed and is not the latest record in a set of workflowruns")
+
 	flag.BoolVar(&useWebhook, "use-webhook", false, "Enable Admission Webhook")
 	flag.StringVar(&certDir, "webhook-cert-dir", "/k8s-webhook-server/serving-certs", "Admission webhook cert/key dir.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "admission webhook listen address")
@@ -115,7 +119,7 @@ func main() {
 	flag.StringVar(&backupStrategy, "backup-strategy", "BackupFinishedRecord", "Set the strategy for backup workflow records, default is RemainLatestFailedRecord")
 	flag.StringVar(&backupIgnoreStrategy, "backup-ignore-strategy", "", "Set the strategy for ignore backup workflow records, default is IgnoreLatestFailedRecord")
 	flag.StringVar(&backupPersistType, "backup-persist-type", "", "Set the persist type for backup workflow records, default is empty")
-	flag.StringVar(&groupByLabel, "backup-group-by-label", "", "Set the label for group by, default is empty")
+	flag.StringVar(&groupByLabel, "group-by-label", "pipeline.oam.dev/name", "Set the label for group by, default is pipeline.oam.dev/name")
 	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
@@ -210,6 +214,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	kubeClient := mgr.GetClient()
+	if groupByLabel != "" {
+		if err := mgr.Add(utils.NewRecycleCronJob(kubeClient, recycleDuration, "0 0 * * *", groupByLabel)); err != nil {
+			klog.Error(err, "unable to start recycle cronjob")
+			os.Exit(1)
+		}
+	}
+
 	pd, err := packages.NewPackageDiscover(mgr.GetConfig())
 	if err != nil {
 		klog.Error(err, "Failed to create CRD discovery for CUE package client")
@@ -227,8 +239,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	kubeClient := mgr.GetClient()
 
 	if err = (&controllers.WorkflowRunReconciler{
 		Client:            kubeClient,

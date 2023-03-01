@@ -20,6 +20,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
+## @param workflow.groupByLabel The label used to group workflow record
 workflow:
   enableSuspendOnFailure: false
   enablePatchStatusAtOnce: false
@@ -30,6 +31,7 @@ workflow:
       failedState: 300
   step:
     errorRetryTimes: 10
+  groupByLabel: "pipeline.oam.dev/name"
 
 ## @section KubeVela workflow backup parameters
 
@@ -37,7 +39,6 @@ workflow:
 ## @param backup.strategy The backup strategy for workflow record
 ## @param backup.ignoreStrategy The ignore strategy for backup
 ## @param backup.cleanOnBackup Enable auto clean after backup workflow record
-## @param backup.groupByLabel The label used to group workflow record
 ## @param backup.persistType The persist type for workflow record
 ## @param backup.configSecretName The secret name of backup config
 ## @param backup.configSecretNamespace The secret name of backup config namespace
@@ -46,7 +47,6 @@ backup:
   strategy: BackupFinishedRecord
   ignoreStrategy: IgnoreLatestFailedRecord
   cleanOnBackup: false
-  groupByLabel: ""
   persistType: ""
   configSecretName: "backup-config"
   configSecretNamespace: "vela-system"
