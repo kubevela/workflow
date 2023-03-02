@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
+	triggerv1alpha1 "github.com/kubevela/kube-trigger/api/v1alpha1"
 	velaclient "github.com/kubevela/pkg/controller/client"
 	"github.com/kubevela/pkg/multicluster"
 
@@ -180,6 +181,10 @@ func main() {
 		"Burst", restConfig.Burst,
 	)
 	restConfig.UserAgent = userAgent
+
+	if feature.DefaultMutableFeatureGate.Enabled(features.EnableWatchEventListener) {
+		utilruntime.Must(triggerv1alpha1.AddToScheme(scheme))
+	}
 
 	leaderElectionID := fmt.Sprintf("workflow-%s", strings.ToLower(strings.ReplaceAll(version.VelaVersion, ".", "-")))
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
