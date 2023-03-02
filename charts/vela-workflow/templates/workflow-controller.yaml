@@ -141,10 +141,10 @@ spec:
             - "--feature-gates=EnablePatchStatusAtOnce={{- .Values.workflow.enablePatchStatusAtOnce | toString -}}"
             - "--feature-gates=EnableSuspendOnFailure={{- .Values.workflow.enableSuspendOnFailure | toString -}}"
             - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
+            - "--group-by-label={{ .Values.workflow.groupByLabel }}"
             {{ if .Values.backup.enable }}
             - "--backup-strategy={{ .Values.backup.strategy }}"
             - "--backup-ignore-strategy={{ .Values.backup.ignoreStrategy }}"
-            - "--backup-group-by-label={{ .Values.backup.groupByLabel }}"
             - "--backup-clean-on-backup={{ .Values.backup.cleanOnBackup }}"
             - "--backup-persist-type={{ .Values.backup.persisType }}"
             - "--backup-config-secret-name={{ .Values.backup.configSecretName }}"
