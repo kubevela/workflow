@@ -600,7 +600,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 				case "always":
 					return &types.PreCheckResult{Skip: false}, nil
 				case "":
-					return &types.PreCheckResult{Skip: isUnsuccessfulStep(dependsOnPhase)}, nil
+					return &types.PreCheckResult{Skip: isUnsuccessfulStep(dependsOnPhase, len(step.DependsOn) > 0)}, nil
 				default:
 					ifValue, err := custom.ValidateIfValue(e.wfCtx, step, e.stepStatus, options)
 					if err != nil {
@@ -775,14 +775,15 @@ func (e *engine) needStop() bool {
 }
 
 func (e *engine) findDependPhase(taskRunners []types.TaskRunner, index int, dag bool) v1alpha1.WorkflowStepPhase {
-	if dag {
+	dependsOn := len(e.stepDependsOn[taskRunners[index].Name()]) > 0
+	if dag || dependsOn {
 		return e.findDependsOnPhase(taskRunners[index].Name())
 	}
 	if index < 1 {
 		return v1alpha1.WorkflowStepPhaseSucceeded
 	}
 	for i := index - 1; i >= 0; i-- {
-		if isUnsuccessfulStep(e.stepStatus[taskRunners[i].Name()].Phase) {
+		if isUnsuccessfulStep(e.stepStatus[taskRunners[i].Name()].Phase, dependsOn) {
 			return e.stepStatus[taskRunners[i].Name()].Phase
 		}
 	}
@@ -794,14 +795,17 @@ func (e *engine) findDependsOnPhase(name string) v1alpha1.WorkflowStepPhase {
 		if e.stepStatus[dependsOn].Phase != v1alpha1.WorkflowStepPhaseSucceeded {
 			return e.stepStatus[dependsOn].Phase
 		}
-		if result := e.findDependsOnPhase(dependsOn); isUnsuccessfulStep(result) {
+		if result := e.findDependsOnPhase(dependsOn); result != v1alpha1.WorkflowStepPhaseSucceeded {
 			return result
 		}
 	}
 	return v1alpha1.WorkflowStepPhaseSucceeded
 }
 
-func isUnsuccessfulStep(phase v1alpha1.WorkflowStepPhase) bool {
+func isUnsuccessfulStep(phase v1alpha1.WorkflowStepPhase, dependsOn bool) bool {
+	if dependsOn {
+		return phase != v1alpha1.WorkflowStepPhaseSucceeded
+	}
 	return phase != v1alpha1.WorkflowStepPhaseSucceeded && phase != v1alpha1.WorkflowStepPhaseSkipped
 }
 
