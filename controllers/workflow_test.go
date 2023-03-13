@@ -538,6 +538,21 @@ var _ = Describe("Test Workflow", func() {
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "step3",
+					Type: "suspend",
+					If:   "false",
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step4",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					DependsOn:  []string{"step3"},
+				},
+			},
 		}
 		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
@@ -551,6 +566,7 @@ var _ = Describe("Test Workflow", func() {
 		expDeployment := &appsv1.Deployment{}
 		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
 		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
+		step4Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step4"}
 		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		checkRun := &v1alpha1.WorkflowRun{}
@@ -570,6 +586,8 @@ var _ = Describe("Test Workflow", func() {
 		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, step4Key, expDeployment)).Should(utils.NotFoundMatcher{})
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
