@@ -39,7 +39,7 @@ type provider struct{}
 
 // PromCheck do health check from metrics from prometheus
 func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
-	stepId, err := v.GetString("stepID")
+	stepID, err := v.GetString("stepID")
 	if err != nil {
 		return err
 	}
@@ -61,13 +61,15 @@ func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context
 	}
 
 	if res {
-		// not meet the condition
-		return handleSuccessCompare(wfCtx, stepId, v, conditionStr, valueStr)
+		// meet the condition
+		return handleSuccessCompare(wfCtx, stepID, v, conditionStr, valueStr)
 	}
-	return handleFailCompare(wfCtx, stepId, v, conditionStr, valueStr)
+	return handleFailCompare(wfCtx, stepID, v, conditionStr, valueStr)
 }
 
-func handleSuccessCompare(wfCtx wfContext.Context, stepId string, v *value.Value, conditionStr, valueStr string) error {
+func handleSuccessCompare(wfCtx wfContext.Context, stepID string, v *value.Value, conditionStr, valueStr string) error {
+	// clean up fail timeStamp
+	setMetricsStatusTime(wfCtx, stepID, "fail", 0)
 	d, err := v.GetString("duration")
 	if err != nil {
 		return err
@@ -77,14 +79,13 @@ func handleSuccessCompare(wfCtx wfContext.Context, stepId string, v *value.Value
 		return err
 	}
 
-	st := getSuccessTime(wfCtx, stepId)
+	st := getMetricsStatusTime(wfCtx, stepID, "success")
 	if st == 0 {
 		// first success
-		if err = v.FillObject(fmt.Sprintf("The healthy condition should be %s, and the query result is %s, indicating success.", conditionStr, valueStr), "message"); err != nil {
+		if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, and the query result is %s, indicating success.", conditionStr, valueStr), "message"); err != nil {
 			return err
 		}
-		setSuccessTime(wfCtx, stepId, time.Now().Unix())
-		setFailTime(wfCtx, stepId, 0)
+		setMetricsStatusTime(wfCtx, stepID, "success", time.Now().Unix())
 		return v.FillObject(false, "result")
 	}
 	successTime := time.Unix(st, 0)
@@ -100,9 +101,10 @@ func handleSuccessCompare(wfCtx wfContext.Context, stepId string, v *value.Value
 	return v.FillObject(false, "result")
 }
 
-func handleFailCompare(wfCtx wfContext.Context, stepId string, v *value.Value, conditionStr, valueStr string) error {
-	setSuccessTime(wfCtx, stepId, 0)
-	ft := getFailTime(wfCtx, stepId)
+func handleFailCompare(wfCtx wfContext.Context, stepID string, v *value.Value, conditionStr, valueStr string) error {
+	// clean up success timeStamp
+	setMetricsStatusTime(wfCtx, stepID, "success", 0)
+	ft := getMetricsStatusTime(wfCtx, stepID, "")
 	d, err := v.GetString("failDuration")
 	if err != nil {
 		return err
@@ -114,8 +116,8 @@ func handleFailCompare(wfCtx wfContext.Context, stepId string, v *value.Value, c
 
 	if ft == 0 {
 		// first failed
-		setFailTime(wfCtx, stepId, time.Now().Unix())
-		if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure, with the failure duration being %s. The check has terminated.", conditionStr, valueStr, failDuration), "message"); err != nil {
+		setMetricsStatusTime(wfCtx, stepID, "fail", time.Now().Unix())
+		if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure, with the failure duration being %s. This is first failed checking.", conditionStr, valueStr, failDuration), "message"); err != nil {
 			return err
 		}
 		return v.FillObject(false, "result")
@@ -164,7 +166,7 @@ func getQueryResult(ctx monitorContext.Context, v *value.Value) (string, error) 
 		valueStr = v.Value.String()
 	case model.Vector:
 		if len(v) != 1 {
-			return "", fmt.Errorf("the query value have multi result, please check the query")
+			return "", fmt.Errorf(fmt.Sprintf("ehe query is returning %d results when it should only return one. Please review the query to identify and fix the issue", len(v)))
 		}
 		valueStr = v[0].Value.String()
 	default:
@@ -186,25 +188,12 @@ func compareValueWithCondition(valueStr string, conditionStr string, v *value.Va
 	return res, nil
 }
 
-func setSuccessTime(wfCtx wfContext.Context, stepID string, time int64) {
-	wfCtx.SetMutableValue(strconv.FormatInt(time, 10), stepID, "success", "time")
+func setMetricsStatusTime(wfCtx wfContext.Context, stepID string, status string, time int64) {
+	wfCtx.SetMutableValue(strconv.FormatInt(time, 10), stepID, "metrics", status, "time")
 }
 
-func getSuccessTime(wfCtx wfContext.Context, stepID string) int64 {
-	str := wfCtx.GetMutableValue(stepID, "success", "time")
-	if len(str) == 0 {
-		return 0
-	}
-	t, _ := strconv.ParseInt(str, 10, 64)
-	return t
-}
-
-func setFailTime(wfCtx wfContext.Context, stepID string, time int64) {
-	wfCtx.SetMutableValue(strconv.FormatInt(time, 10), stepID, "fail", "time")
-}
-
-func getFailTime(wfCtx wfContext.Context, stepID string) int64 {
-	str := wfCtx.GetMutableValue(stepID, "fail", "time")
+func getMetricsStatusTime(wfCtx wfContext.Context, stepID string, status string) int64 {
+	str := wfCtx.GetMutableValue(stepID, "metrics", status, "time")
 	if len(str) == 0 {
 		return 0
 	}
