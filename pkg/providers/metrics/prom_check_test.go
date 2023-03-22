@@ -89,7 +89,7 @@ func runMockPrometheusServer() *http.Server {
     }
 }`))
 	})}
-	time.Sleep(3 * time.Second)
 	go srv.ListenAndServe() // no lint
+	time.Sleep(3 * time.Second)
 	return &srv
 }
