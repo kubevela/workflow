@@ -25,11 +25,9 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/types"
-	"github.com/prometheus/common/model"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 )
 
 const (
@@ -37,10 +35,7 @@ const (
 	ProviderName = "metrics"
 )
 
-type provider struct {
-	cli client.Client
-	ns  string
-}
+type provider struct{}
 
 // PromCheck do health check from metrics from prometheus
 func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
@@ -59,7 +54,7 @@ func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context
 		return err
 	}
 
-	res, err := campareValueWithCondition(valueStr, conditionStr, v)
+	res, err := compareValueWithCondition(valueStr, conditionStr, v)
 
 	if err != nil {
 		return err
@@ -99,7 +94,7 @@ func handleSuccessCompare(wfCtx wfContext.Context, stepId string, v *value.Value
 		}
 		return v.FillObject(true, "result")
 	}
-	if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, and the query result is %s, indicating success. The success has persisted for %s, with success duration being %s.", conditionStr, valueStr, time.Now().Sub(successTime).String(), duration), "message"); err != nil {
+	if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, and the query result is %s, indicating success. The success has persisted for %s, with success duration being %s.", conditionStr, valueStr, time.Since(successTime).String(), duration), "message"); err != nil {
 		return err
 	}
 	return v.FillObject(false, "result")
@@ -131,12 +126,12 @@ func handleFailCompare(wfCtx wfContext.Context, stepId string, v *value.Value, c
 		if err = v.FillObject(true, "failed"); err != nil {
 			return err
 		}
-		if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure. The failure has persisted for %s, with the failure duration being %s. The check has terminated.", conditionStr, valueStr, time.Now().Sub(failTime).String(), failDuration), "message"); err != nil {
+		if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure. The failure has persisted for %s, with the failure duration being %s. The check has terminated.", conditionStr, valueStr, time.Since(failTime).String(), failDuration), "message"); err != nil {
 			return err
 		}
 		return v.FillObject(false, "result")
 	}
-	if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure. The failure has persisted for %s, with the failure duration being %s.", conditionStr, valueStr, time.Now().Sub(failTime).String(), failDuration), "message"); err != nil {
+	if err := v.FillObject(fmt.Sprintf("The healthy condition should be %s, but the query result is %s, indicating failure. The failure has persisted for %s, with the failure duration being %s.", conditionStr, valueStr, time.Since(failTime).String(), failDuration), "message"); err != nil {
 		return err
 	}
 	return v.FillObject(false, "result")
@@ -144,6 +139,9 @@ func handleFailCompare(wfCtx wfContext.Context, stepId string, v *value.Value, c
 
 func getQueryResult(ctx monitorContext.Context, v *value.Value) (string, error) {
 	addr, err := v.GetString("metricEndpoint")
+	if err != nil {
+		return "", err
+	}
 	c, err := api.NewClient(api.Config{
 		Address: addr,
 	})
@@ -175,11 +173,7 @@ func getQueryResult(ctx monitorContext.Context, v *value.Value) (string, error) 
 	return valueStr, nil
 }
 
-func campareValueWithCondition(valueStr string, conditionStr string, v *value.Value) (bool, error) {
-	conditionStr, err := v.GetString("condition")
-	if err != nil {
-		return false, err
-	}
+func compareValueWithCondition(valueStr string, conditionStr string, v *value.Value) (bool, error) {
 	template := fmt.Sprintf("if: %s %s", valueStr, conditionStr)
 	cueValue, err := value.NewValue(template, nil, "")
 	if err != nil {

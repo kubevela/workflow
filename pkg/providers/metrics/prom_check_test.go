@@ -31,10 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	queryString = `sum(nginx_ingress_controller_requests{host="canary-demo.com",status="200"})`
-)
-
 func TestMetricCheck(t *testing.T) {
 	srv := runMockPrometheusServer() // no lint
 
@@ -77,7 +73,7 @@ func TestMetricCheck(t *testing.T) {
 func runMockPrometheusServer() *http.Server {
 	srv := http.Server{Addr: ":18089", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(fmt.Sprintf(`{
+		w.Write([]byte(`{
     "status": "success",
     "data": {
         "resultType": "vector",
@@ -91,7 +87,7 @@ func runMockPrometheusServer() *http.Server {
             }
         ]
     }
-}`)))
+}`))
 	})}
 	time.Sleep(3 * time.Second)
 	go srv.ListenAndServe() // no lint
