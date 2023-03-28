@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	metrics2 "github.com/kubevela/workflow/pkg/providers/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -160,6 +161,7 @@ func installBuiltinProviders(instance *types.WorkflowInstance, client client.Cli
 	util.Install(providerHandlers, pCtx)
 	http.Install(providerHandlers, client, instance.Namespace)
 	provider.Install(providerHandlers, client, nil)
+	metrics2.Install(providerHandlers)
 	kube.Install(providerHandlers, client, map[string]string{
 		types.LabelWorkflowRunName:      instance.Name,
 		types.LabelWorkflowRunNamespace: instance.Namespace,
