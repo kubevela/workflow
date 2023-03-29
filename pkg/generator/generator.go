@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	metrics2 "github.com/kubevela/workflow/pkg/providers/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +38,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/http"
 	"github.com/kubevela/workflow/pkg/providers/kube"
+	metrics2 "github.com/kubevela/workflow/pkg/providers/metrics"
 	"github.com/kubevela/workflow/pkg/providers/util"
 	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks"
@@ -127,7 +127,7 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 					Kind:       v1alpha1.WorkflowRunKind,
 					Name:       run.Name,
 					UID:        run.UID,
-					Controller: pointer.BoolPtr(true),
+					Controller: pointer.Bool(true),
 				},
 			},
 		},
