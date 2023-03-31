@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"github.com/pkg/errors"
-
 	monitorContext "github.com/kubevela/pkg/monitor/context"
+	"github.com/kubevela/pkg/util/slices"
+	"github.com/pkg/errors"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -63,6 +63,7 @@ type taskRunner struct {
 	name         string
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
 	checkPending func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
+	fillContext  func(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter
 }
 
 // Name return step name.
@@ -78,6 +79,10 @@ func (tr *taskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) 
 // Pending check task should be executed or not.
 func (tr *taskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 	return tr.checkPending(ctx, wfCtx, stepStatus)
+}
+
+func (tr *taskRunner) FillContextData(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
+	return tr.fillContext(ctx, processCtx)
 }
 
 // nolint:gocyclo
@@ -119,8 +124,26 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			if t.runOptionsProcess != nil {
 				t.runOptionsProcess(options)
 			}
-			basicVal, _, _ := MakeBasicValue(ctx, wfCtx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
+			resetter := tRunner.fillContext(ctx, options.PCtx)
+			defer resetter(options.PCtx)
+			basicVal, _, _ := MakeBasicValue(wfCtx, paramsStr, options.PCtx)
 			return CheckPending(wfCtx, wfStep, exec.wfStatus.ID, stepStatus, basicVal)
+		}
+		tRunner.fillContext = func(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
+			metas := []process.StepMetaKV{
+				process.WithName(wfStep.Name),
+				process.WithSessionID(exec.wfStatus.ID),
+				process.WithSpanID(ctx.GetID()),
+			}
+			manager := process.NewStepRunTimeMeta()
+			manager.Fill(processCtx, metas)
+			return func(processCtx process.Context) {
+				manager.Remove(processCtx, slices.Map(metas,
+					func(t process.StepMetaKV) string {
+						return t.Key
+					}),
+				)
+			}
 		}
 		tRunner.run = func(ctx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 			if options.GetTracer == nil {
@@ -138,7 +161,9 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				t.runOptionsProcess(options)
 			}
 
-			basicVal, basicTemplate, err := MakeBasicValue(tracer, ctx, t.pd, wfStep.Name, exec.wfStatus.ID, paramsStr, options.PCtx)
+			resetter := tRunner.fillContext(tracer, options.PCtx)
+			defer resetter(options.PCtx)
+			basicVal, basicTemplate, err := MakeBasicValue(ctx, paramsStr, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")
 				return v1alpha1.StepStatus{}, nil, errors.WithMessage(err, "make context parameter")
@@ -292,12 +317,12 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, temp
 }
 
 // MakeBasicValue makes basic value
-func MakeBasicValue(ctx monitorContext.Context, wfCtx wfContext.Context, pd *packages.PackageDiscover, step, id, parameterTemplate string, pCtx process.Context) (*value.Value, string, error) {
+func MakeBasicValue(wfCtx wfContext.Context, parameterTemplate string, pCtx process.Context) (*value.Value, string, error) {
 	paramStr := model.ParameterFieldName + ": {}\n"
 	if parameterTemplate != "" {
 		paramStr = fmt.Sprintf(model.ParameterFieldName+": {%s}\n", parameterTemplate)
 	}
-	template := strings.Join([]string{getContextTemplate(ctx, wfCtx, step, id, pCtx), paramStr}, "\n")
+	template := strings.Join([]string{getContextTemplate(pCtx), paramStr}, "\n")
 	v, err := wfCtx.MakeParameter(template)
 	if err != nil {
 		return nil, "", err
@@ -308,14 +333,11 @@ func MakeBasicValue(ctx monitorContext.Context, wfCtx wfContext.Context, pd *pac
 	return v, template, nil
 }
 
-func getContextTemplate(ctx monitorContext.Context, wfCtx wfContext.Context, step, id string, pCtx process.Context) string {
-	contextTempl := fmt.Sprintf("\ncontext: stepSessionID: \"%s\"", id)
+func getContextTemplate(pCtx process.Context) string {
+	var contextTempl string
 	if pCtx == nil {
-		return ""
+		return contextTempl
 	}
-	pCtx.PushData(model.ContextStepSessionID, id)
-	pCtx.PushData(model.ContextStepName, step)
-	pCtx.PushData(model.ContextSpanID, ctx.GetID())
 	c, err := pCtx.BaseContextFile()
 	if err != nil {
 		return ""

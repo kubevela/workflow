@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
+	"github.com/kubevela/pkg/util/slices"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -61,7 +62,9 @@ func (tr *stepGroupTaskRunner) Name() string {
 
 // Pending check task should be executed or not.
 func (tr *stepGroupTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
-	basicVal, _, _ := custom.MakeBasicValue(ctx, wfCtx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	resetter := tr.FillContextData(ctx, tr.pCtx)
+	defer resetter(tr.pCtx)
+	basicVal, _, _ := custom.MakeBasicValue(wfCtx, "", tr.pCtx)
 	return custom.CheckPending(wfCtx, tr.step, tr.id, stepStatus, basicVal)
 }
 
@@ -81,7 +84,9 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 		}
 	}
 	tracer := options.GetTracer(tr.id, tr.step).AddTag("step_name", tr.name, "step_type", types.WorkflowStepTypeStepGroup)
-	basicVal, basicTemplate, err := custom.MakeBasicValue(tracer, ctx, tr.pd, tr.name, tr.id, "", tr.pCtx)
+	resetter := tr.FillContextData(tracer, tr.pCtx)
+	defer resetter(tr.pCtx)
+	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, "", tr.pCtx)
 	if err != nil {
 		return status, nil, err
 	}
@@ -135,6 +140,24 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	status, operations = getStepGroupStatus(status, stepStatus, e.GetOperation(), len(tr.subTaskRunners))
 
 	return status, operations, nil
+}
+
+func (tr *stepGroupTaskRunner) FillContextData(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
+	metas := []process.StepMetaKV{
+		process.WithName(tr.name),
+		process.WithSessionID(tr.id),
+		process.WithSpanID(ctx.GetID()),
+		process.WithGroupName(tr.name),
+	}
+	manager := process.NewStepRunTimeMeta()
+	manager.Fill(processCtx, metas)
+	return func(processCtx process.Context) {
+		manager.Remove(processCtx, slices.Map(metas,
+			func(t process.StepMetaKV) string {
+				return t.Key
+			}),
+		)
+	}
 }
 
 func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.WorkflowStepStatus, operation *types.Operation, subTaskRunners int) (v1alpha1.StepStatus, *types.Operation) {
