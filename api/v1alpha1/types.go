@@ -160,7 +160,10 @@ type WorkflowList struct {
 // WorkflowStep defines how to execute a workflow step.
 type WorkflowStep struct {
 	WorkflowStepBase `json:",inline"`
-	SubSteps         []WorkflowStepBase `json:"subSteps,omitempty"`
+	// Mode is only valid for sub steps, it defines the mode of the sub steps
+	// +nullable
+	Mode     WorkflowMode       `json:"mode,omitempty"`
+	SubSteps []WorkflowStepBase `json:"subSteps,omitempty"`
 }
 
 // WorkflowStepMeta contains the meta data of a workflow step
