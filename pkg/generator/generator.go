@@ -201,6 +201,9 @@ func generateTaskRunner(ctx context.Context,
 		if instance.Mode != nil {
 			options.SubStepExecuteMode = instance.Mode.SubSteps
 		}
+		if step.Mode != "" {
+			options.SubStepExecuteMode = step.Mode
+		}
 	}
 
 	genTask, err := taskDiscover.GetTaskGenerator(ctx, step.Type)

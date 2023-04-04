@@ -875,6 +875,80 @@ var _ = Describe("Test Workflow", func() {
 		}))
 	})
 
+	It("test workflow run with mode in step groups", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-group-mode"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name:       "step1",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+				},
+			},
+			{
+				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+					Name: "group",
+					Type: "step-group",
+				},
+				Mode: v1alpha1.WorkflowModeStep,
+				SubSteps: []v1alpha1.WorkflowStepBase{
+					{
+						Name:       "step2",
+						Type:       "test-apply",
+						Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					},
+					{
+						Name:       "step3",
+						Type:       "test-apply",
+						Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					},
+				},
+			},
+		}
+		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+			Steps: v1alpha1.WorkflowModeDAG,
+		}
+
+		Expect(k8sClient.Create(context.Background(), wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		expDeployment := &appsv1.Deployment{}
+		step3Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step3"}
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(utils.NotFoundMatcher{})
+
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
+		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, step3Key, expDeployment)).Should(BeNil())
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(v1alpha1.WorkflowExecuteMode{
+			Steps:    v1alpha1.WorkflowModeDAG,
+			SubSteps: v1alpha1.WorkflowModeDAG,
+		}))
+	})
+
 	It("test sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-substeps"
