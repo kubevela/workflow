@@ -53,7 +53,6 @@ func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstanc
 		metrics.GenerateTaskRunnersDurationHistogram.WithLabelValues("workflowrun").Observe(v)
 	}))
 	defer subCtx.Commit("finish generate task runners")
-	options = initStepGeneratorOptions(ctx, instance, options)
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
 	var tasks []types.TaskRunner
 	for _, step := range instance.Steps {

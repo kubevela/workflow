@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/kubevela/workflow/pkg/opt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +31,6 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 var _ = Describe("Test workflow step runner generator", func() {
@@ -86,7 +87,7 @@ var _ = Describe("Test workflow step runner generator", func() {
 		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
 		Expect(err).Should(BeNil())
 		ctx := monitorContext.NewTraceContext(ctx, "test-wr")
-		runners, err := GenerateRunners(ctx, instance, types.StepGeneratorOptions{Client: k8sClient})
+		runners, err := GenerateRunners(ctx, instance, opt.NewStepGeneratorOptions(k8sClient, instance))
 		Expect(err).Should(BeNil())
 		Expect(len(runners)).Should(BeEquivalentTo(1))
 		Expect(runners[0].Name()).Should(BeEquivalentTo("step-1"))
@@ -128,7 +129,7 @@ var _ = Describe("Test workflow step runner generator", func() {
 		ctx := monitorContext.NewTraceContext(ctx, "test-wr-sub")
 		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
 		Expect(err).Should(BeNil())
-		runners, err := GenerateRunners(ctx, instance, types.StepGeneratorOptions{Client: k8sClient})
+		runners, err := GenerateRunners(ctx, instance, opt.NewStepGeneratorOptions(k8sClient, instance))
 		Expect(err).Should(BeNil())
 		Expect(len(runners)).Should(BeEquivalentTo(1))
 		Expect(runners[0].Name()).Should(BeEquivalentTo("step-1"))

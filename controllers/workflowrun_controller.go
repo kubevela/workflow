@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/kubevela/workflow/pkg/opt"
+
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/pkg/errors"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -127,11 +129,8 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return r.endWithNegativeCondition(logCtx, run, condition.ErrorCondition(v1alpha1.WorkflowRunConditionType, err))
 	}
 	isUpdate := instance.Status.Message != ""
+	runners, err := generator.GenerateRunners(logCtx, instance, opt.NewStepGeneratorOptions(r.Client, instance, opt.WithPackageDiscover(r.PackageDiscover)))
 
-	runners, err := generator.GenerateRunners(logCtx, instance, types.StepGeneratorOptions{
-		PackageDiscover: r.PackageDiscover,
-		Client:          r.Client,
-	})
 	if err != nil {
 		logCtx.Error(err, "[generate runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))
