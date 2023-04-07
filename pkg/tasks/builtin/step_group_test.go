@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
@@ -53,7 +54,7 @@ func TestStepGroupStep(t *testing.T) {
 			Name:      "test",
 			DependsOn: []string{"depend"},
 		},
-	}, &types.TaskGeneratorOptions{ID: "124", SubTaskRunners: []types.TaskRunner{subRunner}})
+	}, &types.TaskGeneratorOptions{ID: "124", SubTaskRunners: []types.TaskRunner{subRunner}, ProcessContext: process.NewContext(process.ContextData{})})
 	r.NoError(err)
 	r.Equal(runner.Name(), "test")
 

@@ -39,6 +39,7 @@ type Context interface {
 	BaseContextLabels() map[string]string
 	SetParameters(params map[string]interface{})
 	PushData(key string, data interface{})
+	RemoveData(key string)
 	GetData(key string) interface{}
 	GetCtx() context.Context
 	SetCtx(context.Context)
@@ -216,6 +217,10 @@ func (ctx *templateContext) PushData(key string, data interface{}) {
 		return
 	}
 	ctx.data[key] = data
+}
+
+func (ctx *templateContext) RemoveData(key string) {
+	delete(ctx.data, key)
 }
 
 // GetData get data from context

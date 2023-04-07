@@ -23,11 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/kubevela/pkg/util/slices"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/yaml"
-
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,12 +35,13 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
-
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
@@ -2306,7 +2306,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 			}, &types.Operation{}, err
 		}
 	case "step-group":
-		group, _ := builtin.StepGroup(step, &types.TaskGeneratorOptions{SubTaskRunners: subTaskRunners})
+		group, _ := builtin.StepGroup(step, &types.TaskGeneratorOptions{SubTaskRunners: subTaskRunners, ProcessContext: process.NewContext(process.ContextData{})})
 		run = group.Run
 	case "running":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
@@ -2329,6 +2329,17 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 	return &testTaskRunner{
 		step: step,
 		run:  run,
+		fillContext: func(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
+			metas := []process.StepMetaKV{process.WithName(step.Name), process.WithSessionID("id"), process.WithSpanID(ctx.GetID())}
+			manager := process.NewStepRunTimeMeta()
+			manager.Fill(processCtx, metas)
+			return func(processCtx process.Context) {
+				manager.Remove(processCtx, slices.Map(metas,
+					func(t process.StepMetaKV) string {
+						return t.Key
+					}))
+			}
+		},
 		checkPending: func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 			if step.Type != "pending" {
 				return false, v1alpha1.StepStatus{}
@@ -2349,6 +2360,7 @@ type testTaskRunner struct {
 	step         v1alpha1.WorkflowStep
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
 	checkPending func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
+	fillContext  func(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter
 }
 
 // Name return step name.
@@ -2359,7 +2371,13 @@ func (tr *testTaskRunner) Name() string {
 // Run execute task.
 func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
 	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
-	basicVal, basicTemplate, err := custom.MakeBasicValue(logCtx, ctx, nil, tr.step.Name, "id", "", options.PCtx)
+	if options.PCtx == nil {
+		options.PCtx = process.NewContext(process.ContextData{})
+	}
+	resetter := tr.fillContext(logCtx, options.PCtx)
+	defer resetter(options.PCtx)
+
+	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, "", options.PCtx)
 	if err != nil {
 		return v1alpha1.StepStatus{}, nil, err
 	}
@@ -2402,6 +2420,11 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 // Pending check task should be executed or not.
 func (tr *testTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 	return tr.checkPending(ctx, wfCtx, stepStatus)
+}
+
+// FillRunTime fill runtime data to context.
+func (tr *testTaskRunner) FillContextData(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
+	return tr.fillContext(ctx, processCtx)
 }
 
 func cleanStepTimeStamp(wfStatus *v1alpha1.WorkflowRunStatus) {

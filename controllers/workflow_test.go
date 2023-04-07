@@ -72,7 +72,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		},
 	}
-	testDefinitions := []string{"test-apply", "apply-object", "failed-render", "suspend-and-deploy", "multi-suspend"}
+	testDefinitions := []string{"test-apply", "apply-object", "failed-render", "suspend-and-deploy", "multi-suspend", "save-process-context"}
 
 	BeforeEach(func() {
 		setupNamespace(ctx, namespace)
@@ -1821,6 +1821,101 @@ var _ = Describe("Test Workflow", func() {
 			Name:      debug.GenerateContextName(wr.Name, curRun.Status.Steps[1].SubStepsStatus[0].ID, string(curRun.UID)),
 			Namespace: wr.Namespace,
 		}, debugCM)).Should(BeNil())
+	})
+
+	It("test step context data", func() {
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "test-step-context-data"
+		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{{
+			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				Name: "group1",
+				Type: "step-group",
+			},
+			SubSteps: []v1alpha1.WorkflowStepBase{
+				{
+					Name:       "step1",
+					Type:       "save-process-context",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step1"}`)},
+				},
+				{
+					Name:       "step2",
+					Type:       "save-process-context",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step2"}`)},
+				},
+			},
+		}, {
+			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				Name: "group2",
+				Type: "step-group",
+			},
+			SubSteps: []v1alpha1.WorkflowStepBase{
+				{
+					Name:       "step3",
+					Type:       "save-process-context",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step3"}`)},
+				},
+				{
+					Name:       "step4",
+					Type:       "save-process-context",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step4"}`)},
+				},
+			},
+		}, {
+			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				Name:       "step5",
+				Type:       "save-process-context",
+				Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step5"}`)},
+			},
+		}}
+		Expect(k8sClient.Create(ctx, wr)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+		wrObj := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr.Name,
+			Namespace: wr.Namespace,
+		}, wrObj)).Should(BeNil())
+		cmList := new(corev1.ConfigMapList)
+		labels := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"process.context.data": "true",
+			},
+		}
+		selector, err := metav1.LabelSelectorAsSelector(labels)
+		Expect(err).Should(BeNil())
+		Expect(k8sClient.List(ctx, cmList, &client.ListOptions{
+			LabelSelector: selector,
+		})).Should(BeNil())
+
+		processCtxMap := make(map[string]map[string]string)
+		for _, cm := range cmList.Items {
+			processCtxMap[cm.Name] = cm.Data
+		}
+		step1Ctx := processCtxMap["process-context-step1"]
+		step2Ctx := processCtxMap["process-context-step2"]
+		step3Ctx := processCtxMap["process-context-step3"]
+		step4Ctx := processCtxMap["process-context-step4"]
+		step5Ctx := processCtxMap["process-context-step5"]
+
+		By("check context.stepName")
+		Expect(step1Ctx["stepName"]).Should(Equal("step1"))
+		Expect(step2Ctx["stepName"]).Should(Equal("step2"))
+		Expect(step3Ctx["stepName"]).Should(Equal("step3"))
+		Expect(step4Ctx["stepName"]).Should(Equal("step4"))
+		Expect(step5Ctx["stepName"]).Should(Equal("step5"))
+
+		By("check context.stepGroupName")
+		Expect(step1Ctx["stepGroupName"]).Should(Equal("group1"))
+		Expect(step2Ctx["stepGroupName"]).Should(Equal("group1"))
+		Expect(step3Ctx["stepGroupName"]).Should(Equal("group2"))
+		Expect(step4Ctx["stepGroupName"]).Should(Equal("group2"))
+		Expect(step5Ctx["stepGroupName"]).Should(Equal(""))
+
+		By("check context.spanID")
+		spanID := strings.Split(step1Ctx["spanID"], ".")[0]
+		for _, pCtx := range processCtxMap {
+			Expect(pCtx["spanID"]).Should(ContainSubstring(spanID))
+		}
 	})
 })
 

@@ -57,11 +57,15 @@ type WorkflowMeta struct {
 	ChildOwnerReferences []metav1.OwnerReference
 }
 
+// ContextDataResetter reset process.Context after the step is finished
+type ContextDataResetter func(processCtx process.Context)
+
 // TaskRunner is a task runner
 type TaskRunner interface {
 	Name() string
 	Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 	Run(ctx wfContext.Context, options *TaskRunOptions) (v1alpha1.StepStatus, *Operation, error)
+	FillContextData(ctx monitorContext.Context, processCtx process.Context) ContextDataResetter
 }
 
 // TaskDiscover is the interface to obtain the TaskGenerator

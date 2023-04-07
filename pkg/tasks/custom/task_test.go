@@ -23,14 +23,13 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
-
-	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
@@ -598,8 +597,7 @@ func TestValidateIfValue(t *testing.T) {
 		Namespace: "default",
 		Data:      map[string]interface{}{"arr": []string{"a", "b"}},
 	})
-	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
-	basicVal, basicTemplate, err := MakeBasicValue(logCtx, ctx, nil, "test-step", "id", `key: "value"`, pCtx)
+	basicVal, basicTemplate, err := MakeBasicValue(ctx, `key: "value"`, pCtx)
 	r := require.New(t)
 	r.NoError(err)
 

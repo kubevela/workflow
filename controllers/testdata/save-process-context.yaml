@@ -1,0 +1,26 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+    name: save-process-context
+    namespace: vela-system
+spec:
+    schematic:
+        cue:
+            template: |
+                import "vela/op"
+
+                cm: op.#Apply & {
+                	value: {
+                		apiVersion: "v1"
+                		kind: "ConfigMap"
+                		metadata: {
+                			name: parameter.name
+                			labels: {
+                				"process.context.data": "true"
+                			}
+                		}
+                		data: context
+                	}
+                }
+
+                parameter: name: string
