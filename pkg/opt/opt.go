@@ -22,78 +22,78 @@ type Option func(options *StepGeneratorOptions)
 
 // StepGeneratorOptions is the options for generate step.
 type StepGeneratorOptions struct {
-	Providers       types.Providers
-	PackageDiscover *packages.PackageDiscover
-	ProcessCtx      process.Context
-	TemplateLoader  template.Loader
-	Client          client.Client
-	StepConvertor   map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
-	LogLevel        int
+	providers       types.Providers
+	packageDiscover *packages.PackageDiscover
+	processCtx      process.Context
+	templateLoader  template.Loader
+	client          client.Client
+	stepConvertor   map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	logLevel        int
 }
 
 func NewStepGeneratorOptions(client client.Client, instance *types.WorkflowInstance, opts ...Option) types.StepGeneratorOptions {
 	o := StepGeneratorOptions{
-		Client:         client,
-		Providers:      providers.NewProviders(),
-		TemplateLoader: template.NewWorkflowStepTemplateLoader(client),
-		LogLevel:       3,
+		client:         client,
+		providers:      providers.NewProviders(),
+		templateLoader: template.NewWorkflowStepTemplateLoader(client),
+		logLevel:       3,
 	}
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	installBuiltinProviders(instance, client, o.Providers, o.ProcessCtx)
+	installBuiltinProviders(instance, client, o.providers, o.processCtx)
 
 	return types.StepGeneratorOptions{
-		Providers:       o.Providers,
-		PackageDiscover: o.PackageDiscover,
-		ProcessCtx:      o.ProcessCtx,
-		TemplateLoader:  o.TemplateLoader,
-		Client:          o.Client,
-		StepConvertor:   o.StepConvertor,
-		LogLevel:        o.LogLevel,
+		Providers:       o.providers,
+		PackageDiscover: o.packageDiscover,
+		ProcessCtx:      o.processCtx,
+		TemplateLoader:  o.templateLoader,
+		Client:          o.client,
+		StepConvertor:   o.stepConvertor,
+		LogLevel:        o.logLevel,
 	}
 }
 
 func WithProviders(providers types.Providers) Option {
 	return func(o *StepGeneratorOptions) {
-		o.Providers = providers
+		o.providers = providers
 	}
 }
 
 func WithPackageDiscover(discover *packages.PackageDiscover) Option {
 	return func(o *StepGeneratorOptions) {
-		o.PackageDiscover = discover
+		o.packageDiscover = discover
 	}
 }
 
 func WithProcessCtx(ctx process.Context) Option {
 	return func(o *StepGeneratorOptions) {
-		o.ProcessCtx = ctx
+		o.processCtx = ctx
 	}
 }
 
 func WithTemplateLoader(loader template.Loader) Option {
 	return func(o *StepGeneratorOptions) {
-		o.TemplateLoader = loader
+		o.templateLoader = loader
 	}
 }
 
 func WithClient(c client.Client) Option {
 	return func(o *StepGeneratorOptions) {
-		o.Client = c
+		o.client = c
 	}
 }
 
 func WithStepConvertor(convertor map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)) Option {
 	return func(o *StepGeneratorOptions) {
-		o.StepConvertor = convertor
+		o.stepConvertor = convertor
 	}
 }
 
 func WithLogLevel(l int) Option {
 	return func(o *StepGeneratorOptions) {
-		o.LogLevel = l
+		o.logLevel = l
 	}
 }
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	metrics2 "github.com/kubevela/workflow/pkg/providers/metrics"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,20 +28,11 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/util/rand"
 
-	"github.com/oam-dev/kubevela/pkg/config/provider"
-
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
-	"github.com/kubevela/workflow/pkg/providers"
-	"github.com/kubevela/workflow/pkg/providers/email"
-	"github.com/kubevela/workflow/pkg/providers/http"
-	"github.com/kubevela/workflow/pkg/providers/kube"
-	"github.com/kubevela/workflow/pkg/providers/util"
-	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks"
-	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -138,33 +128,6 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 	}
 	executor.InitializeWorkflowInstance(instance)
 	return instance, nil
-}
-
-func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
-	if options.Providers == nil {
-		options.Providers = providers.NewProviders()
-	}
-	if options.ProcessCtx == nil {
-		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
-	}
-	installBuiltinProviders(instance, options.Client, options.Providers, options.ProcessCtx)
-	if options.TemplateLoader == nil {
-		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
-	}
-	return options
-}
-
-func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers, pCtx process.Context) {
-	workspace.Install(providerHandlers, pCtx)
-	email.Install(providerHandlers)
-	util.Install(providerHandlers, pCtx)
-	http.Install(providerHandlers, client, instance.Namespace)
-	provider.Install(providerHandlers, client, nil)
-	metrics2.Install(providerHandlers)
-	kube.Install(providerHandlers, client, map[string]string{
-		types.LabelWorkflowRunName:      instance.Name,
-		types.LabelWorkflowRunNamespace: instance.Namespace,
-	}, nil)
 }
 
 func generateTaskRunner(ctx context.Context,
