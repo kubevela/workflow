@@ -1,0 +1,49 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: chat-gpt
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+    # apply a deployment with invalid image, this step will fail because of timeout
+    # the resource will be passed to chat-gpt step to anaylze
+    - name: apply
+      type: apply-deployment
+      timeout: 3s
+      outputs:
+        - name: resource
+          valueFrom: output.value
+      properties:
+        image: invalid
+
+    # if apply step failed, send the resource to chat-gpt to diagnose
+    - name: chat-diagnose
+      if: status.apply.failed
+      type: chat-gpt
+      inputs:
+        - from: resource
+          parameterKey: prompt.content
+      properties:
+        token: 
+          # specify your token
+          value: <your token>
+        prompt:
+          type: diagnose
+
+    # if apply step succeeded, send the resource to chat-gpt to audit
+    - name: chat-audit
+      if: status.apply.succeeded
+      type: chat-gpt
+      inputs:
+        - from: resource
+          parameterKey: prompt.content
+      properties:
+        token: 
+          # or read your token from secret
+          secretRef:
+            name: chat-gpt-token-secret
+            key: token
+        prompt:
+          type: audit
+          lang: Chinese
