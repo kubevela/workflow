@@ -148,12 +148,12 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 		return status, &types.Operation{Skip: true}
 	case status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonTimeout:
 		return status, &types.Operation{Terminated: true}
+	case subStepCounts[string(v1alpha1.WorkflowStepPhaseSuspending)] > 0:
+		status.Phase = v1alpha1.WorkflowStepPhaseSuspending
 	case len(stepStatus.SubStepsStatus) < subTaskRunners:
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseRunning)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
-	case subStepCounts[string(v1alpha1.WorkflowStepPhaseSuspending)] > 0:
-		status.Phase = v1alpha1.WorkflowStepPhaseSuspending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhasePending)] > 0:
 		status.Phase = v1alpha1.WorkflowStepPhasePending
 	case subStepCounts[string(v1alpha1.WorkflowStepPhaseFailed)] > 0:
