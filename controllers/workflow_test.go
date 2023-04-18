@@ -310,11 +310,7 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
 
 		// terminate the workflow
-		wrObj.Status.Terminated = true
-		wrObj.Status.Suspend = false
-		wrObj.Status.Steps[0].Phase = v1alpha1.WorkflowStepPhaseFailed
-		wrObj.Status.Steps[0].Reason = wfTypes.StatusReasonTerminate
-		Expect(k8sClient.Status().Patch(ctx, wrObj, client.Merge)).Should(BeNil())
+		Expect(utils.TerminateWorkflow(ctx, k8sClient, wrObj)).Should(BeNil())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
@@ -1743,7 +1739,7 @@ var _ = Describe("Test Workflow", func() {
 		// terminate manually
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
-		terminateWorkflowRun(ctx, checkRun, 0)
+		Expect(utils.TerminateWorkflow(ctx, k8sClient, checkRun)).Should(BeNil())
 
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 
@@ -1954,12 +1950,4 @@ func setupTestDefinitions(ctx context.Context, defs []string, namespace string) 
 			return strings.ReplaceAll(s, "vela-system", namespace)
 		})).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 	}
-}
-
-func terminateWorkflowRun(ctx context.Context, run *v1alpha1.WorkflowRun, index int) {
-	run.Status.Suspend = false
-	run.Status.Terminated = true
-	run.Status.Steps[index].Phase = v1alpha1.WorkflowStepPhaseFailed
-	run.Status.Steps[index].Reason = wfTypes.StatusReasonTerminate
-	Expect(k8sClient.Status().Update(ctx, run)).Should(BeNil())
 }
