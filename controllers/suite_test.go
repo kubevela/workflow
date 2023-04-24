@@ -33,8 +33,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -69,9 +69,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	pd, err := packages.NewPackageDiscover(cfg)
-	Expect(err).To(BeNil())
-
 	testScheme = scheme.Scheme
 	err = v1alpha1.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -81,14 +78,12 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: testScheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+	singleton.KubeClient.Set(k8sClient)
 
 	reconciler = &WorkflowRunReconciler{
 		Client:   k8sClient,
 		Scheme:   testScheme,
 		Recorder: event.NewAPIRecorder(recorder),
-		Args: Args{
-			PackageDiscover: pd,
-		},
 	}
 
 }, 60)

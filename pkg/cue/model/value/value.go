@@ -28,11 +28,11 @@ import (
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
-	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"github.com/cue-exp/kubevelafix"
 	"github.com/pkg/errors"
 
+	"github.com/kubevela/pkg/cue/util"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/stdlib"
@@ -191,27 +191,6 @@ func TagFieldOrder(root *ast.File) error {
 	return nil
 }
 
-// ProcessScript preprocess the script builtin function.
-func ProcessScript(root *ast.File) error {
-	return sets.PreprocessBuiltinFunc(root, "script", func(values []ast.Node) (ast.Expr, error) {
-		for _, v := range values {
-			lit, ok := v.(*ast.BasicLit)
-			if ok {
-				src, err := literal.Unquote(lit.Value)
-				if err != nil {
-					return nil, errors.WithMessage(err, "unquote script value")
-				}
-				expr, err := parser.ParseExpr("-", src)
-				if err != nil {
-					return nil, errors.Errorf("script value(%s) is invalid CueLang", src)
-				}
-				return expr, nil
-			}
-		}
-		return nil, errors.New("script parameter error")
-	})
-}
-
 type visitor struct {
 	r map[string]struct{}
 }
@@ -305,6 +284,20 @@ func (val *Value) makeValueWithFile(files ...*ast.File) (*Value, error) {
 }
 
 // FillRaw unify the value with the cue format string x at the given path.
+func FillRaw(val cue.Value, x string, paths ...string) (cue.Value, error) {
+	file, err := parser.ParseFile("-", x, parser.ParseComments)
+	if err != nil {
+		return cue.Value{}, err
+	}
+	xInst := val.Context().BuildFile(file)
+	v := val.FillPath(FieldPath(paths...), xInst)
+	if v.Err() != nil {
+		return cue.Value{}, v.Err()
+	}
+	return v, nil
+}
+
+// FillRaw unify the value with the cue format string x at the given path.
 func (val *Value) FillRaw(x string, paths ...string) error {
 	file, err := parser.ParseFile("-", x, parser.ParseComments)
 	if err != nil {
@@ -388,6 +381,22 @@ func setValue(orig ast.Node, expr ast.Expr, selectors []cue.Selector) error {
 		return fmt.Errorf("not support type %T", orig)
 	}
 	return nil
+}
+
+// SetValueByScript set the value v at the given script path.
+// nolint:staticcheck
+func SetValueByScript(base, v cue.Value, path ...string) (cue.Value, error) {
+	cuepath := FieldPath(path...)
+	selectors := cuepath.Selectors()
+	node := base.Syntax(cue.ResolveReferences(true))
+	if err := setValue(node, v.Syntax(cue.ResolveReferences(true)).(ast.Expr), selectors); err != nil {
+		return cue.Value{}, err
+	}
+	b, err := format.Node(node)
+	if err != nil {
+		return cue.Value{}, err
+	}
+	return base.Context().CompileBytes(b), nil
 }
 
 // SetValueByScript set the value v at the given script path.
@@ -494,6 +503,79 @@ func isSelector(node ast.Node) bool {
 	default:
 		return false
 	}
+}
+
+// LookupValueByScript reports the value by cue script.
+func LookupValueByScript(val cue.Value, script string) (cue.Value, error) {
+	var outputKey = "zz_output__"
+	script = strings.TrimSpace(script)
+	scriptFile, err := parser.ParseFile("-", script, parser.ParseComments)
+	if err != nil {
+		return cue.Value{}, errors.WithMessage(err, "parse script")
+	}
+	isScriptPath, err := isScript(script)
+	if err != nil {
+		return cue.Value{}, err
+	}
+
+	if !isScriptPath {
+		v := val.LookupPath(cue.ParsePath(script))
+		if !v.Exists() {
+			return cue.Value{}, LookUpNotFoundErr(script)
+		}
+	}
+
+	raw, err := util.ToString(val)
+	if err != nil {
+		return cue.Value{}, err
+	}
+
+	rawFile, err := parser.ParseFile("-", raw, parser.ParseComments)
+	if err != nil {
+		return cue.Value{}, errors.WithMessage(err, "parse script")
+	}
+
+	behindKey(scriptFile, outputKey)
+
+	newV, err := makeValueWithFiles(rawFile, scriptFile)
+	if err != nil {
+		return cue.Value{}, err
+	}
+
+	v := newV.LookupPath(cue.ParsePath(outputKey))
+	if !v.Exists() {
+		return cue.Value{}, LookUpNotFoundErr(outputKey)
+	}
+	return v, nil
+}
+
+func makeValueWithFiles(files ...*ast.File) (cue.Value, error) {
+	builder := &build.Instance{}
+	newFile := &ast.File{}
+	imports := map[string]*ast.ImportSpec{}
+	for _, f := range files {
+		for _, importSpec := range f.Imports {
+			if _, ok := imports[importSpec.Name.String()]; !ok {
+				imports[importSpec.Name.String()] = importSpec
+			}
+		}
+		newFile.Decls = append(newFile.Decls, f.Decls...)
+	}
+
+	for _, imp := range imports {
+		newFile.Imports = append(newFile.Imports, imp)
+	}
+
+	if err := builder.AddSyntax(newFile); err != nil {
+		return cue.Value{}, err
+	}
+
+	v := cuecontext.New().BuildInstance(builder)
+	if v.Err() != nil {
+		return cue.Value{}, v.Err()
+	}
+
+	return v, nil
 }
 
 // LookupByScript reports the value by cue script.

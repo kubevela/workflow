@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The KubeVela Authors.
+Copyright 2023 The KubeVela Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,27 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package errors
 
-import (
-	"testing"
+// ActionType is the type of action
+type ActionType string
 
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/kubevela/pkg/util/singleton"
-	"github.com/kubevela/workflow/api/v1alpha1"
+const (
+	// ActionSuspend is the action type of suspend
+	ActionSuspend ActionType = "suspend"
+	// ActionTerminate is the action type of terminate
+	ActionTerminate ActionType = "terminate"
+	// ActionWait is the action type of wait
+	ActionWait ActionType = "wait"
 )
 
-var (
-	cli client.Client
-)
+// GenericActionError is the error type of action
+type GenericActionError ActionType
 
-func TestMain(m *testing.M) {
-	sc := scheme.Scheme
-	_ = v1alpha1.AddToScheme(sc)
-	cli = fake.NewFakeClientWithScheme(sc)
-	singleton.KubeClient.Set(cli)
-	m.Run()
+func (e GenericActionError) Error() string {
+	return ""
 }

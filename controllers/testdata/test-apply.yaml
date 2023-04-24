@@ -6,14 +6,46 @@ metadata:
 spec:
   schematic:
     cue:
-      template: "import (\t\"vela/op\"\n)\n\noutput: op.#Apply & {\n\tvalue: {\n\t\tapiVersion:
-        \"apps/v1\"\n\t\tkind:       \"Deployment\"\n\t\tmetadata: {\n\t\t\tname:
-        \     context.stepName\n\t\t\tnamespace: context.namespace\n\t\t}\n\t\tspec:
-        {\n\t\t\tselector: matchLabels: wr: context.stepName\n\t\t\ttemplate: {\n\t\t\t\tmetadata:
-        labels: wr: context.stepName\n\t\t\t\tspec: containers: [{\n\t\t\t\t\tname:
-        \ context.stepName\n\t\t\t\t\timage: parameter.image\n\t\t\t\t\tif parameter[\"cmd\"]
-        != _|_ {\n\t\t\t\t\t\tcommand: parameter.cmd\n\t\t\t\t\t}\n\t\t\t\t\tif parameter[\"message\"]
-        != _|_ {\n\t\t\t\t\t\tenv: [{\n\t\t\t\t\t\t\tname:  \"MESSAGE\"\n\t\t\t\t\t\t\tvalue:
-        parameter.message\n\t\t\t\t\t\t}]\n\t\t\t\t\t}\n\t\t\t\t}]\n\t\t\t}\n\t\t}\n\t}\n}\nwait:
-        op.#ConditionalWait & {\n\tcontinue: output.value.status.readyReplicas ==
-        1\n}\nparameter: {\n\timage:    string\n\tcmd?:     [...string]\n\tmessage?: string\n}\n"
+      template: |
+        import ( "vela/op"
+        )
+
+        output: op.#Apply & {
+                value: {
+                        apiVersion: "apps/v1"
+                        kind:       "Deployment"
+                        metadata: {
+                                name:      context.stepName
+                                namespace: context.namespace
+                        }
+                        spec: {
+                                selector: matchLabels: wr: context.stepName
+                                template: {
+                                        metadata: labels: wr: context.stepName
+                                        spec: containers: [{
+                                                name:  context.stepName
+                                                image: parameter.image
+                                                if parameter["cmd"] != _|_ {
+                                                        command: parameter.cmd
+                                                }
+                                                if parameter["message"] != _|_ {
+                                                        env: [{
+                                                                name:  "MESSAGE"
+                                                                value: parameter.message
+                                                        }]
+                                                }
+                                        }]
+                                }
+                        }
+                }
+        }
+        wait: op.#ConditionalWait & {
+                if len(output.value.status) > 0 if output.value.status.readyReplicas == 1 {
+                        continue: true
+                }
+        }
+        parameter: {
+                image: string
+                cmd?: [...string]
+                message?: string
+        }

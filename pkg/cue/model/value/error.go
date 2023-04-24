@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,27 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package value
 
 import (
-	"testing"
-
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/kubevela/pkg/util/singleton"
-	"github.com/kubevela/workflow/api/v1alpha1"
+	"fmt"
 )
 
-var (
-	cli client.Client
-)
+// LookUpNotFoundErr is the error type of lookup
+type LookUpNotFoundErr string
 
-func TestMain(m *testing.M) {
-	sc := scheme.Scheme
-	_ = v1alpha1.AddToScheme(sc)
-	cli = fake.NewFakeClientWithScheme(sc)
-	singleton.KubeClient.Set(cli)
-	m.Run()
+// Error .
+func (e LookUpNotFoundErr) Error() string {
+	return fmt.Sprintf("failed to lookup value: var(path=%s) not exist", string(e))
 }

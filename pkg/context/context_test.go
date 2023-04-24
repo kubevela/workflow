@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -29,7 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	yamlUtil "sigs.k8s.io/yaml"
 
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/pkg/cue/util"
+	"github.com/kubevela/pkg/util/singleton"
 )
 
 func TestVars(t *testing.T) {
@@ -43,13 +46,12 @@ func TestVars(t *testing.T) {
 		{
 			variable: `input: "1.1.1.1"`,
 			paths:    []string{"clusterIP"},
-			expected: `"1.1.1.1"
-`,
+			expected: `"1.1.1.1"`,
 		},
 		{
 			variable: "input: 100",
 			paths:    []string{"football", "score"},
-			expected: "100\n",
+			expected: "100",
 		},
 		{
 			variable: `
@@ -59,42 +61,26 @@ input: {
 }`,
 			paths: []string{"football"},
 			expected: `score:  100
-result: 101
-`,
+result: 101`,
 		},
 	}
 	for _, tCase := range testCases {
 		r := require.New(t)
-		val, err := value.NewValue(tCase.variable, nil, "")
-		r.NoError(err)
-		input, err := val.LookupValue("input")
-		r.NoError(err)
-		err = wfCtx.SetVar(input, tCase.paths...)
+		cuectx := cuecontext.New()
+		val := cuectx.CompileString(tCase.variable)
+		input := val.LookupPath(cue.ParsePath("input"))
+		err := wfCtx.SetVar(input, tCase.paths...)
 		r.NoError(err)
 		result, err := wfCtx.GetVar(tCase.paths...)
 		r.NoError(err)
-		rStr, err := result.String()
+		rStr, err := util.ToString(result)
 		r.NoError(err)
 		r.Equal(rStr, tCase.expected)
 	}
 
 	r := require.New(t)
-	param, err := wfCtx.MakeParameter(`{"name": "foo"}`)
-	r.NoError(err)
-	mark, err := wfCtx.GetVar("football")
-	r.NoError(err)
-	err = param.FillObject(mark)
-	r.NoError(err)
-	rStr, err := param.String()
-	r.NoError(err)
-	r.Equal(rStr, `name:   "foo"
-score:  100
-result: 101
-`)
-
-	conflictV, err := value.NewValue(`score: 101`, nil, "")
-	r.NoError(err)
-	err = wfCtx.SetVar(conflictV, "football")
+	conflictV := cuecontext.New().CompileString(`score: 101`)
+	err := wfCtx.SetVar(conflictV, "football")
 	r.Equal(err.Error(), "football.score: conflicting values 101 and 100")
 }
 
@@ -116,37 +102,38 @@ func TestRefObj(t *testing.T) {
 }
 
 func TestContext(t *testing.T) {
-	cli := newCliForTest(t, nil)
+	newCliForTest(t, nil)
 	r := require.New(t)
+	ctx := context.Background()
 
-	wfCtx, err := NewContext(context.Background(), cli, "default", "app-v1", []metav1.OwnerReference{{Name: "test1"}})
+	wfCtx, err := NewContext(ctx, "default", "app-v1", []metav1.OwnerReference{{Name: "test1"}})
 	r.NoError(err)
-	err = wfCtx.Commit()
-	r.NoError(err)
-
-	_, err = NewContext(context.Background(), cli, "default", "app-v1", []metav1.OwnerReference{{Name: "test2"}})
+	err = wfCtx.Commit(context.Background())
 	r.NoError(err)
 
-	wfCtx, err = LoadContext(cli, "default", "app-v1", "workflow-app-v1-context")
-	r.NoError(err)
-	err = wfCtx.Commit()
+	_, err = NewContext(ctx, "default", "app-v1", []metav1.OwnerReference{{Name: "test2"}})
 	r.NoError(err)
 
-	cli = newCliForTest(t, nil)
-	_, err = LoadContext(cli, "default", "app-v1", "workflow-app-v1-context")
+	wfCtx, err = LoadContext(ctx, "default", "app-v1", "workflow-app-v1-context")
+	r.NoError(err)
+	err = wfCtx.Commit(context.Background())
+	r.NoError(err)
+
+	newCliForTest(t, nil)
+	_, err = LoadContext(ctx, "default", "app-v1", "workflow-app-v1-context")
 	r.Equal(err.Error(), `configMap "workflow-app-v1-context" not found`)
 
-	_, err = NewContext(context.Background(), cli, "default", "app-v1", nil)
+	_, err = NewContext(ctx, "default", "app-v1", nil)
 	r.NoError(err)
 }
 
 func TestGetStore(t *testing.T) {
-	cli := newCliForTest(t, nil)
+	newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(context.Background(), cli, "default", "app-v1", nil)
+	wfCtx, err := NewContext(context.Background(), "default", "app-v1", nil)
 	r.NoError(err)
-	err = wfCtx.Commit()
+	err = wfCtx.Commit(context.Background())
 	r.NoError(err)
 
 	store := wfCtx.GetStore()
@@ -154,12 +141,12 @@ func TestGetStore(t *testing.T) {
 }
 
 func TestMutableValue(t *testing.T) {
-	cli := newCliForTest(t, nil)
+	newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(context.Background(), cli, "default", "app-v1", nil)
+	wfCtx, err := NewContext(context.Background(), "default", "app-v1", nil)
 	r.NoError(err)
-	err = wfCtx.Commit()
+	err = wfCtx.Commit(context.Background())
 	r.NoError(err)
 
 	wfCtx.SetMutableValue("value", "test", "key")
@@ -172,12 +159,12 @@ func TestMutableValue(t *testing.T) {
 }
 
 func TestMemoryValue(t *testing.T) {
-	cli := newCliForTest(t, nil)
+	newCliForTest(t, nil)
 	r := require.New(t)
 
-	wfCtx, err := NewContext(context.Background(), cli, "default", "app-v1", nil)
+	wfCtx, err := NewContext(context.Background(), "default", "app-v1", nil)
 	r.NoError(err)
-	err = wfCtx.Commit()
+	err = wfCtx.Commit(context.Background())
 	r.NoError(err)
 
 	wfCtx.SetValueInMemory("value", "test", "key")
@@ -199,9 +186,9 @@ func TestMemoryValue(t *testing.T) {
 	r.Equal(count, 11)
 }
 
-func newCliForTest(t *testing.T, wfCm *corev1.ConfigMap) *test.MockClient {
+func newCliForTest(t *testing.T, wfCm *corev1.ConfigMap) {
 	r := require.New(t)
-	return &test.MockClient{
+	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {
@@ -241,6 +228,7 @@ func newCliForTest(t *testing.T, wfCm *corev1.ConfigMap) *test.MockClient {
 			return nil
 		},
 	}
+	singleton.KubeClient.Set(cli)
 }
 
 func newContextForTest(t *testing.T) *WorkflowContext {
@@ -254,7 +242,7 @@ func newContextForTest(t *testing.T) *WorkflowContext {
 	wfCtx := &WorkflowContext{
 		store: &cm,
 	}
-	err = wfCtx.LoadFromConfigMap(cm)
+	err = wfCtx.LoadFromConfigMap(context.Background(), cm)
 	r.NoError(err)
 	return wfCtx
 }

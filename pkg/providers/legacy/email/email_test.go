@@ -17,6 +17,7 @@ limitations under the License.
 package email
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -27,86 +28,56 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/gomail.v2"
 
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/mock"
-	"github.com/kubevela/workflow/pkg/providers"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestSendEmail(t *testing.T) {
+	ctx := context.Background()
 	var dial *gomail.Dialer
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepSessionID, "test-id")
+	act := &mock.Action{}
+
 	testCases := map[string]struct {
+		vars        MailVars
 		from        string
 		expectedErr error
 		errMsg      string
 	}{
 		"success": {
-			from: `
-from: {
-address: "kubevela@gmail.com"
-alias: "kubevela-bot"
-password: "pwd"
-host: "smtp.test.com"
-port: 465
-}
-to: ["user1@gmail.com", "user2@gmail.com"]
-content: {
-subject: "Subject"
-body: "Test body."
-}
-stepID: "success"
-`,
-		},
-		"no-step-id": {
-			from:        ``,
-			expectedErr: errors.New("failed to lookup value: var(path=stepID) not exist"),
-		},
-		"no-sender": {
-			from:        `stepID:"no-sender"`,
-			expectedErr: errors.New("failed to lookup value: var(path=from) not exist"),
-		},
-		"no-receiver": {
-			from: `
-from: {
-address: "kubevela@gmail.com"
-alias: "kubevela-bot"
-password: "pwd"
-host: "smtp.test.com"
-port: 465
-}
-stepID: "no-receiver"
-`,
-			expectedErr: errors.New("failed to lookup value: var(path=to) not exist"),
-		},
-		"no-content": {
-			from: `
-from: {
-address: "kubevela@gmail.com"
-alias: "kubevela-bot"
-password: "pwd"
-host: "smtp.test.com"
-port: 465
-}
-to: ["user1@gmail.com", "user2@gmail.com"]
-stepID: "no-content"
-`,
-			expectedErr: errors.New("failed to lookup value: var(path=content) not exist"),
+			vars: MailVars{
+				From: Sender{
+					Address:  "kubevela@gmail.com",
+					Alias:    "kubevela-bot",
+					Password: "pwd",
+					Host:     "smtp.test.com",
+					Port:     465,
+				},
+				To: []string{"user1@gmail.com", "user2@gmail.com"},
+				Content: Content{
+					Subject: "Subject",
+					Body:    "Test body.",
+				},
+			},
 		},
 		"send-fail": {
-			from: `
-from: {
-address: "kubevela@gmail.com"
-alias: "kubevela-bot"
-password: "pwd"
-host: "smtp.test.com"
-port: 465
-}
-to: ["user1@gmail.com", "user2@gmail.com"]
-content: {
-subject: "Subject"
-body: "Test body."
-}
-stepID: "send-fail"
-`,
+			vars: MailVars{
+				From: Sender{
+					Address:  "kubevela@gmail.com",
+					Alias:    "kubevela-bot",
+					Password: "pwd",
+					Host:     "smtp.test.com",
+					Port:     465,
+				},
+				To: []string{"user1@gmail.com", "user2@gmail.com"},
+				Content: Content{
+					Subject: "fail",
+					Body:    "Test body.",
+				},
+			},
 			errMsg: "fail to send",
 		},
 	}
@@ -120,8 +91,6 @@ stepID: "send-fail"
 			})
 			defer patch.Reset()
 
-			act := &mock.Action{}
-
 			if tc.errMsg != "" {
 				patch.Reset()
 				patch = ApplyMethod(reflect.TypeOf(dial), "DialAndSend", func(_ *gomail.Dialer, _ ...*gomail.Message) error {
@@ -129,10 +98,13 @@ stepID: "send-fail"
 				})
 				defer patch.Reset()
 			}
-			v, err := value.NewValue(tc.from, nil, "")
-			r.NoError(err)
-			prd := &provider{}
-			err = prd.Send(nil, nil, v, act)
+			_, err := Send(ctx, &MailParams{
+				Params: tc.vars,
+				RuntimeParams: types.RuntimeParams{
+					ProcessContext: pCtx,
+					Action:         act,
+				},
+			})
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
@@ -142,7 +114,13 @@ stepID: "send-fail"
 
 			// mock reconcile
 			time.Sleep(time.Second)
-			err = prd.Send(nil, nil, v, act)
+			_, err = Send(ctx, &MailParams{
+				Params: tc.vars,
+				RuntimeParams: types.RuntimeParams{
+					ProcessContext: pCtx,
+					Action:         act,
+				},
+			})
 			if tc.errMsg != "" {
 				r.Equal(fmt.Errorf("failed to send email: %s", tc.errMsg), err)
 				return
@@ -150,13 +128,4 @@ stepID: "send-fail"
 			r.NoError(err)
 		})
 	}
-}
-
-func TestInstall(t *testing.T) {
-	p := providers.NewProviders()
-	Install(p)
-	h, ok := p.GetHandler("email", "send")
-	r := require.New(t)
-	r.Equal(ok, true)
-	r.Equal(h != nil, true)
 }

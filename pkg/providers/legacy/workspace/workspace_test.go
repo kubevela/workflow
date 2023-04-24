@@ -17,6 +17,7 @@ limitations under the License.
 package workspace
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -27,198 +28,189 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/errors"
+	"github.com/kubevela/workflow/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProvider_DoVar(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
-	p := &provider{}
 	r := require.New(t)
+	ctx := context.Background()
 
-	v, err := value.NewValue(`
-method: "Put"
-path: "clusterIP"
-value: "1.1.1.1"
-`, nil, "")
-	r.NoError(err)
-	err = p.DoVar(nil, wfCtx, v, &mockAction{})
+	_, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method: "Put",
+			Path:   "clusterIP",
+			Value:  "1.1.1.1",
+		},
+		RuntimeParams: types.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
 	r.NoError(err)
 	varV, err := wfCtx.GetVar("clusterIP")
 	r.NoError(err)
-	s, err := varV.CueValue().String()
+	s, err := varV.String()
 	r.NoError(err)
 	r.Equal(s, "1.1.1.1")
 
-	v, err = value.NewValue(`
-method: "Get"
-path: "clusterIP"
-`, nil, "")
+	res, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method: "Get",
+			Path:   "clusterIP",
+		},
+		RuntimeParams: types.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
 	r.NoError(err)
-	err = p.DoVar(nil, wfCtx, v, &mockAction{})
-	r.NoError(err)
-	varV, err = v.LookupValue("value")
-	r.NoError(err)
-	s, err = varV.CueValue().String()
-	r.NoError(err)
-	r.Equal(s, "1.1.1.1")
-
-	errCases := []string{`
-value: "1.1.1.1"
-`, `
-method: "Get"
-`, `
-path: "ClusterIP"
-`, `
-method: "Put"
-path: "ClusterIP"
-`}
-
-	for _, tCase := range errCases {
-		v, err = value.NewValue(tCase, nil, "")
-		r.NoError(err)
-		err = p.DoVar(nil, wfCtx, v, &mockAction{})
-		r.Error(err)
-	}
+	r.Equal(res.Value, "1.1.1.1")
 }
 
 func TestProvider_Wait(t *testing.T) {
-	wfCtx := newWorkflowContextForTest(t)
-	p := &provider{}
+	ctx := context.Background()
 	r := require.New(t)
 	act := &mockAction{}
-	v, err := value.NewValue(`
-continue: 100!=100
-message: "test log"
-`, nil, "")
-	r.NoError(err)
-	err = p.Wait(nil, wfCtx, v, act)
-	r.NoError(err)
+
+	_, err := Wait(ctx, &WaitParams{
+		Params: WaitVars{
+			Continue: false,
+			ActionVars: ActionVars{
+				Message: "test log",
+			},
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
+	_, ok := err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.wait, true)
 	r.Equal(act.msg, "test log")
 
 	act = &mockAction{}
-	v, err = value.NewValue(`
-continue: 100==100
-message: "not invalid"
-`, nil, "")
-	r.NoError(err)
-	err = p.Wait(nil, wfCtx, v, act)
+	_, err = Wait(ctx, &WaitParams{
+		Params: WaitVars{
+			Continue: true,
+			ActionVars: ActionVars{
+				Message: "omit msg",
+			},
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
 	r.NoError(err)
 	r.Equal(act.wait, false)
 	r.Equal(act.msg, "")
-
-	act = &mockAction{}
-	v, err = value.NewValue(`
-continue: bool
-message: string
-`, nil, "")
-	r.NoError(err)
-	err = p.Wait(nil, wfCtx, v, act)
-	r.NoError(err)
-	r.Equal(act.wait, true)
-
-	act = &mockAction{}
-	v, err = value.NewValue(``, nil, "")
-	r.NoError(err)
-	err = p.Wait(nil, wfCtx, v, act)
-	r.NoError(err)
-	r.Equal(act.wait, true)
 }
 
 func TestProvider_Break(t *testing.T) {
-	wfCtx := newWorkflowContextForTest(t)
-	p := &provider{}
+	ctx := context.Background()
 	r := require.New(t)
 	act := &mockAction{}
-	err := p.Break(nil, wfCtx, nil, act)
-	r.NoError(err)
+	_, err := Break(ctx, &ActionParams{
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
+	_, ok := err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.terminate, true)
 
 	act = &mockAction{}
-	v, err := value.NewValue(`
-message: "terminate"
-`, nil, "")
-	r.NoError(err)
-	err = p.Break(nil, wfCtx, v, act)
-	r.NoError(err)
+	_, err = Break(ctx, &ActionParams{
+		Params: ActionVars{
+			Message: "terminate",
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
+	_, ok = err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.terminate, true)
 	r.Equal(act.msg, "terminate")
 }
 
 func TestProvider_Suspend(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
+	ctx := context.Background()
 	pCtx := process.NewContext(process.ContextData{})
 	pCtx.PushData(model.ContextStepSessionID, "test-id")
-	p := &provider{pCtx: pCtx}
 	r := require.New(t)
 	act := &mockAction{}
-	v, err := value.NewValue(`
-duration: "1s"
-`, nil, "")
-	r.NoError(err)
-	err = p.Suspend(nil, wfCtx, v, act)
-	r.NoError(err)
+
+	params := &SuspendParams{
+		Params: SuspendVars{
+			Duration: "1s",
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action:          act,
+			WorkflowContext: wfCtx,
+			ProcessContext:  pCtx,
+		},
+	}
+	_, err := Suspend(ctx, params)
+	_, ok := err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.suspend, true)
 	r.Equal(act.msg, "Suspended by field ")
 	// test second time to check if the suspend is resumed in 1s
-	err = p.Suspend(nil, wfCtx, v, act)
-	r.NoError(err)
+	_, err = Suspend(ctx, params)
+	_, ok = err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.suspend, true)
 	time.Sleep(time.Second)
-	err = p.Suspend(nil, wfCtx, v, act)
+	_, err = Suspend(ctx, params)
 	r.NoError(err)
 	r.Equal(act.suspend, false)
 }
 
 func TestProvider_Fail(t *testing.T) {
-	wfCtx := newWorkflowContextForTest(t)
-	p := &provider{}
+	ctx := context.Background()
 	r := require.New(t)
 	act := &mockAction{}
-	err := p.Fail(nil, wfCtx, nil, act)
-	r.NoError(err)
+	_, err := Fail(ctx, &ActionParams{
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
+	_, ok := err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.terminate, true)
 
 	act = &mockAction{}
-	v, err := value.NewValue(`
-message: "fail"
-`, nil, "")
-	r.NoError(err)
-	err = p.Fail(nil, wfCtx, v, act)
-	r.NoError(err)
+	_, err = Fail(ctx, &ActionParams{
+		Params: ActionVars{
+			Message: "fail",
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
+	_, ok = err.(errors.GenericActionError)
+	r.Equal(ok, true)
 	r.Equal(act.terminate, true)
 	r.Equal(act.msg, "fail")
 }
 
 func TestProvider_Message(t *testing.T) {
-	wfCtx := newWorkflowContextForTest(t)
-	p := &provider{}
+	ctx := context.Background()
 	r := require.New(t)
 	act := &mockAction{}
-	v, err := value.NewValue(`
-message: "test"
-`, nil, "")
-	r.NoError(err)
-	err = p.Message(nil, wfCtx, nil, act)
-	r.NoError(err)
-	r.Equal(act.msg, "")
-	err = p.Message(nil, wfCtx, v, act)
-	r.NoError(err)
-	r.Equal(act.msg, "test")
-	err = p.Message(nil, wfCtx, nil, act)
+	_, err := Message(ctx, &ActionParams{
+		Params: ActionVars{
+			Message: "test",
+		},
+		RuntimeParams: types.RuntimeParams{
+			Action: act,
+		},
+	})
 	r.NoError(err)
 	r.Equal(act.msg, "test")
-
-	act = &mockAction{}
-	v, err = value.NewValue(`
-message: "fail"
-`, nil, "")
-	r.NoError(err)
-	err = p.Fail(nil, wfCtx, v, act)
-	r.NoError(err)
-	r.Equal(act.msg, "fail")
 }
 
 type mockAction struct {
@@ -280,7 +272,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	r.NoError(err)
 
 	wfCtx := new(wfContext.WorkflowContext)
-	err = wfCtx.LoadFromConfigMap(cm)
+	err = wfCtx.LoadFromConfigMap(context.Background(), cm)
 	r.NoError(err)
 	return wfCtx
 }

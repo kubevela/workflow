@@ -52,7 +52,7 @@ func TestDiscover(t *testing.T) {
 		builtin: map[string]types.TaskGenerator{
 			"stepGroup": builtin.StepGroup,
 		},
-		customTaskDiscover: custom.NewTaskLoader(loadTemplate, nil, nil, 0, pCtx),
+		customTaskDiscover: custom.NewTaskLoader(loadTemplate, 0, pCtx),
 	}
 
 	_, err := discover.GetTaskGenerator(context.Background(), "stepGroup")

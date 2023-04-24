@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubevela/pkg/util/singleton"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -64,6 +65,7 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
+	singleton.KubeClient.Set(k8sClient)
 
 	close(done)
 }, 60)

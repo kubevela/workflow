@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/cue/cuex"
+	"github.com/kubevela/pkg/cue/util"
 	"github.com/kubevela/pkg/util/rand"
+	"github.com/kubevela/pkg/util/singleton"
+	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
 
@@ -48,28 +54,34 @@ var (
 
 // WorkflowContext is workflow context.
 type WorkflowContext struct {
-	cli         client.Client
 	store       *corev1.ConfigMap
 	memoryStore *sync.Map
-	vars        *value.Value
+	vars        cue.Value
 	modified    bool
 }
 
 // GetVar get variable from workflow context.
-func (wf *WorkflowContext) GetVar(paths ...string) (*value.Value, error) {
-	return wf.vars.LookupValue(paths...)
+func (wf *WorkflowContext) GetVar(paths ...string) (cue.Value, error) {
+	v := wf.vars.LookupPath(value.FieldPath(paths...))
+	if !v.Exists() {
+		return v, fmt.Errorf("var %s not found", strings.Join(paths, "."))
+	}
+	return v, nil
 }
 
 // SetVar set variable to workflow context.
-func (wf *WorkflowContext) SetVar(v *value.Value, paths ...string) error {
-	str, err := v.String()
+func (wf *WorkflowContext) SetVar(v cue.Value, paths ...string) error {
+	// convert value to string to set
+	str, err := sets.ToString(v)
 	if err != nil {
-		return errors.WithMessage(err, "compile var")
-	}
-	if err := wf.vars.FillRaw(str, paths...); err != nil {
 		return err
 	}
-	if err := wf.vars.Error(); err != nil {
+
+	wf.vars, err = value.FillRaw(wf.vars, str, paths...)
+	if err != nil {
+		return err
+	}
+	if err := wf.vars.Err(); err != nil {
 		return err
 	}
 	wf.modified = true
@@ -134,31 +146,22 @@ func (wf *WorkflowContext) DeleteValueInMemory(paths ...string) {
 	wf.memoryStore.Delete(strings.Join(paths, "."))
 }
 
-// MakeParameter make 'value' with string
-func (wf *WorkflowContext) MakeParameter(parameter string) (*value.Value, error) {
-	if parameter == "" {
-		parameter = "{}"
-	}
-
-	return wf.vars.MakeValue(parameter)
-}
-
 // Commit the workflow context and persist it's content.
-func (wf *WorkflowContext) Commit() error {
+func (wf *WorkflowContext) Commit(ctx context.Context) error {
 	if !wf.modified {
 		return nil
 	}
 	if err := wf.writeToStore(); err != nil {
 		return err
 	}
-	if err := wf.sync(); err != nil {
+	if err := wf.sync(ctx); err != nil {
 		return errors.WithMessagef(err, "save context to configMap(%s/%s)", wf.store.Namespace, wf.store.Name)
 	}
 	return nil
 }
 
 func (wf *WorkflowContext) writeToStore() error {
-	varStr, err := wf.vars.String()
+	varStr, err := util.ToString(wf.vars)
 	if err != nil {
 		return err
 	}
@@ -171,32 +174,32 @@ func (wf *WorkflowContext) writeToStore() error {
 	return nil
 }
 
-func (wf *WorkflowContext) sync() error {
-	ctx := context.Background()
+func (wf *WorkflowContext) sync(ctx context.Context) error {
+	cli := singleton.KubeClient.Get()
 	store := &corev1.ConfigMap{}
 	if EnableInMemoryContext {
 		MemStore.UpdateInMemoryContext(wf.store)
-	} else if err := wf.cli.Get(ctx, types.NamespacedName{
+	} else if err := cli.Get(ctx, types.NamespacedName{
 		Name:      wf.store.Name,
 		Namespace: wf.store.Namespace,
 	}, store); err != nil {
 		if kerrors.IsNotFound(err) {
-			return wf.cli.Create(ctx, wf.store)
+			return cli.Create(ctx, wf.store)
 		}
 		return err
 	}
-	return wf.cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy()))
+	return cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy()))
 }
 
 // LoadFromConfigMap recover workflow context from configMap.
-func (wf *WorkflowContext) LoadFromConfigMap(cm corev1.ConfigMap) error {
+func (wf *WorkflowContext) LoadFromConfigMap(ctx context.Context, cm corev1.ConfigMap) error {
 	if wf.store == nil {
 		wf.store = &cm
 	}
 	data := cm.Data
 
 	var err error
-	wf.vars, err = value.NewValue(data[ConfigMapKeyVars], nil, "")
+	wf.vars, err = cuex.DefaultCompiler.Get().CompileString(ctx, data[ConfigMapKeyVars])
 	if err != nil {
 		return errors.WithMessage(err, "decode vars")
 	}
@@ -215,8 +218,8 @@ func (wf *WorkflowContext) StoreRef() *corev1.ObjectReference {
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(ctx context.Context, cli client.Client, ns, name string, owner []metav1.OwnerReference) (Context, error) {
-	wfCtx, err := newContext(ctx, cli, ns, name, owner)
+func NewContext(ctx context.Context, ns, name string, owner []metav1.OwnerReference) (Context, error) {
+	wfCtx, err := newContext(ctx, ns, name, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +232,8 @@ func CleanupMemoryStore(name, ns string) {
 	workflowMemoryCache.Delete(fmt.Sprintf("%s-%s", name, ns))
 }
 
-func newContext(ctx context.Context, cli client.Client, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
+func newContext(ctx context.Context, ns, name string, owner []metav1.OwnerReference) (*WorkflowContext, error) {
+	cli := singleton.KubeClient.Get()
 	store := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            generateStoreName(name),
@@ -274,13 +278,12 @@ func newContext(ctx context.Context, cli client.Client, ns, name string, owner [
 	}
 	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
-		cli:         cli,
 		store:       store,
 		memoryStore: memCache,
 		modified:    true,
 	}
 	var err error
-	wfCtx.vars, err = value.NewValue("", nil, "")
+	wfCtx.vars = cuecontext.New().CompileString("")
 
 	return wfCtx, err
 }
@@ -300,10 +303,11 @@ func getMemoryStore(key string) *sync.Map {
 }
 
 // LoadContext load workflow context from store.
-func LoadContext(cli client.Client, ns, name, ctxName string) (Context, error) {
+func LoadContext(ctx context.Context, ns, name, ctxName string) (Context, error) {
 	var store corev1.ConfigMap
 	store.Name = ctxName
 	store.Namespace = ns
+	cli := singleton.KubeClient.Get()
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
 	} else if err := cli.Get(context.Background(), client.ObjectKey{
@@ -313,15 +317,14 @@ func LoadContext(cli client.Client, ns, name, ctxName string) (Context, error) {
 		return nil, err
 	}
 	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
-	ctx := &WorkflowContext{
-		cli:         cli,
+	wfCtx := &WorkflowContext{
 		store:       &store,
 		memoryStore: memCache,
 	}
-	if err := ctx.LoadFromConfigMap(store); err != nil {
+	if err := wfCtx.LoadFromConfigMap(ctx, store); err != nil {
 		return nil, err
 	}
-	return ctx, nil
+	return wfCtx, nil
 }
 
 // generateStoreName generates the config map name of workflow context.

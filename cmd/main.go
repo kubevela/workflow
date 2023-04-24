@@ -53,7 +53,6 @@ import (
 	"github.com/kubevela/workflow/controllers"
 	"github.com/kubevela/workflow/pkg/backup"
 	"github.com/kubevela/workflow/pkg/common"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/types"
@@ -221,15 +220,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	pd, err := packages.NewPackageDiscover(mgr.GetConfig())
-	if err != nil {
-		klog.Error(err, "Failed to create CRD discovery for CUE package client")
-		if !packages.IsCUEParseErr(err) {
-			os.Exit(1)
-		}
-	}
-	controllerArgs.PackageDiscover = pd
 
 	if useWebhook {
 		klog.InfoS("Enable webhook", "server port", strconv.Itoa(webhookPort))

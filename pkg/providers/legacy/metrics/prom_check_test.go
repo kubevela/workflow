@@ -23,27 +23,21 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
-
-	monitorContext "github.com/kubevela/pkg/monitor/context"
-	context2 "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/kubevela/pkg/util/singleton"
+
+	context2 "github.com/kubevela/workflow/pkg/context"
+	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestMetricCheck(t *testing.T) {
 	srv := runMockPrometheusServer() // no lint
-
-	v, err := value.NewValue(`
-	  metricEndpoint: "http://127.0.0.1:18089"
-      query: "sum(nginx_ingress_controller_requests{host=\"canary-demo.com\",status=\"200\"})"
-      duration: "4s"
-      failDuration: "2s"
-      condition: ">=3"
-      stepID: "123456"`, nil, "")
-	assert.NoError(t, err)
-	prd := &provider{}
-	ctx := monitorContext.NewTraceContext(context.Background(), "")
+	r := require.New(t)
+	ctx := context.Background()
 	cli := &test.MockClient{
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
@@ -55,16 +49,27 @@ func TestMetricCheck(t *testing.T) {
 			return nil
 		},
 	}
-	wfCtx, err := context2.NewContext(context.Background(), cli, "default", "v1", nil)
-	assert.NoError(t, err)
-	err = prd.PromCheck(ctx, wfCtx, v, nil)
-	assert.NoError(t, err)
-	res, err := v.GetBool("result")
-	assert.NoError(t, err)
-	assert.Equal(t, res, false)
-	message, err := v.GetString("message")
-	assert.NoError(t, err)
-	assert.Equal(t, message, "The healthy condition should be >=3, and the query result is 10, indicating success.")
+	singleton.KubeClient.Set(cli)
+	wfCtx, err := context2.NewContext(context.Background(), "default", "v1", nil)
+	r.NoError(err)
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepSessionID, "test-id")
+	res, err := PromCheck(ctx, &PromParams{
+		Params: PromVars{
+			MetricEndpoint: "http://127.0.0.1:18089",
+			Query:          "sum(nginx_ingress_controller_requests{host=\"canary-demo.com\",status=\"200\"})",
+			Duration:       "4s",
+			FailDuration:   "2s",
+			Condition:      ">=3",
+		},
+		RuntimeParams: types.RuntimeParams{
+			WorkflowContext: wfCtx,
+			ProcessContext:  pCtx,
+		},
+	})
+	r.NoError(err)
+	r.Equal(res.Result, false)
+	r.Equal(res.Message, "The healthy condition should be >=3, and the query result is 10, indicating success.")
 	if err := srv.Close(); err != nil {
 		fmt.Printf("Server shutdown error: %v\n", err)
 	}
