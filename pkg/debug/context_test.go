@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -27,13 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestSetContext(t *testing.T) {
 	r := require.New(t)
-	cli := newCliForTest(&corev1.ConfigMap{
+	newCliForTest(&corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: GenerateContextName("test", "step1", "123456"),
 		},
@@ -41,34 +42,29 @@ func TestSetContext(t *testing.T) {
 			"debug": "test",
 		},
 	})
+	cuectx := cuecontext.New()
 	// test update
-	debugCtx := NewContext(cli, &types.WorkflowInstance{
+	debugCtx := NewContext(&types.WorkflowInstance{
 		WorkflowMeta: types.WorkflowMeta{
 			Name: "test",
 		},
 	}, "step1")
-	v, err := value.NewValue(`
-test: test
-`, nil, "")
-	r.NoError(err)
-	err = debugCtx.Set(v)
+	v := cuectx.CompileString(`test: "test"`)
+	err := debugCtx.Set(v)
 	r.NoError(err)
 	// test create
-	debugCtx = NewContext(cli, &types.WorkflowInstance{
+	debugCtx = NewContext(&types.WorkflowInstance{
 		WorkflowMeta: types.WorkflowMeta{
 			Name: "test",
 		},
 	}, "step2")
-	v, err = value.NewValue(`
-test: test
-`, nil, "")
-	r.NoError(err)
+	v = cuectx.CompileString(`test2: "test2"`)
 	err = debugCtx.Set(v)
 	r.NoError(err)
 }
 
-func newCliForTest(wfCm *corev1.ConfigMap) *test.MockClient {
-	return &test.MockClient{
+func newCliForTest(wfCm *corev1.ConfigMap) {
+	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {
@@ -98,4 +94,5 @@ func newCliForTest(wfCm *corev1.ConfigMap) *test.MockClient {
 			return nil
 		},
 	}
+	singleton.KubeClient.Set(cli)
 }

@@ -23,18 +23,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/feature"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/cue/cuex"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
+
+// RuntimeParams is the runtime parameters of a provider.
+type RuntimeParams struct {
+	WorkflowContext wfContext.Context
+	ProcessContext  process.Context
+	Action          Action
+	FieldLabel      string
+	Labels          map[string]string
+}
+
+// LegacyParams is the legacy input parameters of a provider.
+type LegacyParams[T any] struct {
+	Params T
+	RuntimeParams
+}
 
 // WorkflowInstance is the instance for workflow engine to execute
 type WorkflowInstance struct {
@@ -91,9 +105,10 @@ type TaskRunOptions struct {
 	PostStopHooks []TaskPostStopHook
 	GetTracer     func(id string, step v1alpha1.WorkflowStep) monitorContext.Context
 	RunSteps      func(isDag bool, runners ...TaskRunner) (*v1alpha1.WorkflowRunStatus, error)
-	Debug         func(step string, v *value.Value) error
+	Debug         func(step string, v cue.Value) error
 	StepStatus    map[string]v1alpha1.StepStatus
 	Engine        Engine
+	Compiler      *cuex.Compiler
 }
 
 // PreCheckResult is the result of pre check.
@@ -104,9 +119,7 @@ type PreCheckResult struct {
 
 // PreCheckOptions is the options for pre check.
 type PreCheckOptions struct {
-	PackageDiscover *packages.PackageDiscover
-	BasicTemplate   string
-	BasicValue      *value.Value
+	BasicValue cue.Value
 }
 
 // StatusPatcher is the interface to patch status
@@ -116,10 +129,10 @@ type StatusPatcher func(ctx context.Context, status *v1alpha1.WorkflowRunStatus,
 type TaskPreCheckHook func(step v1alpha1.WorkflowStep, options *PreCheckOptions) (*PreCheckResult, error)
 
 // TaskPreStartHook run before task execution.
-type TaskPreStartHook func(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.WorkflowStep) error
+type TaskPreStartHook func(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowStep) (cue.Value, error)
 
 // TaskPostStopHook  run after task execution.
-type TaskPostStopHook func(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error
+type TaskPostStopHook func(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error
 
 // Operation is workflow operation object.
 type Operation struct {
@@ -140,28 +153,16 @@ type TaskGeneratorOptions struct {
 	StepConvertor      func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
 	SubTaskRunners     []TaskRunner
 	SubStepExecuteMode v1alpha1.WorkflowMode
-	PackageDiscover    *packages.PackageDiscover
 	ProcessContext     process.Context
-}
-
-// Handler is provider's processing method.
-type Handler func(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act Action) error
-
-// Providers is provider discover interface.
-type Providers interface {
-	GetHandler(provider, name string) (Handler, bool)
-	Register(provider string, m map[string]Handler)
 }
 
 // StepGeneratorOptions is the options for generate step.
 type StepGeneratorOptions struct {
-	Providers       Providers
-	PackageDiscover *packages.PackageDiscover
-	ProcessCtx      process.Context
-	TemplateLoader  template.Loader
-	Client          client.Client
-	StepConvertor   map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
-	LogLevel        int
+	Compiler       cuex.Compiler
+	ProcessCtx     process.Context
+	TemplateLoader template.Loader
+	StepConvertor  map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	LogLevel       int
 }
 
 // Action is that workflow provider can do.

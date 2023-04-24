@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 
+	"cuelang.org/go/cue"
 	"github.com/kubevela/pkg/multicluster"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,29 +31,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
 // GetDataFromContext get data from workflow context
-func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, ns string, paths ...string) (*value.Value, error) { //nolint:revive,unused
-	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
+func GetDataFromContext(ctx context.Context, ctxName, name, ns string, paths ...string) (cue.Value, error) {
+	wfCtx, err := wfContext.LoadContext(ctx, ns, name, ctxName)
 	if err != nil {
-		return nil, err
+		return cue.Value{}, err
 	}
 	v, err := wfCtx.GetVar(paths...)
 	if err != nil {
-		return nil, err
+		return cue.Value{}, err
 	}
-	if v.Error() != nil {
-		return nil, v.Error()
+	if v.Err() != nil {
+		return cue.Value{}, v.Err()
 	}
 	return v, nil
 }
 
 // GetLogConfigFromStep get log config from step
-func GetLogConfigFromStep(ctx context.Context, cli client.Client, ctxName, name, ns, step string) (*types.LogConfig, error) { //nolint:revive,unused
-	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
+func GetLogConfigFromStep(ctx context.Context, ctxName, name, ns, step string) (*types.LogConfig, error) {
+	wfCtx, err := wfContext.LoadContext(ctx, ns, name, ctxName)
 	if err != nil {
 		return nil, err
 	}

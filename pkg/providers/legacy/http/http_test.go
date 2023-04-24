@@ -35,12 +35,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	monitorContext "github.com/kubevela/pkg/monitor/context"
-
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
-	"github.com/kubevela/workflow/pkg/providers"
-	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
-	"github.com/kubevela/workflow/pkg/providers/http/testdata"
+	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
+	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -49,206 +47,184 @@ func TestHttpDo(t *testing.T) {
 	defer func() {
 		close(shutdown)
 	}()
-	ctx := monitorContext.NewTraceContext(context.Background(), "")
-	baseTemplate := `
-		url: string
-		request?: close({
-			timeout?: string
-			body?:    string
-			header?:  [string]: string
-			trailer?: [string]: string
-			ratelimiter?: {
-				limit: int
-				period: string
-			}
-		})
-		response: close({
-			body: string
-			header?:  [string]: [...string]
-			trailer?: [string]: [...string]
-			statusCode: int
-		})
-`
+	ctx := context.Background()
+
 	testCases := map[string]struct {
-		request      string
-		expectedBody string
-		expectedErr  string
-		statusCode   int
+		request     RequestVars
+		expected    ResponseVars
+		expectedErr string
 	}{
 		"hello": {
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/hello"
-request: {
-	timeout: "2s"
-}`,
-			expectedBody: `hello`,
-			statusCode:   200,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/hello",
+				Request: &Request{
+					Timeout: "2s",
+				},
+			},
+			expected: ResponseVars{
+				Body:       "hello",
+				StatusCode: 200,
+			},
 		},
 
 		"echo": {
-			request: baseTemplate + `
-method: "POST"
-url: "http://127.0.0.1:1229/echo"
-request:{ 
-   body: "I am vela" 
-   header: "Content-Type": "text/plain; charset=utf-8"
-}`,
-			expectedBody: `I am vela`,
-			statusCode:   200,
+			request: RequestVars{
+				Method: "POST",
+				URL:    "http://127.0.0.1:1229/echo",
+				Request: &Request{
+					Body: "I am vela",
+					Header: map[string]string{
+						"Content-Type": "text/plain; charset=utf-8",
+					},
+				},
+			},
+			expected: ResponseVars{
+				Body:       "I am vela",
+				StatusCode: 200,
+			},
 		},
 		"json": {
-			request: `
-import ("encoding/json")
-foo: {
-	name: "foo"
-	score: 100
-}
-
-method: "POST"
-url: "http://127.0.0.1:1229/echo"
-request:{ 
-   body: json.Marshal(foo)
-   header: "Content-Type": "application/json; charset=utf-8"
-}` + baseTemplate,
-			expectedBody: `{"name":"foo","score":100}`,
-			statusCode:   200,
+			request: RequestVars{
+				Method: "POST",
+				URL:    "http://127.0.0.1:1229/echo",
+				Request: &Request{
+					Body: `{"name":"foo","score":100}`,
+					Header: map[string]string{
+						"Content-Type": "text/plain; charset=utf-8",
+					},
+				},
+			},
+			expected: ResponseVars{
+				Body:       `{"name":"foo","score":100}`,
+				StatusCode: 200,
+			},
 		},
 		"timeout": {
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/timeout"
-request: {
-	timeout: "1s"
-}`,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/timeout",
+				Request: &Request{
+					Timeout: "1s",
+				},
+			},
+			expected: ResponseVars{
+				Body:       `{"name":"foo","score":100}`,
+				StatusCode: 200,
+			},
 			expectedErr: "context deadline exceeded",
 		},
 		"not-timeout": {
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/timeout"
-request: {
-	timeout: "3s"
-}`,
-			expectedBody: `hello`,
-			statusCode:   200,
-		},
-		"invalid-timeout": {
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/timeout"
-request: {
-	timeout: "test"
-}`,
-			expectedErr: "invalid duration",
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/timeout",
+				Request: &Request{
+					Timeout: "3s",
+				},
+			},
+			expected: ResponseVars{
+				Body:       "hello",
+				StatusCode: 200,
+			},
 		},
 		"notfound": {
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/notfound"
-`,
-			statusCode: 404,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/notfound",
+				Request: &Request{
+					Timeout: "1s",
+				},
+			},
+			expected: ResponseVars{
+				StatusCode: 404,
+			},
 		},
 	}
 
-	for tName, tCase := range testCases {
+	for tName, tc := range testCases {
 		r := require.New(t)
-		v, err := value.NewValue(tCase.request, nil, "")
-		r.NoError(err, tName)
-		prd := &provider{}
-		err = prd.Do(ctx, nil, v, nil)
-		if tCase.expectedErr != "" {
+		res, err := Do(ctx, &DoParams{
+			Params: tc.request,
+		})
+		if tc.expectedErr != "" {
 			r.Error(err)
-			r.Contains(err.Error(), tCase.expectedErr)
+			r.Contains(err.Error(), tc.expectedErr)
 			continue
 		}
 		r.NoError(err, tName)
-		body, err := v.LookupValue("response", "body")
-		r.NoError(err, tName)
-		ret, err := body.CueValue().String()
-		r.NoError(err)
-		r.Equal(ret, tCase.expectedBody, tName)
-		code, err := v.LookupValue("response", "statusCode")
-		r.NoError(err, tName)
-		sc, err := code.CueValue().Int64()
-		r.NoError(err)
-		r.Equal(tCase.statusCode, int(sc), tName)
+		r.Equal(res.Body, tc.expected.Body, tName)
+		r.Equal(res.StatusCode, tc.expected.StatusCode, tName)
 	}
 
 	// test ratelimiter
 	rateLimiter = ratelimiter.NewRateLimiter(1)
 	limiterTestCases := []struct {
-		request     string
+		request     RequestVars
 		expectedErr string
 	}{
 		{
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/hello"
-request: {
-	ratelimiter: {
-		limit: 1
-		period: "1m"
-	}
-}`},
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/hello",
+				Request: &Request{
+					RateLimiter: &RateLimiter{
+						Limit:  1,
+						Period: "1m",
+					},
+				},
+			},
+		},
 		{
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/hello?query=1"
-request: {
-	ratelimiter: {
-		limit: 1
-		period: "1m"
-	}
-}`,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/hello?query=1",
+				Request: &Request{
+					RateLimiter: &RateLimiter{
+						Limit:  1,
+						Period: "1m",
+					},
+				},
+			},
 			expectedErr: "request exceeds the rate limiter",
 		},
 		{
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/echo"
-request: {
-	ratelimiter: {
-		limit: 1
-		period: "1m"
-	}
-}`,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/echo",
+				Request: &Request{
+					RateLimiter: &RateLimiter{
+						Limit:  1,
+						Period: "1m",
+					},
+				},
+			},
 		},
 		{
-			request: baseTemplate + `
-method: "GET"
-url: "http://127.0.0.1:1229/hello?query=2"
-request: {
-	ratelimiter: {
-		limit: 1
-		period: "1m"
-	}
-}`,
+			request: RequestVars{
+				Method: "GET",
+				URL:    "http://127.0.0.1:1229/hello?query=2",
+				Request: &Request{
+					RateLimiter: &RateLimiter{
+						Limit:  1,
+						Period: "1m",
+					},
+				},
+			},
 		},
 	}
 
-	for tName, tCase := range limiterTestCases {
+	for tName, tc := range limiterTestCases {
 		r := require.New(t)
-		v, err := value.NewValue(tCase.request, nil, "")
-		r.NoError(err, tName)
-		prd := &provider{}
-		err = prd.Do(ctx, nil, v, nil)
-		if tCase.expectedErr != "" {
+		_, err := Do(ctx, &DoParams{
+			Params: tc.request,
+		})
+		if tc.expectedErr != "" {
 			r.Error(err)
-			r.Contains(err.Error(), tCase.expectedErr)
+			r.Contains(err.Error(), tc.expectedErr)
 			continue
 		}
 		r.NoError(err, tName)
 	}
-}
-
-func TestInstall(t *testing.T) {
-	r := require.New(t)
-	p := providers.NewProviders()
-	Install(p, nil, "")
-	h, ok := p.GetHandler("http", "do")
-	r.Equal(ok, true)
-	r.Equal(h != nil, true)
 }
 
 func runMockServer(shutdown chan struct{}) {
@@ -286,7 +262,7 @@ func runMockServer(shutdown chan struct{}) {
 }
 
 func TestHTTPSDo(t *testing.T) {
-	ctx := monitorContext.NewTraceContext(context.Background(), "")
+	ctx := context.Background()
 	s := newMockHttpsServer()
 	defer s.Close()
 	cli := &test.MockClient{
@@ -302,6 +278,7 @@ func TestHTTPSDo(t *testing.T) {
 			return nil
 		},
 	}
+	singleton.KubeClient.Set(cli)
 	r := require.New(t)
 	v, err := value.NewValue(`
 method: "GET"
@@ -309,8 +286,16 @@ url: "https://127.0.0.1:8443/api/v1/token?val=test-token"
 `, nil, "")
 	r.NoError(err)
 	r.NoError(v.FillObject("certs", "tls_config", "secret"))
-	prd := &provider{cli, "default"}
-	err = prd.Do(ctx, nil, v, nil)
+	_, err = Do(ctx, &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "https://127.0.0.1:8443/api/v1/token?val=test-token",
+			TLSConfig: &TLSConfig{
+				Secret:    "certs",
+				Namespace: "default",
+			},
+		},
+	})
 	r.NoError(err)
 }
 

@@ -21,12 +21,12 @@ import (
 	"embed"
 	"fmt"
 
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -77,11 +77,9 @@ func (loader *WorkflowStepLoader) LoadTemplate(ctx context.Context, name string)
 }
 
 // NewWorkflowStepTemplateLoader create a task template loader.
-func NewWorkflowStepTemplateLoader(client client.Client) Loader {
+func NewWorkflowStepTemplateLoader() Loader {
 	return &WorkflowStepLoader{
-		loadDefinition: func(ctx context.Context, capName string) (string, error) {
-			return getDefinitionTemplate(ctx, client, capName)
-		},
+		loadDefinition: getDefinitionTemplate,
 	}
 }
 
@@ -95,11 +93,12 @@ type def struct {
 	} `json:"spec,omitempty"`
 }
 
-func getDefinitionTemplate(ctx context.Context, cli client.Client, definitionName string) (string, error) {
+func getDefinitionTemplate(ctx context.Context, definitionName string) (string, error) {
 	const (
 		definitionAPIVersion       = "core.oam.dev/v1beta1"
 		kindWorkflowStepDefinition = "WorkflowStepDefinition"
 	)
+	cli := singleton.KubeClient.Get()
 	definition := &unstructured.Unstructured{}
 	definition.SetAPIVersion(definitionAPIVersion)
 	definition.SetKind(kindWorkflowStepDefinition)

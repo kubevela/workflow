@@ -23,22 +23,22 @@ import (
 	"sync"
 	"time"
 
+	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/cue/cuex"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/debug"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
-	"github.com/kubevela/workflow/pkg/providers/workspace"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -59,18 +59,31 @@ const (
 
 type workflowExecutor struct {
 	instance *types.WorkflowInstance
-	cli      client.Client
 	wfCtx    wfContext.Context
 	patcher  types.StatusPatcher
+	compiler *cuex.Compiler
 }
 
 // New returns a Workflow Executor implementation.
-func New(instance *types.WorkflowInstance, cli client.Client, patcher types.StatusPatcher) WorkflowExecutor {
-	return &workflowExecutor{
-		instance: instance,
-		cli:      cli,
-		patcher:  patcher,
+func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
+	executor := &workflowExecutor{instance: instance}
+	for _, opt := range options {
+		opt.ApplyTo(executor)
 	}
+	if executor.compiler == nil {
+		executor.compiler = providers.NewCompiler(nil)
+		// 		v, err := executor.compiler.CompileString(context.Background(), `import (
+		// 			"vela/op"
+		// )
+		// a: op.#Suspend & {}`)
+		// 		if err != nil {
+		// 			panic(err)
+		// 		}
+		// 		if v.Err() != nil {
+		// 			panic(v.Err())
+		// 		}
+	}
+	return executor
 }
 
 // InitializeWorkflowInstance init workflow instance
@@ -204,13 +217,13 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 		status:        wfStatus,
 		instance:      w.instance,
 		wfCtx:         wfCtx,
-		cli:           w.cli,
 		debug:         w.instance.Debug,
 		stepStatus:    stepStatus,
 		stepDependsOn: stepDependsOn,
 		stepTimeout:   make(map[string]time.Time),
 		taskRunners:   taskRunners,
 		statusPatcher: w.patcher,
+		compiler:      w.compiler,
 	}
 }
 
@@ -268,7 +281,8 @@ func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowSte
 		}
 	}
 
-	if ts := wfCtx.GetMutableValue(status.ID, workspace.ResumeTimeStamp); ts != "" {
+	//FIXME:
+	if ts := wfCtx.GetMutableValue(status.ID, "resumeTimeStamp"); ts != "" {
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
 			return min
@@ -324,14 +338,14 @@ func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfCont
 	ctx = request.WithUser(ctx, nil)
 	status := &w.instance.Status
 	if status.ContextBackend != nil {
-		wfCtx, err := wfContext.LoadContext(w.cli, w.instance.Namespace, w.instance.Name, w.instance.Status.ContextBackend.Name)
+		wfCtx, err := wfContext.LoadContext(ctx, w.instance.Namespace, w.instance.Name, w.instance.Status.ContextBackend.Name)
 		if err != nil {
 			return nil, errors.WithMessage(err, "load context")
 		}
 		return wfCtx, nil
 	}
 
-	wfCtx, err := wfContext.NewContext(ctx, w.cli, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
+	wfCtx, err := wfContext.NewContext(ctx, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new context")
 	}
@@ -548,7 +562,7 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 			if err := e.updateStepStatus(ctx, status); err != nil {
 				return err
 			}
-			if err := handleBackoffTimes(wfCtx, status, false); err != nil {
+			if err := handleBackoffTimes(ctx, wfCtx, status, false); err != nil {
 				return err
 			}
 			if dag {
@@ -557,7 +571,7 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 			return nil
 		}
 		// clear the backoff time when the step is finished
-		if err := handleBackoffTimes(wfCtx, status, true); err != nil {
+		if err := handleBackoffTimes(ctx, wfCtx, status, true); err != nil {
 			return err
 		}
 		if err := e.updateStepStatus(ctx, status); err != nil {
@@ -583,6 +597,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 		},
 		StepStatus: e.stepStatus,
 		Engine:     e,
+		Compiler:   e.compiler,
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
@@ -599,7 +614,11 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 				case "":
 					return &types.PreCheckResult{Skip: skipExecutionOfNextStep(dependsOnPhase, len(step.DependsOn) > 0)}, nil
 				default:
-					ifValue, err := custom.ValidateIfValue(e.wfCtx, step, e.stepStatus, options)
+					basicVal := cue.Value{}
+					if options != nil {
+						basicVal = options.BasicValue
+					}
+					ifValue, err := custom.ValidateIfValue(e.wfCtx, step, e.stepStatus, basicVal)
 					if err != nil {
 						return &types.PreCheckResult{Skip: true}, err
 					}
@@ -632,8 +651,8 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 		PostStopHooks: []types.TaskPostStopHook{hooks.Output},
 	}
 	if e.debug {
-		options.Debug = func(id string, v *value.Value) error {
-			debugContext := debug.NewContext(e.cli, e.instance, id)
+		options.Debug = func(id string, v cue.Value) error {
+			debugContext := debug.NewContext(e.instance, id)
 			if err := debugContext.Set(v); err != nil {
 				return err
 			}
@@ -651,13 +670,13 @@ type engine struct {
 	status             *v1alpha1.WorkflowRunStatus
 	wfCtx              wfContext.Context
 	instance           *types.WorkflowInstance
-	cli                client.Client
 	parentRunner       string
 	stepStatus         map[string]v1alpha1.StepStatus
 	stepTimeout        map[string]time.Time
 	stepDependsOn      map[string][]string
 	taskRunners        []types.TaskRunner
 	statusPatcher      types.StatusPatcher
+	compiler           *cuex.Compiler
 }
 
 func (e *engine) finishStep(operation *types.Operation) {
@@ -816,7 +835,7 @@ func skipExecutionOfNextStep(phase v1alpha1.WorkflowStepPhase, dependsOn bool) b
 	return phase != v1alpha1.WorkflowStepPhaseSucceeded && phase != v1alpha1.WorkflowStepPhaseSkipped
 }
 
-func handleBackoffTimes(wfCtx wfContext.Context, status v1alpha1.StepStatus, clear bool) error {
+func handleBackoffTimes(ctx context.Context, wfCtx wfContext.Context, status v1alpha1.StepStatus, clear bool) error {
 	if clear {
 		wfCtx.DeleteValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 		wfCtx.DeleteValueInMemory(types.ContextPrefixBackoffReason, status.ID)
@@ -827,7 +846,7 @@ func handleBackoffTimes(wfCtx wfContext.Context, status v1alpha1.StepStatus, cle
 		}
 		wfCtx.IncreaseCountValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 	}
-	if err := wfCtx.Commit(); err != nil {
+	if err := wfCtx.Commit(ctx); err != nil {
 		return errors.WithMessage(err, "commit workflow context")
 	}
 	return nil

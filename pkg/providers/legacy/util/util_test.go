@@ -19,24 +19,25 @@ package util
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	monitorContext "github.com/kubevela/pkg/monitor/context"
-
+	"github.com/kubevela/pkg/cue/util"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	"github.com/kubevela/workflow/pkg/providers"
+	"github.com/kubevela/workflow/pkg/types"
 )
 
 func TestPatchK8sObject(t *testing.T) {
+	ctx := context.Background()
+	cuectx := cuecontext.New()
 	testcases := map[string]struct {
 		value       string
 		expectedErr error
@@ -59,19 +60,14 @@ patch: {
 			"test-label": "true"
 		}
 	}
-}
-`,
+}`,
 			expectedErr: nil,
-			patchResult: `
-apiVersion: "apps/v1"
+			patchResult: `apiVersion: "apps/v1"
 kind:       "Deployment"
-spec: template: metadata: {
-	labels: {
-		"oam.dev/name": "test"
-		"test-label":   "true"
-	}
-}
-`,
+spec: template: metadata: labels: {
+	"oam.dev/name": "test"
+	"test-label":   "true"
+}`,
 		},
 		"test patch k8s object with patchKey": {
 			value: `
@@ -95,22 +91,17 @@ patch: {
 			}]
 		}]
 	}
-}
-`,
+}`,
 			expectedErr: nil,
-			patchResult: `
-apiVersion: "apps/v1"
+			patchResult: `apiVersion: "apps/v1"
 kind:       "Deployment"
-spec: template: spec: {
-	containers: [{
-		name: "test"
-		env: [{
-			name:  "test-env"
-			value: "test-value"
-		}]
+spec: template: spec: containers: [{
+	name: "test"
+	env: [{
+		name:  "test-env"
+		value: "test-value"
 	}]
-}
-`,
+}]`,
 		},
 		"test patch k8s object with patchStrategy": {
 			value: `
@@ -129,151 +120,145 @@ patch: {
 }
 `,
 			expectedErr: nil,
-			patchResult: `
-apiVersion: "apps/v1"
+			patchResult: `apiVersion: "apps/v1"
 kind:       "Deployment"
-spec: template: metadata: {
-	name: "test-patchStrategy"
-}
-`,
+spec: template: metadata: name: "test-patchStrategy"`,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			v, err := value.NewValue(tc.value, nil, "")
-			r.NoError(err)
-			prd := &provider{}
-			err = prd.PatchK8sObject(nil, nil, v, nil)
+			res, err := PatchK8sObject(ctx, &types.LegacyParams[cue.Value]{
+				Params: cuectx.CompileString(tc.value),
+			})
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
 			}
 			r.NoError(err)
-			result, err := v.LookupValue("result")
+			s, err := util.ToString(res.LookupPath(cue.ParsePath("result")))
 			r.NoError(err)
-			var patchResult map[string]interface{}
-			r.NoError(result.UnmarshalTo(&patchResult))
-			var expectResult map[string]interface{}
-			resultValue, err := value.NewValue(tc.patchResult, nil, "")
-			r.NoError(err)
-			r.NoError(resultValue.UnmarshalTo(&expectResult))
-			r.Equal(expectResult, patchResult)
+			r.Equal(tc.patchResult, s)
 		})
 	}
 }
 
 func TestConvertString(t *testing.T) {
+	ctx := context.Background()
 	testCases := map[string]struct {
-		from        string
-		expected    string
-		expectedErr error
+		from     []byte
+		expected string
 	}{
 		"success": {
-			from:     `bt: 'test'`,
+			from:     []byte("test"),
 			expected: "test",
-		},
-		"fail": {
-			from:        `bt: 123`,
-			expectedErr: errors.New("bt: cannot use value 123 (type int) as (string|bytes)"),
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			v, err := value.NewValue(tc.from, nil, "")
+			res, err := String(ctx, &StringParams{
+				Params: StringVars{
+					Byte: []byte(tc.from),
+				},
+			})
 			r.NoError(err)
-			prd := &provider{}
-			err = prd.String(nil, nil, v, nil)
-			if tc.expectedErr != nil {
-				r.Equal(tc.expectedErr.Error(), err.Error())
-				return
-			}
-			r.NoError(err)
-			expected, err := v.LookupValue("str")
-			r.NoError(err)
-			ret, err := expected.CueValue().String()
-			r.NoError(err)
-			r.Equal(ret, tc.expected)
+			r.Equal(tc.expected, res.String)
 		})
 	}
 }
 
 func TestLog(t *testing.T) {
+	ctx := context.Background()
 	wfCtx := newWorkflowContextForTest(t)
 	pCtx := process.NewContext(process.ContextData{})
 	pCtx.PushData(model.ContextStepName, "test-step")
-	prd := &provider{pCtx: pCtx}
-	logCtx := monitorContext.NewTraceContext(context.Background(), "")
 
 	testCases := []struct {
-		value       string
+		value       LogVars
 		expected    string
 		expectedErr string
 	}{
 		{
-			value:    `data: "test"`,
+			value: LogVars{
+				Data: "test",
+			},
 			expected: `{"test-step":{"data":true}}`,
 		},
 		{
-			value: `
-data: {
-	message: "test"
-}
-level: 3`,
+			value: LogVars{
+				Data: map[string]string{
+					"message": "test",
+				},
+				Level: 3,
+			},
 			expected: `{"test-step":{"data":true}}`,
 		},
 		{
-			value:    `test: ""`,
+			value: LogVars{
+				Data: map[string]string{
+					"test": "",
+				},
+			},
 			expected: `{"test-step":{"data":true}}`,
 		},
 		{
-			value: `
-source: {
-	url: "https://kubevela.io"
-}
-`,
+			value: LogVars{
+				Source: &LogSource{
+					URL: "https://kubevela.io",
+				},
+			},
 			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io"}}}`,
 		},
 		{
-			value: `
-source: {
-	resources: [{
-		labelSelector: {"test": "test"}
-	}]
-}
-`,
+			value: LogVars{
+				Source: &LogSource{
+					Resources: []Resource{
+						{
+							LabelSelector: map[string]string{
+								"test": "test",
+							},
+						},
+					},
+				},
+			},
 			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io","resources":[{"labelSelector":{"test":"test"}}]}}}`,
 		},
 		{
-			value: `
-source: {
-	resources: [{
-		name: "test"
-		namespace: "test"
-		cluster: "test"
-	}]
-}
-`,
+			value: LogVars{
+				Source: &LogSource{
+					Resources: []Resource{
+						{
+							Name:      "test",
+							Namespace: "test",
+							Cluster:   "test",
+						},
+					},
+				},
+			},
 			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.io","resources":[{"name":"test","namespace":"test","cluster":"test"}]}}}`,
 		},
 		{
-			value: `
-source: {
-	url: "https://kubevela.com"
-}
-`,
+			value: LogVars{
+				Source: &LogSource{
+					URL: "https://kubevela.com",
+				},
+			},
 			expected: `{"test-step":{"data":true,"source":{"url":"https://kubevela.com","resources":[{"name":"test","namespace":"test","cluster":"test"}]}}}`,
 		},
 	}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			r := require.New(t)
-			v, err := value.NewValue(tc.value, nil, "")
-			r.NoError(err)
-			err = prd.Log(logCtx, wfCtx, v, nil)
+			_, err := Log(ctx, &LogParams{
+				Params: tc.value,
+				RuntimeParams: types.RuntimeParams{
+					ProcessContext:  pCtx,
+					WorkflowContext: wfCtx,
+				},
+			})
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return
@@ -287,16 +272,16 @@ source: {
 	}
 }
 
-func TestInstall(t *testing.T) {
-	p := providers.NewProviders()
-	pCtx := process.NewContext(process.ContextData{})
-	pCtx.PushData(model.ContextStepName, "test-step")
-	Install(p, pCtx)
-	h, ok := p.GetHandler("util", "string")
-	r := require.New(t)
-	r.Equal(ok, true)
-	r.Equal(h != nil, true)
-}
+// func TestInstall(t *testing.T) {
+// 	p := providers.NewProviders()
+// 	pCtx := process.NewContext(process.ContextData{})
+// 	pCtx.PushData(model.ContextStepName, "test-step")
+// 	Install(p, pCtx)
+// 	h, ok := p.GetHandler("util", "string")
+// 	r := require.New(t)
+// 	r.Equal(ok, true)
+// 	r.Equal(h != nil, true)
+// }
 
 func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	cm := corev1.ConfigMap{}
@@ -307,7 +292,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	r.NoError(err)
 
 	wfCtx := new(wfContext.WorkflowContext)
-	err = wfCtx.LoadFromConfigMap(cm)
+	err = wfCtx.LoadFromConfigMap(context.Background(), cm)
 	r.NoError(err)
 	return wfCtx
 }

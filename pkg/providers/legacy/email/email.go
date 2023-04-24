@@ -17,15 +17,18 @@ limitations under the License.
 package email
 
 import (
+	"context"
+	_ "embed"
 	"fmt"
 	"sync"
 
 	"gopkg.in/gomail.v2"
 
-	monitorContext "github.com/kubevela/pkg/monitor/context"
+	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
-	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/errors"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -34,10 +37,8 @@ const (
 	ProviderName = "email"
 )
 
-type provider struct {
-}
-
-type sender struct {
+// Sender is the sender of email
+type Sender struct {
 	Address  string `json:"address"`
 	Alias    string `json:"alias,omitempty"`
 	Password string `json:"password"`
@@ -45,75 +46,55 @@ type sender struct {
 	Port     int    `json:"port"`
 }
 
-type content struct {
+// Content is the content of email
+type Content struct {
 	Subject string `json:"subject"`
 	Body    string `json:"body"`
 }
 
+// MailVars .
+type MailVars struct {
+	From    Sender   `json:"from"`
+	To      []string `json:"to"`
+	Content Content  `json:"content"`
+}
+
+// MailParams .
+type MailParams = types.LegacyParams[MailVars]
+
 var emailRoutine sync.Map
 
 // Send sends email
-func (h *provider) Send(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
-	stepID, err := v.LookupValue("stepID")
-	if err != nil {
-		return err
-	}
-	id, err := stepID.String()
-	if err != nil {
-		return err
-	}
+func Send(ctx context.Context, params *MailParams) (*any, error) {
+	pCtx := params.ProcessContext
+	act := params.Action
+	id := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))
 	routine, ok := emailRoutine.Load(id)
 	if ok {
 		switch routine {
 		case "success":
 			emailRoutine.Delete(id)
-			return nil
+			return nil, nil
 		case "initializing", "sending":
 			act.Wait("wait for the email")
-			return nil
+			return nil, errors.GenericActionError(errors.ActionWait)
 		default:
 			emailRoutine.Delete(id)
-			return fmt.Errorf("failed to send email: %v", routine)
+			return nil, fmt.Errorf("failed to send email: %v", routine)
 		}
 	} else {
 		emailRoutine.Store(id, "initializing")
 	}
 
-	s, err := v.LookupValue("from")
-	if err != nil {
-		return err
-	}
-
-	senderValue := &sender{}
-	if err := s.UnmarshalTo(senderValue); err != nil {
-		return err
-	}
-
-	r, err := v.LookupValue("to")
-	if err != nil {
-		return err
-	}
-	receiverValue := &[]string{}
-	if err := r.UnmarshalTo(receiverValue); err != nil {
-		return err
-	}
-
-	c, err := v.LookupValue("content")
-	if err != nil {
-		return err
-	}
-	contentValue := &content{}
-	if err := c.UnmarshalTo(contentValue); err != nil {
-		return err
-	}
-
+	sender := params.Params.From
+	content := params.Params.Content
 	m := gomail.NewMessage()
-	m.SetAddressHeader("From", senderValue.Address, senderValue.Alias)
-	m.SetHeader("To", *receiverValue...)
-	m.SetHeader("Subject", contentValue.Subject)
-	m.SetBody("text/html", contentValue.Body)
+	m.SetAddressHeader("From", sender.Address, sender.Alias)
+	m.SetHeader("To", params.Params.To...)
+	m.SetHeader("Subject", content.Subject)
+	m.SetBody("text/html", content.Body)
 
-	dial := gomail.NewDialer(senderValue.Host, senderValue.Port, senderValue.Address, senderValue.Password)
+	dial := gomail.NewDialer(sender.Host, sender.Port, sender.Address, sender.Password)
 	go func() {
 		if routine, ok := emailRoutine.Load(id); ok && routine == "initializing" {
 			emailRoutine.Store(id, "sending")
@@ -125,13 +106,20 @@ func (h *provider) Send(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 		}
 	}()
 	act.Wait("wait for the email")
-	return nil
+	return nil, errors.GenericActionError(errors.ActionWait)
 }
 
-// Install register handlers to provider discover.
-func Install(p types.Providers) {
-	prd := &provider{}
-	p.Register(ProviderName, map[string]types.Handler{
-		"send": prd.Send,
-	})
+//go:embed email.cue
+var template string
+
+// GetTemplate returns the template
+func GetTemplate() string {
+	return template
+}
+
+// GetProviders returns the provider
+func GetProviders() map[string]cuexruntime.ProviderFn {
+	return map[string]cuexruntime.ProviderFn{
+		"send": providertypes.LegacyGenericProviderFn[MailVars, any](Send),
+	}
 }

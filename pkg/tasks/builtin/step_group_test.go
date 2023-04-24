@@ -208,7 +208,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	r.NoError(err)
 
 	wfCtx := new(wfContext.WorkflowContext)
-	err = wfCtx.LoadFromConfigMap(cm)
+	err = wfCtx.LoadFromConfigMap(context.Background(), cm)
 	r.NoError(err)
 	return wfCtx
 }

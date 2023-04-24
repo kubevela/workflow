@@ -20,34 +20,34 @@ import (
 	"context"
 	"fmt"
 
+	"cuelang.org/go/cue"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/pkg/cue/util"
+	"github.com/kubevela/pkg/util/singleton"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
 // ContextImpl is workflow debug context interface
 type ContextImpl interface {
-	Set(v *value.Value) error
+	Set(v cue.Value) error
 }
 
 // Context is debug context.
 type Context struct {
-	cli      client.Client
 	instance *wfTypes.WorkflowInstance
 	id       string
 }
 
 // Set sets debug content into context
-func (d *Context) Set(v *value.Value) error {
-	data, err := v.String()
+func (d *Context) Set(v cue.Value) error {
+	data, err := util.ToString(v)
 	if err != nil {
 		return err
 	}
-	err = setStore(context.Background(), d.cli, d.instance, d.id, data)
+	err = setStore(context.Background(), d.instance, d.id, data)
 	if err != nil {
 		return err
 	}
@@ -55,8 +55,9 @@ func (d *Context) Set(v *value.Value) error {
 	return nil
 }
 
-func setStore(ctx context.Context, cli client.Client, instance *wfTypes.WorkflowInstance, id, data string) error {
+func setStore(ctx context.Context, instance *wfTypes.WorkflowInstance, id, data string) error {
 	cm := &corev1.ConfigMap{}
+	cli := singleton.KubeClient.Get()
 	if err := cli.Get(ctx, types.NamespacedName{
 		Namespace: instance.Namespace,
 		Name:      GenerateContextName(instance.Name, id, string(instance.UID)),
@@ -87,9 +88,8 @@ func setStore(ctx context.Context, cli client.Client, instance *wfTypes.Workflow
 }
 
 // NewContext new workflow context without initialize data.
-func NewContext(cli client.Client, instance *wfTypes.WorkflowInstance, id string) ContextImpl {
+func NewContext(instance *wfTypes.WorkflowInstance, id string) ContextImpl {
 	return &Context{
-		cli:      cli,
 		instance: instance,
 		id:       id,
 	}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -31,43 +32,45 @@ import (
 )
 
 // Input set data to parameter.
-func Input(ctx wfContext.Context, paramValue *value.Value, step v1alpha1.WorkflowStep) error {
+func Input(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowStep) (cue.Value, error) {
+	filledVal := paramValue
 	for _, input := range step.Inputs {
 		inputValue, err := ctx.GetVar(strings.Split(input.From, ".")...)
 		if err != nil {
-			inputValue, err = paramValue.LookupByScript(input.From)
+			inputValue, err = value.LookupValueByScript(paramValue, input.From)
 			if err != nil {
-				return errors.WithMessagef(err, "get input from [%s]", input.From)
+				return filledVal, errors.WithMessagef(err, "get input from [%s]", input.From)
 			}
 		}
 		if input.ParameterKey != "" {
-			if err := paramValue.SetValueByScript(inputValue, strings.Join([]string{"parameter", input.ParameterKey}, ".")); err != nil || paramValue.Error() != nil {
+			filledVal, err = value.SetValueByScript(paramValue, inputValue, strings.Join([]string{"parameter", input.ParameterKey}, "."))
+			if err != nil || filledVal.Err() != nil {
 				if err != nil {
-					return err
+					return paramValue, err
 				}
-				if paramValue.Error() != nil {
-					return paramValue.Error()
+				if filledVal.Err() != nil {
+					return filledVal, filledVal.Err()
 				}
 			}
 		}
 	}
-	return nil
+	return filledVal, nil
 }
 
 // Output get data from task value.
-func Output(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
+func Output(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
 	errMsg := ""
 	if wfTypes.IsStepFinish(status.Phase, status.Reason) {
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)
 		for _, output := range step.Outputs {
-			v, err := taskValue.LookupByScript(output.ValueFrom)
+			v, err := value.LookupValueByScript(taskValue, output.ValueFrom)
 			// if the error is not nil and the step is not skipped, return the error
 			if err != nil && status.Phase != v1alpha1.WorkflowStepPhaseSkipped {
 				errMsg += fmt.Sprintf("failed to get output from %s: %s\n", output.ValueFrom, err.Error())
 			}
 			// if the error is not nil, set the value to null
-			if err != nil || v.Error() != nil {
-				v, _ = taskValue.MakeValue("null")
+			if err != nil || v.Err() != nil {
+				v = taskValue.Context().CompileString("null")
 			}
 			if err := ctx.SetVar(v, output.Name); err != nil {
 				errMsg += fmt.Sprintf("failed to set output %s: %s\n", output.Name, err.Error())

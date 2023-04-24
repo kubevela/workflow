@@ -44,11 +44,11 @@ import (
 	"github.com/kubevela/workflow/api/condition"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/generator"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -58,8 +58,6 @@ type Args struct {
 	ConcurrentReconciles int
 	// IgnoreWorkflowWithoutControllerRequirement indicates that workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation.
 	IgnoreWorkflowWithoutControllerRequirement bool
-	// PackageDiscover discover the packages
-	PackageDiscover *packages.PackageDiscover
 }
 
 // WorkflowRunReconciler reconciles a WorkflowRun object
@@ -90,6 +88,10 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	defer cancel()
 
 	ctx = types.SetNamespaceInCtx(ctx, req.Namespace)
+	ctx = providertypes.WithLabelParams(ctx, map[string]string{
+		types.LabelWorkflowRunName:      req.Name,
+		types.LabelWorkflowRunNamespace: req.Namespace,
+	})
 
 	logCtx := monitorContext.NewTraceContext(ctx, "").AddTag("workflowrun", req.String())
 	logCtx.Info("Start reconcile workflowrun")
@@ -128,10 +130,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	isUpdate := instance.Status.Message != ""
 
-	runners, err := generator.GenerateRunners(logCtx, instance, types.StepGeneratorOptions{
-		PackageDiscover: r.PackageDiscover,
-		Client:          r.Client,
-	})
+	runners, err := generator.GenerateRunners(logCtx, instance, types.StepGeneratorOptions{})
 	if err != nil {
 		logCtx.Error(err, "[generate runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))
@@ -143,7 +142,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Client: r.Client,
 		run:    run,
 	}
-	executor := executor.New(instance, r.Client, patcher.patchStatus)
+	executor := executor.New(instance, executor.WithStatusPatcher(patcher.patchStatus))
 	state, err := executor.ExecuteRunners(logCtx, runners)
 	if err != nil {
 		logCtx.Error(err, "[execute runners]")
