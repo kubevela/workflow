@@ -34,7 +34,6 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 const (
@@ -59,7 +58,7 @@ type PromReturns struct {
 }
 
 // PromParams .
-type PromParams = types.LegacyParams[PromVars]
+type PromParams = providertypes.LegacyParams[PromVars]
 
 // PromCheck do health check from metrics from prometheus
 func PromCheck(ctx context.Context, params *PromParams) (*PromReturns, error) {

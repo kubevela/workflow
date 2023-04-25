@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
@@ -30,8 +31,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/errors"
-	"github.com/kubevela/workflow/pkg/types"
-	"github.com/stretchr/testify/require"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func TestProvider_DoVar(t *testing.T) {
@@ -45,7 +45,7 @@ func TestProvider_DoVar(t *testing.T) {
 			Path:   "clusterIP",
 			Value:  "1.1.1.1",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			WorkflowContext: wfCtx,
 		},
 	})
@@ -61,7 +61,7 @@ func TestProvider_DoVar(t *testing.T) {
 			Method: "Get",
 			Path:   "clusterIP",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			WorkflowContext: wfCtx,
 		},
 	})
@@ -81,7 +81,7 @@ func TestProvider_Wait(t *testing.T) {
 				Message: "test log",
 			},
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -98,7 +98,7 @@ func TestProvider_Wait(t *testing.T) {
 				Message: "omit msg",
 			},
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -112,7 +112,7 @@ func TestProvider_Break(t *testing.T) {
 	r := require.New(t)
 	act := &mockAction{}
 	_, err := Break(ctx, &ActionParams{
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -125,7 +125,7 @@ func TestProvider_Break(t *testing.T) {
 		Params: ActionVars{
 			Message: "terminate",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -147,7 +147,7 @@ func TestProvider_Suspend(t *testing.T) {
 		Params: SuspendVars{
 			Duration: "1s",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action:          act,
 			WorkflowContext: wfCtx,
 			ProcessContext:  pCtx,
@@ -174,7 +174,7 @@ func TestProvider_Fail(t *testing.T) {
 	r := require.New(t)
 	act := &mockAction{}
 	_, err := Fail(ctx, &ActionParams{
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -187,7 +187,7 @@ func TestProvider_Fail(t *testing.T) {
 		Params: ActionVars{
 			Message: "fail",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})
@@ -205,7 +205,7 @@ func TestProvider_Message(t *testing.T) {
 		Params: ActionVars{
 			Message: "test",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			Action: act,
 		},
 	})

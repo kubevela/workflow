@@ -31,7 +31,7 @@ import (
 	context2 "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	"github.com/kubevela/workflow/pkg/types"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func TestMetricCheck(t *testing.T) {
@@ -62,7 +62,7 @@ func TestMetricCheck(t *testing.T) {
 			FailDuration:   "2s",
 			Condition:      ">=3",
 		},
-		RuntimeParams: types.RuntimeParams{
+		RuntimeParams: providertypes.RuntimeParams{
 			WorkflowContext: wfCtx,
 			ProcessContext:  pCtx,
 		},

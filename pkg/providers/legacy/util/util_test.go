@@ -32,7 +32,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	"github.com/kubevela/workflow/pkg/types"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func TestPatchK8sObject(t *testing.T) {
@@ -129,7 +129,7 @@ spec: template: metadata: name: "test-patchStrategy"`,
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			res, err := PatchK8sObject(ctx, &types.LegacyParams[cue.Value]{
+			res, err := PatchK8sObject(ctx, &providertypes.LegacyParams[cue.Value]{
 				Params: cuectx.CompileString(tc.value),
 			})
 			if tc.expectedErr != nil {
@@ -254,7 +254,7 @@ func TestLog(t *testing.T) {
 			r := require.New(t)
 			_, err := Log(ctx, &LogParams{
 				Params: tc.value,
-				RuntimeParams: types.RuntimeParams{
+				RuntimeParams: providertypes.RuntimeParams{
 					ProcessContext:  pCtx,
 					WorkflowContext: wfCtx,
 				},

@@ -32,7 +32,6 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/errors"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 const (
@@ -57,7 +56,7 @@ type VarReturns struct {
 }
 
 // VarParams .
-type VarParams = types.LegacyParams[VarVars]
+type VarParams = providertypes.LegacyParams[VarVars]
 
 // DoVar get & put variable from context.
 func DoVar(ctx context.Context, params *VarParams) (*VarReturns, error) {
@@ -100,7 +99,7 @@ type ActionVars struct {
 }
 
 // ActionParams .
-type ActionParams = types.LegacyParams[ActionVars]
+type ActionParams = providertypes.LegacyParams[ActionVars]
 
 // WaitVars .
 type WaitVars struct {
@@ -109,7 +108,7 @@ type WaitVars struct {
 }
 
 // WaitParams .
-type WaitParams = types.LegacyParams[WaitVars]
+type WaitParams = providertypes.LegacyParams[WaitVars]
 
 // Wait let workflow wait.
 func Wait(ctx context.Context, params *WaitParams) (*any, error) {
@@ -139,7 +138,7 @@ type SuspendVars struct {
 }
 
 // SuspendParams .
-type SuspendParams = types.LegacyParams[SuspendVars]
+type SuspendParams = providertypes.LegacyParams[SuspendVars]
 
 // Suspend let the step suspend, its status is suspending and reason is Suspend
 func Suspend(ctx context.Context, params *SuspendParams) (*any, error) {

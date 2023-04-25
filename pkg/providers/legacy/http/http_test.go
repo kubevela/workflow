@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/pkg/util/singleton"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 )
@@ -280,13 +279,7 @@ func TestHTTPSDo(t *testing.T) {
 	}
 	singleton.KubeClient.Set(cli)
 	r := require.New(t)
-	v, err := value.NewValue(`
-method: "GET"
-url: "https://127.0.0.1:8443/api/v1/token?val=test-token"
-`, nil, "")
-	r.NoError(err)
-	r.NoError(v.FillObject("certs", "tls_config", "secret"))
-	_, err = Do(ctx, &DoParams{
+	_, err := Do(ctx, &DoParams{
 		Params: RequestVars{
 			Method: "GET",
 			URL:    "https://127.0.0.1:8443/api/v1/token?val=test-token",

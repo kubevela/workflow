@@ -37,7 +37,6 @@ import (
 
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 const (
@@ -91,7 +90,7 @@ type ResponseVars struct {
 }
 
 // DoParams is the params for http request
-type DoParams = types.LegacyParams[RequestVars]
+type DoParams = providertypes.LegacyParams[RequestVars]
 
 // Do process http request.
 func Do(ctx context.Context, params *DoParams) (*ResponseVars, error) {

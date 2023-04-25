@@ -20,9 +20,9 @@ import (
 	"github.com/kubevela/pkg/cue/cuex"
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 	"github.com/kubevela/pkg/util/runtime"
+	"github.com/kubevela/pkg/util/singleton"
 
 	"github.com/kubevela/workflow/pkg/providers/legacy"
-	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 const (
@@ -30,15 +30,10 @@ const (
 	LegacyProviderName = "op"
 )
 
-var defaultCompiler *cuex.Compiler
-
-// NewCompiler create a cuex compiler
-func NewCompiler(kubeHandlers *providertypes.KubeHandlers) *cuex.Compiler {
-	if defaultCompiler == nil {
-		defaultCompiler = cuex.NewCompilerWithInternalPackages(
-			// legacy packages
-			runtime.Must(cuexruntime.NewInternalPackage(LegacyProviderName, legacy.GetLegacyTemplate(), legacy.GetLegacyProviders(kubeHandlers))),
-		)
-	}
-	return defaultCompiler
-}
+// Compiler is the workflow default compiler
+var Compiler = singleton.NewSingletonE[*cuex.Compiler](func() (*cuex.Compiler, error) {
+	return cuex.NewCompilerWithInternalPackages(
+		// legacy packages
+		runtime.Must(cuexruntime.NewInternalPackage(LegacyProviderName, legacy.GetLegacyTemplate(), legacy.GetLegacyProviders())),
+	), nil
+})

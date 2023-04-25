@@ -29,26 +29,10 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 )
-
-// RuntimeParams is the runtime parameters of a provider.
-type RuntimeParams struct {
-	WorkflowContext wfContext.Context
-	ProcessContext  process.Context
-	Action          Action
-	FieldLabel      string
-	Labels          map[string]string
-}
-
-// LegacyParams is the legacy input parameters of a provider.
-type LegacyParams[T any] struct {
-	Params T
-	RuntimeParams
-}
 
 // WorkflowInstance is the instance for workflow engine to execute
 type WorkflowInstance struct {
@@ -98,7 +82,6 @@ type Engine interface {
 
 // TaskRunOptions is the options for task run
 type TaskRunOptions struct {
-	Data          *value.Value
 	PCtx          process.Context
 	PreCheckHooks []TaskPreCheckHook
 	PreStartHooks []TaskPreStartHook

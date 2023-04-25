@@ -11,7 +11,6 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/metrics"
 	"github.com/kubevela/workflow/pkg/providers/legacy/util"
 	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
-	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func registerProviders(providers map[string]cuexruntime.ProviderFn, new map[string]cuexruntime.ProviderFn) map[string]cuexruntime.ProviderFn {
@@ -22,11 +21,11 @@ func registerProviders(providers map[string]cuexruntime.ProviderFn, new map[stri
 }
 
 // GetLegacyProviders get legacy providers
-func GetLegacyProviders(handlers *providertypes.KubeHandlers) map[string]cuexruntime.ProviderFn {
+func GetLegacyProviders() map[string]cuexruntime.ProviderFn {
 	providers := make(map[string]cuexruntime.ProviderFn, 0)
 	registerProviders(providers, email.GetProviders())
 	registerProviders(providers, http.GetProviders())
-	registerProviders(providers, kube.GetProviders(handlers))
+	registerProviders(providers, kube.GetProviders())
 	registerProviders(providers, metrics.GetProviders())
 	registerProviders(providers, util.GetProviders())
 	registerProviders(providers, workspace.GetProviders())
