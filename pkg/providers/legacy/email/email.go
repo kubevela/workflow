@@ -64,7 +64,7 @@ type MailParams = providertypes.LegacyParams[MailVars]
 var emailRoutine sync.Map
 
 // Send sends email
-func Send(ctx context.Context, params *MailParams) (*any, error) {
+func Send(ctx context.Context, params *MailParams) (res *any, err error) {
 	pCtx := params.ProcessContext
 	act := params.Action
 	id := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))
@@ -97,8 +97,9 @@ func Send(ctx context.Context, params *MailParams) (*any, error) {
 	go func() {
 		if routine, ok := emailRoutine.Load(id); ok && routine == "initializing" {
 			emailRoutine.Store(id, "sending")
-			if err := dial.DialAndSend(m); err != nil {
+			if err = dial.DialAndSend(m); err != nil {
 				emailRoutine.Store(id, err.Error())
+				fmt.Println("=========", err.Error())
 				return
 			}
 			emailRoutine.Store(id, "success")
