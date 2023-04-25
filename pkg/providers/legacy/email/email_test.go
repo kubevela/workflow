@@ -18,7 +18,6 @@ package email
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -30,6 +29,7 @@ import (
 
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/errors"
 	"github.com/kubevela/workflow/pkg/mock"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
@@ -94,7 +94,7 @@ func TestSendEmail(t *testing.T) {
 			if tc.errMsg != "" {
 				patch.Reset()
 				patch = ApplyMethod(reflect.TypeOf(dial), "DialAndSend", func(_ *gomail.Dialer, _ ...*gomail.Message) error {
-					return errors.New(tc.errMsg)
+					return fmt.Errorf(tc.errMsg)
 				})
 				defer patch.Reset()
 			}
@@ -109,7 +109,8 @@ func TestSendEmail(t *testing.T) {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
 			}
-			r.NoError(err)
+			_, ok := err.(errors.GenericActionError)
+			r.Equal(ok, true)
 			r.Equal(act.Phase, "Wait")
 
 			// mock reconcile
@@ -122,10 +123,8 @@ func TestSendEmail(t *testing.T) {
 				},
 			})
 			if tc.errMsg != "" {
-				r.Equal(fmt.Errorf("failed to send email: %s", tc.errMsg), err)
-				return
+				r.Contains(err.Error(), tc.errMsg)
 			}
-			r.NoError(err)
 		})
 	}
 }
