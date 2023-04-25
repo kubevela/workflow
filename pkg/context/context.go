@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/pkg/cue/cuex"
 	"github.com/kubevela/pkg/cue/util"
 	"github.com/kubevela/pkg/util/rand"
 	"github.com/kubevela/pkg/util/singleton"
@@ -198,11 +197,7 @@ func (wf *WorkflowContext) LoadFromConfigMap(ctx context.Context, cm corev1.Conf
 	}
 	data := cm.Data
 
-	var err error
-	wf.vars, err = cuex.DefaultCompiler.Get().CompileString(ctx, data[ConfigMapKeyVars])
-	if err != nil {
-		return errors.WithMessage(err, "decode vars")
-	}
+	wf.vars = cuecontext.New().CompileString(data[ConfigMapKeyVars])
 	return nil
 }
 

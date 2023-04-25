@@ -38,6 +38,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/hooks"
+	"github.com/kubevela/workflow/pkg/providers"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -298,7 +299,7 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, step
 // MakeBasicValue makes basic value
 func MakeBasicValue(ctx monitorContext.Context, properties *runtime.RawExtension, pCtx process.Context) (cue.Value, error) {
 	// use default compiler to compile the basic value without providers
-	v, err := cuex.DefaultCompiler.Get().CompileStringWithOptions(ctx, getContextTemplate(pCtx), cuex.WithExtraData(
+	v, err := providers.Compiler.Get().CompileStringWithOptions(ctx, getContextTemplate(pCtx), cuex.WithExtraData(
 		model.ParameterFieldName, properties,
 	), cuex.DisableResolveProviderFunctions{})
 	if err != nil {
