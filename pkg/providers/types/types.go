@@ -35,10 +35,39 @@ const (
 	processContextKey  contextKey = "processContext"
 	actionKey          contextKey = "action"
 	labelsKey          contextKey = "labels"
+	kubeHandlersKey    contextKey = "kubeHandlers"
 )
 
+// Dispatcher is a client for apply resources.
+type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*unstructured.Unstructured) error
+
+// Deleter is a client for delete resources.
+type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
+
+// KubeHandlers handles resources.
+type KubeHandlers struct {
+	Apply  Dispatcher
+	Delete Deleter
+}
+
+// RuntimeParams is the runtime parameters of a provider.
+type RuntimeParams struct {
+	WorkflowContext wfContext.Context
+	ProcessContext  process.Context
+	Action          types.Action
+	FieldLabel      string
+	Labels          map[string]string
+	KubeHandlers    *KubeHandlers
+}
+
+// LegacyParams is the legacy input parameters of a provider.
+type LegacyParams[T any] struct {
+	Params T
+	RuntimeParams
+}
+
 // LegacyGenericProviderFn is the legacy provider function
-type LegacyGenericProviderFn[T any, U any] func(context.Context, *types.LegacyParams[T]) (*U, error)
+type LegacyGenericProviderFn[T any, U any] func(context.Context, *LegacyParams[T]) (*U, error)
 
 // Call marshal value into json and decode into underlying function input
 // parameters, then fill back the returned output value
@@ -54,7 +83,7 @@ func (fn LegacyGenericProviderFn[T, U]) Call(ctx context.Context, value cue.Valu
 	runtimeParams := RuntimeParamsFrom(ctx)
 	label, _ := value.Label()
 	runtimeParams.FieldLabel = label
-	ret, err := fn(ctx, &types.LegacyParams[T]{Params: *params, RuntimeParams: runtimeParams})
+	ret, err := fn(ctx, &LegacyParams[T]{Params: *params, RuntimeParams: runtimeParams})
 	if err != nil {
 		return value, err
 	}
@@ -62,13 +91,13 @@ func (fn LegacyGenericProviderFn[T, U]) Call(ctx context.Context, value cue.Valu
 }
 
 // LegacyNativeProviderFn is the legacy native provider function
-type LegacyNativeProviderFn func(context.Context, *types.LegacyParams[cue.Value]) (cue.Value, error)
+type LegacyNativeProviderFn func(context.Context, *LegacyParams[cue.Value]) (cue.Value, error)
 
 // Call marshal value into json and decode into underlying function input
 // parameters, then fill back the returned output value
 func (fn LegacyNativeProviderFn) Call(ctx context.Context, value cue.Value) (cue.Value, error) {
 	runtimeParams := RuntimeParamsFrom(ctx)
-	return fn(ctx, &types.LegacyParams[cue.Value]{Params: value, RuntimeParams: runtimeParams})
+	return fn(ctx, &LegacyParams[cue.Value]{Params: value, RuntimeParams: runtimeParams})
 }
 
 // WithLabelParams returns a copy of parent in which the labels value is set
@@ -77,7 +106,7 @@ func WithLabelParams(parent context.Context, labels map[string]string) context.C
 }
 
 // WithRuntimeParams returns a copy of parent in which the runtime params value is set
-func WithRuntimeParams(parent context.Context, params types.RuntimeParams) context.Context {
+func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Context {
 	ctx := context.WithValue(parent, workflowContextKey, params.WorkflowContext)
 	ctx = context.WithValue(ctx, processContextKey, params.ProcessContext)
 	ctx = context.WithValue(ctx, actionKey, params.Action)
@@ -85,8 +114,8 @@ func WithRuntimeParams(parent context.Context, params types.RuntimeParams) conte
 }
 
 // RuntimeParamsFrom returns the runtime params value stored in ctx, if any.
-func RuntimeParamsFrom(ctx context.Context) types.RuntimeParams {
-	params := types.RuntimeParams{}
+func RuntimeParamsFrom(ctx context.Context) RuntimeParams {
+	params := RuntimeParams{}
 	if wfCtx, ok := ctx.Value(workflowContextKey).(wfContext.Context); ok {
 		params.WorkflowContext = wfCtx
 	}
@@ -99,17 +128,8 @@ func RuntimeParamsFrom(ctx context.Context) types.RuntimeParams {
 	if labels, ok := ctx.Value(labelsKey).(map[string]string); ok {
 		params.Labels = labels
 	}
+	if kubeHandlers, ok := ctx.Value(kubeHandlersKey).(*KubeHandlers); ok {
+		params.KubeHandlers = kubeHandlers
+	}
 	return params
-}
-
-// Dispatcher is a client for apply resources.
-type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*unstructured.Unstructured) error
-
-// Deleter is a client for delete resources.
-type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
-
-// KubeHandlers handles resources.
-type KubeHandlers struct {
-	Apply  Dispatcher
-	Delete Deleter
 }

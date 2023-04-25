@@ -33,7 +33,6 @@ import (
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 
-	// providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"

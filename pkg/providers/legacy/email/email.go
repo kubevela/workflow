@@ -29,7 +29,6 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/errors"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 const (
@@ -60,7 +59,7 @@ type MailVars struct {
 }
 
 // MailParams .
-type MailParams = types.LegacyParams[MailVars]
+type MailParams = providertypes.LegacyParams[MailVars]
 
 var emailRoutine sync.Map
 

@@ -63,26 +63,26 @@ func TestTaskLoader(t *testing.T) {
 			"templateError": cuexruntime.NativeProviderFn(func(ctx context.Context, v cue.Value) (cue.Value, error) {
 				return v.Context().CompileString("output: xxx"), nil
 			}),
-			"wait": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"wait": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				val.RuntimeParams.Action.Wait("I am waiting")
 				return nil, nil
 			}),
-			"terminate": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"terminate": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				val.RuntimeParams.Action.Terminate("I am terminated")
 				return nil, nil
 			}),
-			"suspend": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"suspend": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				val.RuntimeParams.Action.Suspend("I am suspended")
 				return nil, nil
 			}),
-			"resume": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"resume": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				val.RuntimeParams.Action.Resume("I am resumed")
 				return nil, nil
 			}),
-			"executeFailed": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"executeFailed": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				return nil, errors.New("execute error")
 			}),
-			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				return nil, nil
 			}),
 		},
@@ -197,10 +197,10 @@ func TestErrCases(t *testing.T) {
 	compiler := cuex.NewCompilerWithInternalPackages(
 		// legacy packages
 		pkgruntime.Must(cuexruntime.NewInternalPackage("test", "", map[string]cuexruntime.ProviderFn{
-			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				return nil, nil
 			}),
-			"error": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"error": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				return nil, errors.New("mock error")
 			}),
 			"input": cuexruntime.NativeProviderFn(func(ctx context.Context, v cue.Value) (cue.Value, error) {
@@ -316,139 +316,6 @@ func TestErrCases(t *testing.T) {
 	}
 }
 
-// func TestSteps(t *testing.T) {
-
-// 	var (
-// 		echo    string
-// 		mockErr = errors.New("mock error")
-// 	)
-
-// 	wfCtx := newWorkflowContextForTest(t)
-// 	r := require.New(t)
-// 	discover := providers.NewProviders()
-// 	discover.Register("test", map[string]types.Handler{
-// 		"ok": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
-// 			echo = echo + "ok"
-// 			return nil
-// 		},
-// 		"error": func(mCtx monitorContext.Context, ctx wfContext.Context, v *value.Value, act types.Action) error {
-// 			return mockErr
-// 		},
-// 	})
-// 	exec := &executor{
-// 		handlers: discover,
-// 	}
-
-// 	testCases := []struct {
-// 		base     string
-// 		expected string
-// 		hasErr   bool
-// 	}{
-// 		{
-// 			base: `
-// process: {
-// 	#provider: "test"
-// 	#do: "ok"
-// }
-
-// #up: [process]
-// `,
-// 			expected: "okok",
-// 		},
-// 		{
-// 			base: `
-// process: {
-// 	#provider: "test"
-// 	#do: "ok"
-// }
-
-// #up: [process,{
-//   #do: "steps"
-//   p1: process
-//   #up: [process]
-// }]
-// `,
-// 			expected: "okokokok",
-// 		},
-// 		{
-// 			base: `
-// process: {
-// 	#provider: "test"
-// 	#do: "ok"
-// }
-
-// #up: [process,{
-//   p1: process
-//   #up: [process]
-// }]
-// `,
-// 			expected: "okok",
-// 		},
-// 		{
-// 			base: `
-// process: {
-// 	#provider: "test"
-// 	#do: "ok"
-// }
-
-// #up: [process,{
-//   #do: "steps"
-//   err: {
-//     #provider: "test"
-// 	#do: "error"
-//   } @step(1)
-//   #up: [{},process] @step(2)
-// }]
-// `,
-// 			expected: "okok",
-// 			hasErr:   true,
-// 		},
-
-// 		{
-// 			base: `
-// 	#provider: "test"
-// 	#do: "ok"
-// `,
-// 			expected: "ok",
-// 		},
-// 		{
-// 			base: `
-// process: {
-// 	#provider: "test"
-// 	#do: "ok"
-//     err: true
-// }
-
-// if process.err {
-//   err: {
-//     #provider: "test"
-// 	  #do: "error"
-//   }
-// }
-
-// apply: {
-// 	#provider: "test"
-// 	#do: "ok"
-// }
-
-// #up: [process,{}]
-// `,
-// 			expected: "ok",
-// 			hasErr:   true,
-// 		},
-// 	}
-
-// 	for i, tc := range testCases {
-// 		echo = ""
-// 		v, err := value.NewValue(tc.base, nil, "", value.TagFieldOrder)
-// 		r.NoError(err)
-// 		err = exec.doSteps(nil, wfCtx, v)
-// 		r.Equal(err != nil, tc.hasErr)
-// 		r.Equal(tc.expected, echo, i)
-// 	}
-
-// }
-
 func TestPendingInputCheck(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	r := require.New(t)
@@ -549,7 +416,7 @@ func TestTimeout(t *testing.T) {
 	compiler := cuex.NewCompilerWithInternalPackages(
 		// legacy packages
 		pkgruntime.Must(cuexruntime.NewInternalPackage("test", "", map[string]cuexruntime.ProviderFn{
-			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *types.LegacyParams[any]) (*any, error) {
+			"ok": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
 				return nil, nil
 			}),
 		})),

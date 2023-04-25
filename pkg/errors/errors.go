@@ -16,6 +16,8 @@ limitations under the License.
 
 package errors
 
+import "fmt"
+
 // ActionType is the type of action
 type ActionType string
 
@@ -33,4 +35,12 @@ type GenericActionError ActionType
 
 func (e GenericActionError) Error() string {
 	return ""
+}
+
+// LookUpNotFoundErr is the error type of lookup
+type LookUpNotFoundErr string
+
+// Error .
+func (e LookUpNotFoundErr) Error() string {
+	return fmt.Sprintf("failed to lookup value: var(path=%s) not exist", string(e))
 }

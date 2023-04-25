@@ -162,7 +162,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			resetter := tRunner.fillContext(tracer, options.PCtx)
 			defer resetter(options.PCtx)
 
-			ctx := providertypes.WithRuntimeParams(tracer.GetContext(), types.RuntimeParams{
+			ctx := providertypes.WithRuntimeParams(tracer.GetContext(), providertypes.RuntimeParams{
 				WorkflowContext: wfCtx,
 				ProcessContext:  options.PCtx,
 				Action:          exec,

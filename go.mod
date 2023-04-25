@@ -7,7 +7,6 @@ require (
 	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.38
 	github.com/crossplane/crossplane-runtime v0.19.2
-	github.com/cue-exp/kubevelafix v0.0.0-20220922150317-aead819d979d
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/google/go-cmp v0.5.9

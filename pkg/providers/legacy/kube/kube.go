@@ -37,7 +37,6 @@ import (
 
 	"github.com/kubevela/workflow/pkg/cue/model"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 const (
@@ -46,10 +45,6 @@ const (
 	// AnnoWorkflowLastAppliedTime is annotation for last applied time
 	AnnoWorkflowLastAppliedTime = "workflow.oam.dev/last-applied-time"
 )
-
-type provider struct {
-	handlers providertypes.KubeHandlers
-}
 
 const (
 	// WorkflowResourceCreator is the creator name of workflow resource
@@ -125,11 +120,22 @@ type ResourceReturns struct {
 }
 
 // ResourceParams .
-type ResourceParams = types.LegacyParams[ResourceVars]
+type ResourceParams = providertypes.LegacyParams[ResourceVars]
+
+func getHandlers(runtimeParams providertypes.RuntimeParams) *providertypes.KubeHandlers {
+	if runtimeParams.KubeHandlers != nil {
+		return runtimeParams.KubeHandlers
+	}
+	return &providertypes.KubeHandlers{
+		Apply:  apply,
+		Delete: delete,
+	}
+}
 
 // Apply create or update CR in cluster.
-func (h *provider) Apply(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
+func Apply(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
 	workload := params.Params.Resource
+	handlers := getHandlers(params.RuntimeParams)
 	if workload.GetNamespace() == "" {
 		workload.SetNamespace("default")
 	}
@@ -139,7 +145,7 @@ func (h *provider) Apply(ctx context.Context, params *ResourceParams) (*Resource
 		}
 	}
 	deployCtx := handleContext(ctx, params.Params.Cluster)
-	if err := h.handlers.Apply(deployCtx, params.Params.Cluster, WorkflowResourceCreator, workload); err != nil {
+	if err := handlers.Apply(deployCtx, params.Params.Cluster, WorkflowResourceCreator, workload); err != nil {
 		return nil, err
 	}
 	return &ResourceReturns{
@@ -159,18 +165,19 @@ type ApplyInParallelReturns struct {
 }
 
 // ApplyInParallelParams .
-type ApplyInParallelParams = types.LegacyParams[ApplyInParallelVars]
+type ApplyInParallelParams = providertypes.LegacyParams[ApplyInParallelVars]
 
 // ApplyInParallel create or update CRs in parallel.
-func (h *provider) ApplyInParallel(ctx context.Context, params *ApplyInParallelParams) (*ApplyInParallelReturns, error) {
+func ApplyInParallel(ctx context.Context, params *ApplyInParallelParams) (*ApplyInParallelReturns, error) {
 	workloads := params.Params.Resources
+	handlers := getHandlers(params.RuntimeParams)
 	for i := range workloads {
 		if workloads[i].GetNamespace() == "" {
 			workloads[i].SetNamespace("default")
 		}
 	}
 	deployCtx := handleContext(ctx, params.Params.Cluster)
-	if err := h.handlers.Apply(deployCtx, params.Params.Cluster, WorkflowResourceCreator, workloads...); err != nil {
+	if err := handlers.Apply(deployCtx, params.Params.Cluster, WorkflowResourceCreator, workloads...); err != nil {
 		return nil, err
 	}
 	return &ApplyInParallelReturns{
@@ -179,7 +186,8 @@ func (h *provider) ApplyInParallel(ctx context.Context, params *ApplyInParallelP
 }
 
 // Patch patch CR in cluster.
-func (h *provider) Patch(ctx context.Context, params *types.LegacyParams[cue.Value]) (cue.Value, error) {
+func Patch(ctx context.Context, params *providertypes.LegacyParams[cue.Value]) (cue.Value, error) {
+	handlers := getHandlers(params.RuntimeParams)
 	val := params.Params.LookupPath(cue.ParsePath("value"))
 	obj := new(unstructured.Unstructured)
 	b, err := val.MarshalJSON()
@@ -220,14 +228,14 @@ func (h *provider) Patch(ctx context.Context, params *types.LegacyParams[cue.Val
 			return cue.Value{}, err
 		}
 	}
-	if err := h.handlers.Apply(multiCtx, cluster, WorkflowResourceCreator, workload); err != nil {
+	if err := handlers.Apply(multiCtx, cluster, WorkflowResourceCreator, workload); err != nil {
 		return cue.Value{}, err
 	}
 	return params.Params.FillPath(cue.ParsePath("result"), workload), nil
 }
 
 // Read get CR from cluster.
-func (h *provider) Read(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
+func Read(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
 	workload := params.Params.Resource
 	key := client.ObjectKeyFromObject(workload)
 	if key.Namespace == "" {
@@ -251,7 +259,7 @@ type ListReturns struct {
 }
 
 // List lists CRs from cluster.
-func (h *provider) List(ctx context.Context, params *ResourceParams) (*ListReturns, error) {
+func List(ctx context.Context, params *ResourceParams) (*ListReturns, error) {
 	workload := params.Params.Resource
 	list := &unstructured.UnstructuredList{Object: map[string]interface{}{
 		"kind":       workload.GetKind(),
@@ -275,8 +283,9 @@ func (h *provider) List(ctx context.Context, params *ResourceParams) (*ListRetur
 }
 
 // Delete deletes CR from cluster.
-func (h *provider) Delete(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
+func Delete(ctx context.Context, params *ResourceParams) (*ResourceReturns, error) {
 	workload := params.Params.Resource
+	handlers := getHandlers(params.RuntimeParams)
 	deleteCtx := handleContext(ctx, params.Params.Cluster)
 
 	if filter := params.Params.Filter; filter != nil {
@@ -292,7 +301,7 @@ func (h *provider) Delete(ctx context.Context, params *ResourceParams) (*Resourc
 		return nil, nil
 	}
 
-	if err := h.handlers.Delete(deleteCtx, params.Params.Cluster, WorkflowResourceCreator, workload); err != nil {
+	if err := handlers.Delete(deleteCtx, params.Params.Cluster, WorkflowResourceCreator, workload); err != nil {
 		return &ResourceReturns{
 			Error: err,
 		}, nil
@@ -310,22 +319,13 @@ func GetTemplate() string {
 }
 
 // GetProviders get kube providers.
-func GetProviders(handlers *providertypes.KubeHandlers) map[string]cuexruntime.ProviderFn {
-	if handlers == nil {
-		handlers = &providertypes.KubeHandlers{
-			Apply:  apply,
-			Delete: delete,
-		}
-	}
-	prd := &provider{
-		handlers: *handlers,
-	}
+func GetProviders() map[string]cuexruntime.ProviderFn {
 	return map[string]cuexruntime.ProviderFn{
-		"apply":             providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](prd.Apply),
-		"apply-in-parallel": providertypes.LegacyGenericProviderFn[ApplyInParallelVars, ApplyInParallelReturns](prd.ApplyInParallel),
-		"read":              providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](prd.Read),
-		"list":              providertypes.LegacyGenericProviderFn[ResourceVars, ListReturns](prd.List),
-		"delete":            providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](prd.Delete),
-		"patch":             providertypes.LegacyNativeProviderFn(prd.Patch),
+		"apply":             providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Apply),
+		"apply-in-parallel": providertypes.LegacyGenericProviderFn[ApplyInParallelVars, ApplyInParallelReturns](ApplyInParallel),
+		"read":              providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Read),
+		"list":              providertypes.LegacyGenericProviderFn[ResourceVars, ListReturns](List),
+		"delete":            providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Delete),
+		"patch":             providertypes.LegacyNativeProviderFn(Patch),
 	}
 }

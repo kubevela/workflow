@@ -48,7 +48,7 @@ type PatchResult struct {
 }
 
 // PatchK8sObject patch k8s object
-func PatchK8sObject(ctx context.Context, params *types.LegacyParams[cue.Value]) (cue.Value, error) {
+func PatchK8sObject(ctx context.Context, params *providertypes.LegacyParams[cue.Value]) (cue.Value, error) {
 	base, err := model.NewBase(params.Params.LookupPath(cue.ParsePath("value")))
 	if err != nil {
 		return cue.Value{}, err
@@ -75,7 +75,7 @@ type StringReturns struct {
 }
 
 // StringParams .
-type StringParams = types.LegacyParams[StringVars]
+type StringParams = providertypes.LegacyParams[StringVars]
 
 // String convert byte to string
 func String(ctx context.Context, params *StringParams) (*StringReturns, error) {
@@ -112,7 +112,7 @@ type LogVars struct {
 }
 
 // LogParams .
-type LogParams = types.LegacyParams[LogVars]
+type LogParams = providertypes.LegacyParams[LogVars]
 
 // Log print cue value in log
 func Log(ctx context.Context, params *LogParams) (*any, error) {

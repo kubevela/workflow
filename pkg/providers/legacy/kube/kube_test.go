@@ -42,9 +42,7 @@ import (
 
 	"github.com/kubevela/pkg/util/singleton"
 
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
-	"github.com/kubevela/workflow/pkg/types"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -54,8 +52,6 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var scheme = runtime.NewScheme()
-var pd *packages.PackageDiscover
-var p *provider
 
 func TestProvider(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -81,16 +77,8 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
-	pd, err = packages.NewPackageDiscover(cfg)
-	Expect(err).ToNot(HaveOccurred())
 
 	singleton.KubeClient.Set(k8sClient)
-	p = &provider{
-		handlers: providertypes.KubeHandlers{
-			Apply:  apply,
-			Delete: delete,
-		},
-	}
 	close(done)
 }, 120)
 
@@ -103,17 +91,19 @@ var _ = AfterSuite(func() {
 var _ = Describe("Test Workflow Provider Kube", func() {
 	It("apply and read", func() {
 		ctx := context.Background()
-		ctx = providertypes.WithLabelParams(ctx, map[string]string{
-			"hello": "world",
-		})
 		un := testUnstructured.DeepCopy()
 		un.SetName("app")
 		un.SetLabels(map[string]string{
 			"test": "test",
 		})
-		res, err := p.Apply(ctx, &ResourceParams{
+		res, err := Apply(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: un,
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				Labels: map[string]string{
+					"hello": "world",
+				},
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -130,7 +120,7 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 			"hello": "world",
 		}))
 
-		res, err = p.Read(ctx, &ResourceParams{
+		res, err = Read(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -140,6 +130,11 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 							"name": "app",
 						},
 					},
+				},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				Labels: map[string]string{
+					"hello": "world",
 				},
 			},
 		})
@@ -159,7 +154,7 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 		un.SetLabels(map[string]string{
 			"test": "test",
 		})
-		_, err := p.Apply(ctx, &ResourceParams{
+		_, err := Apply(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &un,
 			},
@@ -183,7 +178,7 @@ patch: {
 	}
 }
 `)
-		_, err = p.Patch(ctx, &types.LegacyParams[cue.Value]{
+		_, err = Patch(ctx, &providertypes.LegacyParams[cue.Value]{
 			Params: v,
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -225,7 +220,7 @@ patch: {
 		}
 
 		By("List pods with labels test=test")
-		res, err := p.List(ctx, &ResourceParams{
+		res, err := List(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -245,7 +240,7 @@ patch: {
 		Expect(len(res.Resources.Items)).Should(Equal(5))
 
 		By("List pods with labels index=test-1")
-		res, err = p.List(ctx, &ResourceParams{
+		res, err = List(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -287,7 +282,7 @@ patch: {
 		}, &corev1.Pod{})
 		Expect(err).ToNot(HaveOccurred())
 
-		_, err = p.Delete(ctx, &ResourceParams{
+		_, err = Delete(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -336,7 +331,7 @@ patch: {
 		}, &corev1.Pod{})
 		Expect(err).ToNot(HaveOccurred())
 
-		_, err = p.Delete(ctx, &ResourceParams{
+		_, err = Delete(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
@@ -370,7 +365,7 @@ patch: {
 		un2 := testUnstructured.DeepCopy()
 		un2.SetName("app2")
 		ctx := context.Background()
-		_, err := p.ApplyInParallel(ctx, &ApplyInParallelParams{
+		_, err := ApplyInParallel(ctx, &ApplyInParallelParams{
 			Params: ApplyInParallelVars{
 				Resources: []*unstructured.Unstructured{un1, un2},
 			},
@@ -393,7 +388,7 @@ patch: {
 
 	It("test error case", func() {
 		ctx := context.Background()
-		res, err := p.Read(ctx, &ResourceParams{
+		res, err := Read(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{

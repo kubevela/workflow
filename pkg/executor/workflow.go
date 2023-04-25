@@ -39,6 +39,7 @@ import (
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers"
+	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -71,17 +72,7 @@ func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
 		opt.ApplyTo(executor)
 	}
 	if executor.compiler == nil {
-		executor.compiler = providers.NewCompiler(nil)
-		// 		v, err := executor.compiler.CompileString(context.Background(), `import (
-		// 			"vela/op"
-		// )
-		// a: op.#Suspend & {}`)
-		// 		if err != nil {
-		// 			panic(err)
-		// 		}
-		// 		if v.Err() != nil {
-		// 			panic(v.Err())
-		// 		}
+		executor.compiler = providers.Compiler.Get()
 	}
 	return executor
 }
@@ -281,8 +272,7 @@ func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowSte
 		}
 	}
 
-	//FIXME:
-	if ts := wfCtx.GetMutableValue(status.ID, "resumeTimeStamp"); ts != "" {
+	if ts := wfCtx.GetMutableValue(status.ID, workspace.ResumeTimeStamp); ts != "" {
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
 			return min

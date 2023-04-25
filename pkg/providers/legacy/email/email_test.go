@@ -31,7 +31,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/mock"
-	"github.com/kubevela/workflow/pkg/types"
+	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func TestSendEmail(t *testing.T) {
@@ -100,7 +100,7 @@ func TestSendEmail(t *testing.T) {
 			}
 			_, err := Send(ctx, &MailParams{
 				Params: tc.vars,
-				RuntimeParams: types.RuntimeParams{
+				RuntimeParams: providertypes.RuntimeParams{
 					ProcessContext: pCtx,
 					Action:         act,
 				},
@@ -116,7 +116,7 @@ func TestSendEmail(t *testing.T) {
 			time.Sleep(time.Second)
 			_, err = Send(ctx, &MailParams{
 				Params: tc.vars,
-				RuntimeParams: types.RuntimeParams{
+				RuntimeParams: providertypes.RuntimeParams{
 					ProcessContext: pCtx,
 					Action:         act,
 				},

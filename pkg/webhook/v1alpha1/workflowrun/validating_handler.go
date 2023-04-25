@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/types"
 
 	"github.com/kubevela/workflow/controllers"
@@ -40,7 +39,6 @@ var _ admission.Handler = &ValidatingHandler{}
 
 // ValidatingHandler handles application
 type ValidatingHandler struct {
-	pd     *packages.PackageDiscover
 	Client client.Client
 	// Decoder decodes objects
 	Decoder *admission.Decoder
