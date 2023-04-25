@@ -141,7 +141,6 @@ type TaskGeneratorOptions struct {
 
 // StepGeneratorOptions is the options for generate step.
 type StepGeneratorOptions struct {
-	Compiler       cuex.Compiler
 	ProcessCtx     process.Context
 	TemplateLoader template.Loader
 	StepConvertor  map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)

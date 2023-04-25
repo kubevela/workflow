@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/pkg/util/test/definition"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -58,9 +59,11 @@ var k8sClient client.Client
 var _ = BeforeSuite(func() {
 	conf, err := config.GetConfig()
 	Expect(err).Should(BeNil())
+	singleton.KubeConfig.Set(conf)
 
 	k8sClient, err = client.New(conf, client.Options{Scheme: scheme})
 	Expect(err).Should(BeNil())
+	singleton.KubeClient.Set(k8sClient)
 
 	prepareWorkflowDefinitions()
 })

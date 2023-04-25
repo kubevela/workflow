@@ -99,7 +99,6 @@ func Send(ctx context.Context, params *MailParams) (res *any, err error) {
 			emailRoutine.Store(id, "sending")
 			if err = dial.DialAndSend(m); err != nil {
 				emailRoutine.Store(id, err.Error())
-				fmt.Println("=========", err.Error())
 				return
 			}
 			emailRoutine.Store(id, "success")
