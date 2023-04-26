@@ -17,6 +17,7 @@ limitations under the License.
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -300,4 +301,13 @@ func FieldPath(paths ...string) cue.Path {
 		return cue.MakePath(cue.Str(s))
 	}
 	return cue.ParsePath(s)
+}
+
+// UnmarshalTo unmarshal value into golang object
+func UnmarshalTo(val cue.Value, x interface{}) error {
+	data, err := val.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, x)
 }

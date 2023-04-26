@@ -17,6 +17,7 @@ limitations under the License.
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -256,4 +257,38 @@ a: b: c: [{x: 100}, {x: 101}, {x: 102}]`,
 		r.NoError(err)
 		r.Equal(s, tCase.expected, tCase.name)
 	}
+}
+
+func TestUnmarshal(t *testing.T) {
+	case1 := `
+provider: "kube"
+do: "apply"
+`
+	out := struct {
+		Provider string `json:"provider"`
+		Do       string `json:"do"`
+	}{}
+
+	r := require.New(t)
+	cuectx := cuecontext.New()
+	val := cuectx.CompileString(case1)
+	err := UnmarshalTo(val, &out)
+	r.NoError(err)
+	r.Equal(out.Provider, "kube")
+	r.Equal(out.Do, "apply")
+
+	bt, err := val.MarshalJSON()
+	r.NoError(err)
+	expectedJson, err := json.Marshal(out)
+	r.NoError(err)
+	r.Equal(string(bt), string(expectedJson))
+
+	caseIncomplete := `
+provider: string
+do: string
+`
+	val = cuectx.CompileString(caseIncomplete)
+	r.NoError(err)
+	err = UnmarshalTo(val, &out)
+	r.Error(err)
 }
