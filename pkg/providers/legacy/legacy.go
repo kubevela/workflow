@@ -9,6 +9,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/http"
 	"github.com/kubevela/workflow/pkg/providers/legacy/kube"
 	"github.com/kubevela/workflow/pkg/providers/legacy/metrics"
+	"github.com/kubevela/workflow/pkg/providers/legacy/time"
 	"github.com/kubevela/workflow/pkg/providers/legacy/util"
 	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
 )
@@ -27,6 +28,7 @@ func GetLegacyProviders() map[string]cuexruntime.ProviderFn {
 	registerProviders(providers, http.GetProviders())
 	registerProviders(providers, kube.GetProviders())
 	registerProviders(providers, metrics.GetProviders())
+	registerProviders(providers, time.GetProviders())
 	registerProviders(providers, util.GetProviders())
 	registerProviders(providers, workspace.GetProviders())
 	return providers
@@ -34,5 +36,14 @@ func GetLegacyProviders() map[string]cuexruntime.ProviderFn {
 
 // GetLegacyTemplate get legacy template
 func GetLegacyTemplate() string {
-	return strings.Join([]string{email.GetTemplate(), http.GetTemplate(), kube.GetTemplate(), metrics.GetTemplate(), util.GetTemplate(), workspace.GetTemplate()}, "\n")
+	return strings.Join([]string{
+		email.GetTemplate(),
+		http.GetTemplate(),
+		kube.GetTemplate(),
+		metrics.GetTemplate(),
+		time.GetTemplate(),
+		util.GetTemplate(),
+		workspace.GetTemplate(),
+	},
+		"\n")
 }
