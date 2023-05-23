@@ -3,7 +3,7 @@ module github.com/kubevela/workflow
 go 1.19
 
 require (
-	cuelang.org/go v0.5.0-beta.5
+	cuelang.org/go v0.5.0
 	github.com/agiledragon/gomonkey/v2 v2.4.0
 	github.com/aliyun/aliyun-log-go-sdk v0.1.38
 	github.com/crossplane/crossplane-runtime v0.19.2
@@ -13,7 +13,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubevela/kube-trigger v0.1.1-0.20230403060228-6582e7595db6
-	github.com/kubevela/pkg v1.8.1-0.20230403024929-46ddc1466157
+	github.com/kubevela/pkg v1.8.1-0.20230522085329-7d5e1241a86d
 	github.com/oam-dev/kubevela v1.8.0-beta.1.0.20230410031905-d8af20224298
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.5
@@ -124,6 +124,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
+	github.com/jellydator/ttlcache/v3 v3.0.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
