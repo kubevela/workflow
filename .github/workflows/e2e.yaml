@@ -17,8 +17,8 @@ env:
   # Common versions
   GO_VERSION: '1.19'
   GOLANGCI_VERSION: 'v1.49'
-  K3D_IMAGE_VERSION: '[\"v1.20\",\"v1.24\"]'
-  K3D_IMAGE_VERSIONS: '[\"v1.20\",\"v1.24\"]'
+  K3D_IMAGE_VERSION: '[\"v1.26\"]'
+  K3D_IMAGE_VERSIONS: '[\"v1.26\"]'
 
 jobs:
 
@@ -37,7 +37,7 @@ jobs:
           concurrent_skipping: false
 
   set-k8s-matrix:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.set-k8s-matrix.outputs.matrix }}
     steps:
@@ -51,7 +51,7 @@ jobs:
           fi
 
   e2e-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [ detect-noop,set-k8s-matrix ]
     if: needs.detect-noop.outputs.noop != 'true'
     strategy:
@@ -83,7 +83,7 @@ jobs:
       - name: Calculate K3d args
         run: |
           EGRESS_ARG=""
-          if [[ "${{ matrix.k8s-version }}" == v1.24 ]]; then
+          if [[ "${{ matrix.k8s-version }}" == v1.26 ]]; then
             EGRESS_ARG="--k3s-arg --egress-selector-mode=disabled@server:0"
           fi
           echo "EGRESS_ARG=${EGRESS_ARG}" >> $GITHUB_ENV 
