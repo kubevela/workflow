@@ -8,6 +8,7 @@ let defaultBaseImage = "gcr.io/distroless/base@sha256:aa4fd987555ea10e1a4ec8765d
 	namespace: string
 	workspaces: [_name_=string]: #workspace & {name: "\(_name_)"}
 	secrets: [_name_=string]:    #secret & {name:    "\(_name_)"}
+	pullSecrets: [...string]
 	steps: [...#Script]
 
 	toolImage: *defaultToolImage | string
@@ -34,6 +35,7 @@ let defaultBaseImage = "gcr.io/distroless/base@sha256:aa4fd987555ea10e1a4ec8765d
 				scripts_:    strings.Join(generate_scripts_, "")
 				workspaces_: workspaces
 				secrets_:    secrets
+				pullSecrets_: pullSecrets
 				toolImage_:  toolImage
 				baseImage_:  baseImage
 			}
@@ -81,6 +83,7 @@ let defaultBaseImage = "gcr.io/distroless/base@sha256:aa4fd987555ea10e1a4ec8765d
 		scripts_: string
 		workspaces_: {...}
 		secrets_: {...}
+		pullSecrets_: [...string]
 		volumes_: [ for x in workspaces_ {name: x.name, emptyDir: {}}]
 		secretVolumes_: [ for x in secrets_ {name: x.name, secret: {secretName: x.name, items: x.items}}]
 		toolImage_: string
@@ -143,6 +146,7 @@ let defaultBaseImage = "gcr.io/distroless/base@sha256:aa4fd987555ea10e1a4ec8765d
 					name: "vela-internal-downward"
 				}] + _settings.volumes_ + _settings.secretVolumes_
 		restartPolicy: "Never"
+		imagePullSecrets: [ for x in _settings.pullSecrets_ {name: x}]
 	}
 }
 
