@@ -313,7 +313,7 @@ func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Wor
 			if step.Reason != wfTypes.StatusReasonFailedAfterRetries && step.Reason != wfTypes.StatusReasonTimeout {
 				steps[i].Reason = wfTypes.StatusReasonTerminate
 			}
-		case v1alpha1.WorkflowStepPhaseRunning:
+		case v1alpha1.WorkflowStepPhaseRunning, v1alpha1.WorkflowStepPhaseSuspending:
 			steps[i].Phase = v1alpha1.WorkflowStepPhaseFailed
 			steps[i].Reason = wfTypes.StatusReasonTerminate
 		default:
@@ -324,7 +324,7 @@ func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Wor
 				if sub.Reason != wfTypes.StatusReasonFailedAfterRetries && sub.Reason != wfTypes.StatusReasonTimeout {
 					steps[i].SubStepsStatus[j].Reason = wfTypes.StatusReasonTerminate
 				}
-			case v1alpha1.WorkflowStepPhaseRunning:
+			case v1alpha1.WorkflowStepPhaseRunning, v1alpha1.WorkflowStepPhaseSuspending:
 				steps[i].SubStepsStatus[j].Phase = v1alpha1.WorkflowStepPhaseFailed
 				steps[i].SubStepsStatus[j].Reason = wfTypes.StatusReasonTerminate
 			default:
