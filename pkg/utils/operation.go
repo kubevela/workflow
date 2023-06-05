@@ -24,6 +24,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +35,6 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
@@ -424,10 +424,7 @@ func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.Wo
 		return nil, nil, fmt.Errorf("failed step %s not found", stepName)
 	}
 	if contextCM != nil && contextCM.Data != nil {
-		v, err := value.NewValue(contextCM.Data[wfContext.ConfigMapKeyVars], nil, "")
-		if err != nil {
-			return nil, nil, err
-		}
+		v := cuecontext.New().CompileString(contextCM.Data[wfContext.ConfigMapKeyVars])
 		s, err := clearContextVars(steps, v, stepName, dependency)
 		if err != nil {
 			return nil, nil, err
@@ -438,7 +435,7 @@ func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.Wo
 }
 
 // nolint:staticcheck
-func clearContextVars(steps []v1alpha1.WorkflowStep, v *value.Value, stepName string, dependency []string) (string, error) {
+func clearContextVars(steps []v1alpha1.WorkflowStep, v cue.Value, stepName string, dependency []string) (string, error) {
 	outputs := make([]string, 0)
 	for _, step := range steps {
 		if step.Name == stepName || stringsContain(dependency, step.Name) {
@@ -454,7 +451,7 @@ func clearContextVars(steps []v1alpha1.WorkflowStep, v *value.Value, stepName st
 			}
 		}
 	}
-	node := v.CueValue().Syntax(cue.ResolveReferences(true))
+	node := v.Syntax(cue.ResolveReferences(true))
 	x, ok := node.(*ast.StructLit)
 	if !ok {
 		return "", fmt.Errorf("value is not a struct lit")

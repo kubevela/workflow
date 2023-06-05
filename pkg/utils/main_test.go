@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
 
@@ -34,5 +35,6 @@ func TestMain(m *testing.M) {
 	sc := scheme.Scheme
 	_ = v1alpha1.AddToScheme(sc)
 	cli = fake.NewFakeClientWithScheme(sc)
+	singleton.KubeClient.Set(cli)
 	m.Run()
 }

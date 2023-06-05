@@ -25,6 +25,8 @@ const (
 	ConfigFieldName = "config"
 	// ParameterFieldName is the keyword in CUE template to define users' input and the reference to the context parameter
 	ParameterFieldName = "parameter"
+	// ContextFieldName is the keyword in CUE template to define context
+	ContextFieldName = "context"
 	// ContextName is the name of context
 	ContextName = "name"
 	// ContextNamespace is the namespace of the app

@@ -789,11 +789,19 @@ var _ = Describe("Test Workflow", func() {
 		checkRun := &v1alpha1.WorkflowRun{}
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 
+		for i := 0; i < wfTypes.MaxWorkflowStepErrorRetryTimes; i++ {
+			tryReconcile(reconciler, wr.Name, wr.Namespace)
+			Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+			Expect(checkRun.Status.Message).Should(BeEquivalentTo(""))
+			Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
+			Expect(checkRun.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		}
+
 		tryReconcile(reconciler, wr.Name, wr.Namespace)
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
 		Expect(checkRun.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
-		Expect(checkRun.Status.Steps[0].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonRendering))
+		Expect(checkRun.Status.Steps[0].Reason).Should(BeEquivalentTo(wfTypes.StatusReasonFailedAfterRetries))
 		Expect(checkRun.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSkipped))
 	})
 

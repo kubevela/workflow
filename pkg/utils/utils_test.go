@@ -71,19 +71,19 @@ func TestGetWorkflowContextData(t *testing.T) {
 		"path not found": {
 			name:        "workflow-test-context",
 			paths:       "not-found",
-			expectedErr: "not exist",
+			expectedErr: "not found",
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			v, err := GetDataFromContext(ctx, cli, tc.name, tc.name, "default", tc.paths)
+			v, err := GetDataFromContext(ctx, tc.name, tc.name, "default", tc.paths)
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return
 			}
 			r.NoError(err)
-			s, err := sets.ToString(v.CueValue())
+			s, err := sets.ToString(v)
 			r.NoError(err)
 			r.Equal(tc.expected, s)
 		})
@@ -157,7 +157,7 @@ func TestGetStepLogConfig(t *testing.T) {
 					r.NoError(err)
 				}()
 			}
-			v, err := GetLogConfigFromStep(ctx, cli, tc.name, tc.name, "default", tc.step)
+			v, err := GetLogConfigFromStep(ctx, tc.name, tc.name, "default", tc.step)
 			if tc.expectedErr != "" {
 				r.Contains(err.Error(), tc.expectedErr)
 				return
