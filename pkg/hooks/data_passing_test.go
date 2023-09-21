@@ -74,6 +74,27 @@ func TestInput(t *testing.T) {
 	r.NoError(err)
 	r.Equal(s, `99
 `)
+
+	// test array value
+	paramValue, err = wfCtx.MakeParameter(`parameter: {myscore: ["test"]}`)
+	r.NoError(err)
+	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
+		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			DependsOn: []string{"mystep"},
+			Inputs: v1alpha1.StepInputs{{
+				From:         "foo.score",
+				ParameterKey: "myscore[0]",
+			}},
+		},
+	})
+	r.NoError(err)
+	result, err = paramValue.LookupValue("parameter", "myscore")
+	r.NoError(err)
+	s, err = result.String()
+	r.NoError(err)
+	r.Equal(s, `[99]
+`)
+
 	paramValue, err = wfCtx.MakeParameter(`context: {name: "test"}`)
 	r.NoError(err)
 	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
