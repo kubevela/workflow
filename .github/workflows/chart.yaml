@@ -14,11 +14,11 @@ jobs:
         id: vars
         run: |
           if [[ ${GITHUB_REF} == "refs/heads/main" ]]; then
-            echo ::set-output name=TAG::latest
+            echo "TAG=latest" >> $GITHUB_OUTPUT
           else
-            echo ::set-output name=TAG::${GITHUB_REF#refs/tags/}
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
-          echo ::set-output name=GITVERSION::git-$(git rev-parse --short HEAD)
+          echo "GITVERSION=git-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Login ghcr.io
         uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
         with:
@@ -62,7 +62,7 @@ jobs:
       - name: Get the vars
         id: vars
         run: |
-          echo ::set-output name=TAG::${GITHUB_REF#refs/tags/}
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
       - name: Install Helm
         uses: azure/setup-helm@v1
         with:
