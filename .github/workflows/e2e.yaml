@@ -45,9 +45,9 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "pushing tag: ${{ github.ref_name }}"
-            echo "::set-output name=matrix::${{ env.K3D_IMAGE_VERSIONS }}"
+            echo "matrix=${{ env.K3D_IMAGE_VERSIONS }}" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=matrix::${{ env.K3D_IMAGE_VERSION }}"
+            echo "matrix=${{ env.K3D_IMAGE_VERSION }}" >> $GITHUB_OUTPUT
           fi
 
   e2e-tests:
