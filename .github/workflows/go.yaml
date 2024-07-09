@@ -55,6 +55,14 @@ jobs:
           key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-pkg-
 
+      - name: Remove Cached Go dependencies
+        run: |
+          go clean -modcache
+
+      - name: Install go depencies for newer verison of Go
+        run: |
+          go mod tidy
+
       - name: Install StaticCheck
         run: go install honnef.co/go/tools/cmd/staticcheck@2022.1
 
