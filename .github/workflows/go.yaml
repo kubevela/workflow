@@ -18,24 +18,24 @@ env:
 
 jobs:
 
-  detect-noop:
-    runs-on: ubuntu-20.04
-    outputs:
-      noop: ${{ steps.noop.outputs.should_skip }}
-    steps:
-      - name: Detect No-op Changes
-        id: noop
-        uses: fkirc/skip-duplicate-actions@v5.3.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          paths_ignore: '["**.md", "**.mdx", "**.png", "**.jpg"]'
-          do_not_skip: '["workflow_dispatch", "schedule", "push"]'
-          concurrent_skipping: false
+  # detect-noop:
+  #   runs-on: ubuntu-20.04
+  #   outputs:
+  #     noop: ${{ steps.noop.outputs.should_skip }}
+  #   steps:
+  #     - name: Detect No-op Changes
+  #       id: noop
+  #       uses: fkirc/skip-duplicate-actions@v5.3.0
+  #       with:
+  #         # github_token: ${{ secrets.GITHUB_TOKEN }}
+  #         paths_ignore: '["**.md", "**.mdx", "**.png", "**.jpg"]'
+  #         do_not_skip: '["workflow_dispatch", "schedule", "push"]'
+  #         concurrent_skipping: false
 
   staticcheck:
     runs-on: ubuntu-20.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
+    # needs: detect-noop
+    # if: needs.detect-noop.outputs.noop != 'true'
 
     steps:
       - name: Setup Go
@@ -63,8 +63,8 @@ jobs:
 
   lint:
     runs-on: ubuntu-20.04
-    needs: detect-noop
-    if: needs.detect-noop.outputs.noop != 'true'
+    # needs: detect-noop
+    # if: needs.detect-noop.outputs.noop != 'true'
 
     steps:
       - name: Setup Go

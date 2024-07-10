@@ -51,7 +51,7 @@ func (callback *Callback) Fail(result *producer.Result) {
 }
 
 // Success is success callback
-func (callback *Callback) Success(result *producer.Result) { //nolint:golint,unused
+func (callback *Callback) Success(result *producer.Result) { //nolint:revive,unused,govet,golint
 }
 
 // Store is store workflowRun to sls
