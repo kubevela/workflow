@@ -63,7 +63,7 @@ func (p *provider) PatchK8sObject(ctx monitorContext.Context, wfCtx wfContext.Co
 }
 
 // String convert byte to string
-func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	b, err := v.LookupValue("bt")
 	if err != nil {
 		return err
@@ -76,7 +76,7 @@ func (p *provider) String(ctx monitorContext.Context, wfCtx wfContext.Context, v
 }
 
 // Log print cue value in log
-func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (p *provider) Log(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	stepName := fmt.Sprint(p.pCtx.GetData(model.ContextStepName))
 	stepID := fmt.Sprint(p.pCtx.GetData(model.ContextStepSessionID))
 	config := make(map[string]types.LogConfig)

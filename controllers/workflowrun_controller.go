@@ -246,7 +246,7 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 				return !reflect.DeepEqual(old, new)
 			},
-			CreateFunc: func(e ctrlEvent.CreateEvent) bool {
+			CreateFunc: func(e ctrlEvent.CreateEvent) bool { //nolint:revive,unused
 				return true
 			},
 		}).

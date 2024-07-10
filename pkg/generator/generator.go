@@ -141,7 +141,7 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 	return instance, nil
 }
 
-func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
+func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions { //nolint:revive,unused
 	if options.Providers == nil {
 		options.Providers = providers.NewProviders()
 	}

@@ -59,7 +59,7 @@ type provider struct {
 }
 
 // Do process http request.
-func (h *provider) Do(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Do(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	resp, err := h.runHTTP(ctx, v)
 	if err != nil {
 		return err

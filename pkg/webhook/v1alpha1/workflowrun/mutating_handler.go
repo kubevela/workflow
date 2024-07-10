@@ -37,7 +37,7 @@ type MutatingHandler struct {
 var _ admission.Handler = &MutatingHandler{}
 
 // Handle mutate application
-func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) admission.Response { //nolint:revive,unused
 	wr := &v1alpha1.WorkflowRun{}
 	if err := h.Decoder.Decode(req, wr); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)

@@ -188,7 +188,7 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 	return status.Suspend
 }
 
-func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus, taskRunners []types.TaskRunner) *engine {
+func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus, taskRunners []types.TaskRunner) *engine { //nolint:revive,unused
 	stepStatus := make(map[string]v1alpha1.StepStatus)
 	setStepStatus(stepStatus, wfStatus.Steps)
 	stepDependsOn := make(map[string][]string)
@@ -606,7 +606,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 					return &types.PreCheckResult{Skip: !ifValue}, nil
 				}
 			},
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) { //nolint:revive,unused
 				status := e.stepStatus[step.Name]
 				if e.parentRunner != "" {
 					if status, ok := e.stepStatus[e.parentRunner]; ok && status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonTimeout {
