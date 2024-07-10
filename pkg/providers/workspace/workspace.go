@@ -46,7 +46,7 @@ type provider struct {
 }
 
 // DoVar get & put variable from context.
-func (h *provider) DoVar(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) DoVar(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	methodV, err := v.Field("method")
 	if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (h *provider) DoVar(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 }
 
 // Wait let workflow wait.
-func (h *provider) Wait(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Wait(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	cv := v.CueValue()
 	if cv.Exists() {
 		ret := cv.LookupPath(value.FieldPath("continue"))
@@ -104,7 +104,7 @@ func (h *provider) Wait(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 }
 
 // Break let workflow terminate.
-func (h *provider) Break(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Break(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")
@@ -114,7 +114,7 @@ func (h *provider) Break(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 }
 
 // Fail let the step fail, its status is failed and reason is Action
-func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")
@@ -124,7 +124,7 @@ func (h *provider) Fail(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 }
 
 // Suspend let the step suspend, its status is suspending and reason is Suspend
-func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	stepID := fmt.Sprint(h.pCtx.GetData(model.ContextStepSessionID))
 	timestamp := wfCtx.GetMutableValue(stepID, ResumeTimeStamp)
 	var msg string
@@ -173,7 +173,7 @@ func (h *provider) Suspend(ctx monitorContext.Context, wfCtx wfContext.Context, 
 }
 
 // Message writes message to step status, note that the message will be overwritten by the next message.
-func (h *provider) Message(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Message(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	var msg string
 	if v != nil {
 		msg, _ = v.GetString("message")

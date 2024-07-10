@@ -216,8 +216,8 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// filter the changes in workflow status
 			// let workflow handle its reconcile
 			UpdateFunc: func(e ctrlEvent.UpdateEvent) bool {
-				new, isNewWR := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
-				old, isOldWR := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				newObj, isNewWR := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				oldObj, isOldWR := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
 
 				// if the object is a event listener, reconcile the controller
 				if !isNewWR || !isOldWR {
@@ -225,28 +225,28 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 				// if the workflow is finished, skip the reconcile
-				if new.Status.Finished {
+				if newObj.Status.Finished {
 					return false
 				}
 
 				// filter managedFields changes
-				old.ManagedFields = nil
-				new.ManagedFields = nil
+				oldObj.ManagedFields = nil
+				newObj.ManagedFields = nil
 
 				// filter resourceVersion changes
-				old.ResourceVersion = new.ResourceVersion
+				oldObj.ResourceVersion = newObj.ResourceVersion
 
 				// if the generation is changed, return true to let the controller handle it
-				if old.Generation != new.Generation {
+				if oldObj.Generation != newObj.Generation {
 					return true
 				}
 
 				// ignore the changes in step status
-				old.Status.Steps = new.Status.Steps
+				oldObj.Status.Steps = newObj.Status.Steps
 
-				return !reflect.DeepEqual(old, new)
+				return !reflect.DeepEqual(oldObj, newObj)
 			},
-			CreateFunc: func(e ctrlEvent.CreateEvent) bool {
+			CreateFunc: func(e ctrlEvent.CreateEvent) bool { //nolint:revive,unused
 				return true
 			},
 		}).

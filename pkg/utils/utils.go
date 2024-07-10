@@ -35,7 +35,7 @@ import (
 )
 
 // GetDataFromContext get data from workflow context
-func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, ns string, paths ...string) (*value.Value, error) {
+func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, ns string, paths ...string) (*value.Value, error) { //nolint:revive,unused
 	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func GetDataFromContext(ctx context.Context, cli client.Client, ctxName, name, n
 }
 
 // GetLogConfigFromStep get log config from step
-func GetLogConfigFromStep(ctx context.Context, cli client.Client, ctxName, name, ns, step string) (*types.LogConfig, error) {
+func GetLogConfigFromStep(ctx context.Context, cli client.Client, ctxName, name, ns, step string) (*types.LogConfig, error) { //nolint:revive,unused
 	wfCtx, err := wfContext.LoadContext(cli, ns, name, ctxName)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func GetLogsFromURL(ctx context.Context, url string) (io.ReadCloser, error) {
 }
 
 // GetLogsFromPod get logs from pod
-func GetLogsFromPod(ctx context.Context, clientSet kubernetes.Interface, cli client.Client, podName, ns, cluster string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+func GetLogsFromPod(ctx context.Context, clientSet kubernetes.Interface, cli client.Client, podName, ns, cluster string, opts *corev1.PodLogOptions) (io.ReadCloser, error) { //nolint:revive,unused
 	cliCtx := multicluster.WithCluster(ctx, cluster)
 	req := clientSet.CoreV1().Pods(ns).GetLogs(podName, opts)
 	readCloser, err := req.Stream(cliCtx)

@@ -147,7 +147,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 		}
 		tRunner.run = func(ctx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 			if options.GetTracer == nil {
-				options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context {
+				options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context { //nolint:revive,unused
 					return monitorContext.NewTraceContext(context.Background(), "")
 				}
 			}
@@ -561,7 +561,7 @@ func (exec *executor) doSteps(ctx monitorContext.Context, wfCtx wfContext.Contex
 		}
 
 		if isStepList(fieldName) {
-			return false, in.StepByList(func(name string, item *value.Value) (bool, error) {
+			return false, in.StepByList(func(name string, item *value.Value) (bool, error) { //nolint:revive,unused
 				do := OpTpy(item)
 				if do == "" {
 					return false, nil

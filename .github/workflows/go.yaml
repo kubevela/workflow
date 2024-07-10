@@ -13,8 +13,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.19'
-  GOLANGCI_VERSION: 'v1.49'
+  GO_VERSION: '1.22'
+  GOLANGCI_VERSION: 'v1.59'
 
 jobs:
 
@@ -49,14 +49,14 @@ jobs:
           submodules: true
 
       - name: Cache Go Dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: .work/pkg
           key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-pkg-
 
       - name: Install StaticCheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@2022.1
+        run: go install honnef.co/go/tools/cmd/staticcheck@2023.1.7
 
       - name: Static Check
         run: staticcheck ./...
@@ -78,7 +78,7 @@ jobs:
           submodules: true
 
       - name: Cache Go Dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: .work/pkg
           key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}

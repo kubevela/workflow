@@ -69,7 +69,7 @@ func (r *recycleCronJob) start(ctx context.Context) (*cron.Cron, error) {
 			Duration: 1 * time.Minute,
 			Factor:   5.0,
 			Jitter:   0.1,
-		}, func(err error) bool {
+		}, func(err error) bool { //nolint:revive,unused
 			// always retry
 			return true
 		}, func() error {

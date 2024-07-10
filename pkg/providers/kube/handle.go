@@ -84,7 +84,7 @@ type dispatcher struct {
 	cli client.Client
 }
 
-func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads ...*unstructured.Unstructured) error {
+func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads ...*unstructured.Unstructured) error { //nolint:revive,unused
 	for _, workload := range workloads {
 		existing := new(unstructured.Unstructured)
 		existing.GetObjectKind().SetGroupVersionKind(workload.GetObjectKind().GroupVersionKind())
@@ -124,12 +124,12 @@ func (d *dispatcher) apply(ctx context.Context, cluster, owner string, workloads
 	return nil
 }
 
-func (d *dispatcher) delete(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error {
+func (d *dispatcher) delete(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error { //nolint:revive,unused
 	return d.cli.Delete(ctx, manifest)
 }
 
 // Patch patch CR in cluster.
-func (h *provider) Patch(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Patch(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (h *provider) Patch(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 }
 
 // Apply create or update CR in cluster.
-func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -208,7 +208,7 @@ func (h *provider) Apply(ctx monitorContext.Context, wfCtx wfContext.Context, v 
 }
 
 // ApplyInParallel create or update CRs in parallel.
-func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -242,7 +242,7 @@ func (h *provider) ApplyInParallel(ctx monitorContext.Context, wfCtx wfContext.C
 }
 
 // Read get CR from cluster.
-func (h *provider) Read(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Read(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err
@@ -267,7 +267,7 @@ func (h *provider) Read(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 }
 
 // List lists CRs from cluster.
-func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	r, err := v.LookupValue("resource")
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func (h *provider) List(ctx monitorContext.Context, wfCtx wfContext.Context, v *
 }
 
 // Delete deletes CR from cluster.
-func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Delete(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err

@@ -53,7 +53,7 @@ type content struct {
 var emailRoutine sync.Map
 
 // Send sends email
-func (h *provider) Send(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) Send(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	stepID, err := v.LookupValue("stepID")
 	if err != nil {
 		return err

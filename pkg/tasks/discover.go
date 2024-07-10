@@ -34,7 +34,7 @@ type taskDiscover struct {
 }
 
 // NewTaskDiscover new task discover
-func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOptions) types.TaskDiscover {
+func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOptions) types.TaskDiscover { //nolint:revive,unused
 	return &taskDiscover{
 		builtin: map[string]types.TaskGenerator{
 			types.WorkflowStepTypeStepGroup: builtin.StepGroup,

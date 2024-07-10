@@ -241,7 +241,7 @@ func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workfl
 }
 
 // Rollback is not supported for WorkflowRun
-func (wo workflowRunOperator) Rollback(ctx context.Context) error {
+func (wo workflowRunOperator) Rollback(ctx context.Context) error { //nolint:revive,unused
 	return fmt.Errorf("can not rollback a WorkflowRun")
 }
 

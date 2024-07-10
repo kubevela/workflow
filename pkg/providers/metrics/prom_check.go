@@ -38,7 +38,7 @@ const (
 type provider struct{}
 
 // PromCheck do health check from metrics from prometheus
-func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error {
+func (h *provider) PromCheck(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	stepID, err := v.GetString("stepID")
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func getQueryResult(ctx monitorContext.Context, v *value.Value) (string, error) 
 	return valueStr, nil
 }
 
-func compareValueWithCondition(valueStr string, conditionStr string, v *value.Value) (bool, error) {
+func compareValueWithCondition(valueStr string, conditionStr string, v *value.Value) (bool, error) { //nolint:revive,unused
 	template := fmt.Sprintf("if: %s %s", valueStr, conditionStr)
 	cueValue, err := value.NewValue(template, nil, "")
 	if err != nil {

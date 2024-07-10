@@ -172,14 +172,14 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// filter the changes in workflow status
 			// let workflow handle its reconcile
 			UpdateFunc: func(e ctrlEvent.UpdateEvent) bool {
-				new := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
-				old := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				newObj := e.ObjectNew.DeepCopyObject().(*v1alpha1.WorkflowRun)
+				oldObj := e.ObjectOld.DeepCopyObject().(*v1alpha1.WorkflowRun)
 				// if the workflow is not finished, skip the reconcile
-				if !new.Status.Finished {
+				if !newObj.Status.Finished {
 					return false
 				}
 
-				return !reflect.DeepEqual(old, new)
+				return !reflect.DeepEqual(oldObj, newObj)
 			},
 			CreateFunc: func(e ctrlEvent.CreateEvent) bool {
 				run := e.Object.DeepCopyObject().(*v1alpha1.WorkflowRun)
