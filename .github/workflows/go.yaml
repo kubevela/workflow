@@ -64,7 +64,7 @@ jobs:
           go mod tidy
 
       - name: Install StaticCheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@2022.1
+        run: go install honnef.co/go/tools/cmd/staticcheck@2023.1.7
 
       - name: Static Check
         run: staticcheck ./...
