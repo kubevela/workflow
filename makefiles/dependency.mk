@@ -12,7 +12,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= 4.5.5
-CONTROLLER_TOOLS_VERSION ?= v0.9.0
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -39,7 +39,7 @@ ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
 	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@2022.1 ;\
+	go install honnef.co/go/tools/cmd/staticcheck@2023.1.7 ;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
@@ -58,7 +58,7 @@ else
 GOIMPORTS=$(shell which goimports)
 endif
 
-GOLANGCILINT_VERSION ?= v1.46.0
+GOLANGCILINT_VERSION ?= v1.59.0
 
 .PHONY: golangci
 golangci:
