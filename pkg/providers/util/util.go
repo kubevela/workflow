@@ -38,7 +38,7 @@ type provider struct {
 	pCtx process.Context
 }
 
-func (p *provider) PatchK8sObject(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:golint,unused
+func (p *provider) PatchK8sObject(ctx monitorContext.Context, wfCtx wfContext.Context, v *value.Value, act types.Action) error { //nolint:revive,unused
 	val, err := v.LookupValue("value")
 	if err != nil {
 		return err

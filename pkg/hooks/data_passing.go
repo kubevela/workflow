@@ -82,7 +82,7 @@ func Output(ctx wfContext.Context, taskValue *value.Value, step v1alpha1.Workflo
 }
 
 // SetAdditionalNameInStatus sets additional name from properties to status map
-func SetAdditionalNameInStatus(stepStatus map[string]v1alpha1.StepStatus, name string, properties *runtime.RawExtension, status v1alpha1.StepStatus) { //nolint:golint,unused
+func SetAdditionalNameInStatus(stepStatus map[string]v1alpha1.StepStatus, name string, properties *runtime.RawExtension, status v1alpha1.StepStatus) { //nolint:revive,unused
 	if stepStatus == nil || properties == nil {
 		return
 	}
