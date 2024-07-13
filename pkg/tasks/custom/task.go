@@ -38,7 +38,6 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/hooks"
-	"github.com/kubevela/workflow/pkg/providers"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -124,7 +123,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 
 			resetter := tRunner.fillContext(ctx, options.PCtx)
 			defer resetter(options.PCtx)
-			basicVal, _ := MakeBasicValue(ctx, wfStep.Properties, options.PCtx)
+			basicVal, _ := MakeBasicValue(ctx, options.Compiler, wfStep.Properties, options.PCtx)
 
 			return CheckPending(wfCtx, wfStep, exec.wfStatus.ID, stepStatus, basicVal)
 		}
@@ -169,7 +168,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				Action:          exec,
 			})
 
-			basicVal, err := MakeBasicValue(tracer, wfStep.Properties, options.PCtx)
+			basicVal, err := MakeBasicValue(tracer, options.Compiler, wfStep.Properties, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")
 				return v1alpha1.StepStatus{}, nil, errors.WithMessage(err, "make context parameter")
@@ -297,9 +296,9 @@ func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, step
 }
 
 // MakeBasicValue makes basic value
-func MakeBasicValue(ctx monitorContext.Context, properties *runtime.RawExtension, pCtx process.Context) (cue.Value, error) {
+func MakeBasicValue(ctx monitorContext.Context, compiler *cuex.Compiler, properties *runtime.RawExtension, pCtx process.Context) (cue.Value, error) {
 	// use default compiler to compile the basic value without providers
-	v, err := providers.Compiler.Get().CompileStringWithOptions(ctx, getContextTemplate(pCtx), cuex.WithExtraData(
+	v, err := compiler.CompileStringWithOptions(ctx, getContextTemplate(pCtx), cuex.WithExtraData(
 		model.ParameterFieldName, properties,
 	), cuex.DisableResolveProviderFunctions{})
 	if err != nil {

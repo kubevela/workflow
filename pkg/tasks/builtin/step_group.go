@@ -27,6 +27,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -61,7 +62,7 @@ func (tr *stepGroupTaskRunner) Name() string {
 func (tr *stepGroupTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 	resetter := tr.FillContextData(ctx, tr.pCtx)
 	defer resetter(tr.pCtx)
-	basicVal, _ := custom.MakeBasicValue(ctx, nil, tr.pCtx)
+	basicVal, _ := custom.MakeBasicValue(ctx, providers.Compiler.Get(), nil, tr.pCtx)
 	return custom.CheckPending(wfCtx, tr.step, tr.id, stepStatus, basicVal)
 }
 
@@ -83,7 +84,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	tracer := options.GetTracer(tr.id, tr.step).AddTag("step_name", tr.name, "step_type", types.WorkflowStepTypeStepGroup)
 	resetter := tr.FillContextData(tracer, tr.pCtx)
 	defer resetter(tr.pCtx)
-	basicVal, err := custom.MakeBasicValue(tracer, nil, tr.pCtx)
+	basicVal, err := custom.MakeBasicValue(tracer, providers.Compiler.Get(), nil, tr.pCtx)
 	if err != nil {
 		return status, nil, err
 	}

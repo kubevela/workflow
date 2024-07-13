@@ -41,6 +41,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/providers"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -460,7 +461,7 @@ func TestValidateIfValue(t *testing.T) {
 
 	r := require.New(t)
 	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
-	basicVal, err := MakeBasicValue(logCtx, &runtime.RawExtension{Raw: []byte(`{"key": "value"}`)}, pCtx)
+	basicVal, err := MakeBasicValue(logCtx, providers.Compiler.Get(), &runtime.RawExtension{Raw: []byte(`{"key": "value"}`)}, pCtx)
 	r.NoError(err)
 
 	testCases := []struct {
