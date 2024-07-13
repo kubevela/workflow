@@ -29,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
 
-	"github.com/kubevela/pkg/cue/cuex"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -38,7 +37,6 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
-	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -62,7 +60,6 @@ type workflowExecutor struct {
 	instance *types.WorkflowInstance
 	wfCtx    wfContext.Context
 	patcher  types.StatusPatcher
-	compiler *cuex.Compiler
 }
 
 // New returns a Workflow Executor implementation.
@@ -70,9 +67,6 @@ func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
 	executor := &workflowExecutor{instance: instance}
 	for _, opt := range options {
 		opt.ApplyTo(executor)
-	}
-	if executor.compiler == nil {
-		executor.compiler = providers.Compiler.Get()
 	}
 	return executor
 }
@@ -214,7 +208,6 @@ func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowE
 		stepTimeout:   make(map[string]time.Time),
 		taskRunners:   taskRunners,
 		statusPatcher: w.patcher,
-		compiler:      w.compiler,
 	}
 }
 
@@ -587,7 +580,6 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 		},
 		StepStatus: e.stepStatus,
 		Engine:     e,
-		Compiler:   e.compiler,
 		PreCheckHooks: []types.TaskPreCheckHook{
 			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
@@ -643,10 +635,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 	if e.debug {
 		options.Debug = func(id string, v cue.Value) error {
 			debugContext := debug.NewContext(e.instance, id)
-			if err := debugContext.Set(v); err != nil {
-				return err
-			}
-			return nil
+			return debugContext.Set(v)
 		}
 	}
 	return options
@@ -666,7 +655,6 @@ type engine struct {
 	stepDependsOn      map[string][]string
 	taskRunners        []types.TaskRunner
 	statusPatcher      types.StatusPatcher
-	compiler           *cuex.Compiler
 }
 
 func (e *engine) finishStep(operation *types.Operation) {

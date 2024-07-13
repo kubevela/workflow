@@ -59,7 +59,7 @@ type VarReturns struct {
 type VarParams = providertypes.LegacyParams[VarVars]
 
 // DoVar get & put variable from context.
-func DoVar(ctx context.Context, params *VarParams) (*VarReturns, error) {
+func DoVar(_ context.Context, params *VarParams) (*VarReturns, error) {
 	wfCtx := params.RuntimeParams.WorkflowContext
 	path := params.Params.Path
 
@@ -111,7 +111,7 @@ type WaitVars struct {
 type WaitParams = providertypes.LegacyParams[WaitVars]
 
 // Wait let workflow wait.
-func Wait(ctx context.Context, params *WaitParams) (*any, error) {
+func Wait(_ context.Context, params *WaitParams) (*any, error) {
 	if params.Params.Continue {
 		return nil, nil
 	}
@@ -120,13 +120,13 @@ func Wait(ctx context.Context, params *WaitParams) (*any, error) {
 }
 
 // Break let workflow terminate.
-func Break(ctx context.Context, params *ActionParams) (*any, error) {
+func Break(_ context.Context, params *ActionParams) (*any, error) {
 	params.Action.Terminate(params.Params.Message)
 	return nil, errors.GenericActionError(errors.ActionTerminate)
 }
 
 // Fail let the step fail, its status is failed and reason is Action
-func Fail(ctx context.Context, params *ActionParams) (*any, error) {
+func Fail(_ context.Context, params *ActionParams) (*any, error) {
 	params.Action.Fail(params.Params.Message)
 	return nil, errors.GenericActionError(errors.ActionTerminate)
 }
@@ -141,7 +141,7 @@ type SuspendVars struct {
 type SuspendParams = providertypes.LegacyParams[SuspendVars]
 
 // Suspend let the step suspend, its status is suspending and reason is Suspend
-func Suspend(ctx context.Context, params *SuspendParams) (*any, error) {
+func Suspend(_ context.Context, params *SuspendParams) (*any, error) {
 	pCtx := params.ProcessContext
 	wfCtx := params.WorkflowContext
 	act := params.Action
@@ -184,7 +184,7 @@ func Suspend(ctx context.Context, params *SuspendParams) (*any, error) {
 }
 
 // Message writes message to step status, note that the message will be overwritten by the next message.
-func Message(ctx context.Context, params *ActionParams) (*any, error) {
+func Message(_ context.Context, params *ActionParams) (*any, error) {
 	params.Action.Message(params.Params.Message)
 	return nil, nil
 }

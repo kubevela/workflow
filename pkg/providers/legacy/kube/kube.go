@@ -55,7 +55,7 @@ func handleContext(ctx context.Context, cluster string) context.Context {
 	return multicluster.WithCluster(ctx, cluster)
 }
 
-func apply(ctx context.Context, cluster, owner string, workloads ...*unstructured.Unstructured) error {
+func apply(ctx context.Context, _, _ string, workloads ...*unstructured.Unstructured) error {
 	cli := singleton.KubeClient.Get()
 	for _, workload := range workloads {
 		existing := new(unstructured.Unstructured)
@@ -96,7 +96,8 @@ func apply(ctx context.Context, cluster, owner string, workloads ...*unstructure
 	return nil
 }
 
-func delete(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error {
+// nolint:revive
+func delete(ctx context.Context, _, _ string, manifest *unstructured.Unstructured) error {
 	return singleton.KubeClient.Get().Delete(ctx, manifest)
 }
 

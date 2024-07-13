@@ -37,7 +37,7 @@ type Vars struct {
 type Params = providertypes.LegacyParams[Vars]
 
 // Timestamp convert date to timestamp
-func Timestamp(ctx context.Context, params *Params) (*Vars, error) {
+func Timestamp(_ context.Context, params *Params) (*Vars, error) {
 	date := params.Params.Date
 	layout := params.Params.Layout
 	if date == "" {
@@ -56,7 +56,7 @@ func Timestamp(ctx context.Context, params *Params) (*Vars, error) {
 }
 
 // Date convert timestamp to date
-func Date(ctx context.Context, params *Params) (*Vars, error) {
+func Date(_ context.Context, params *Params) (*Vars, error) {
 	timestamp := params.Params.Timestamp
 	layout := params.Params.Layout
 	if layout == "" {

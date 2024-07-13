@@ -17,26 +17,12 @@ limitations under the License.
 package executor
 
 import (
-	"github.com/kubevela/pkg/cue/cuex"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
 // Option is the option of executor
 type Option interface {
 	ApplyTo(*workflowExecutor)
-}
-
-type withCompiler struct {
-	compiler *cuex.Compiler
-}
-
-func (w *withCompiler) ApplyTo(e *workflowExecutor) {
-	e.compiler = w.compiler
-}
-
-// WithCompiler set the cue compiler
-func WithCompiler(compiler *cuex.Compiler) Option {
-	return &withCompiler{compiler: compiler}
 }
 
 type withStatusPatcher struct {

@@ -64,7 +64,7 @@ type MailParams = providertypes.LegacyParams[MailVars]
 var emailRoutine sync.Map
 
 // Send sends email
-func Send(ctx context.Context, params *MailParams) (res *any, err error) {
+func Send(_ context.Context, params *MailParams) (res *any, err error) {
 	pCtx := params.ProcessContext
 	act := params.Action
 	id := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))

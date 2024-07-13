@@ -70,21 +70,15 @@ func setStore(ctx context.Context, instance *wfTypes.WorkflowInstance, id, data 
 			}
 			cm.Labels = map[string]string{}
 			cm.SetOwnerReferences(instance.ChildOwnerReferences)
-			if err := cli.Create(ctx, cm); err != nil {
-				return err
-			}
-			return nil
+			return cli.Create(ctx, cm)
 		}
 		return err
 	}
 	cm.Data = map[string]string{
 		"debug": data,
 	}
-	if err := cli.Update(ctx, cm); err != nil {
-		return err
-	}
 
-	return nil
+	return cli.Update(ctx, cm)
 }
 
 // NewContext new workflow context without initialize data.

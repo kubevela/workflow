@@ -191,7 +191,7 @@ func (wf *WorkflowContext) sync(ctx context.Context) error {
 }
 
 // LoadFromConfigMap recover workflow context from configMap.
-func (wf *WorkflowContext) LoadFromConfigMap(ctx context.Context, cm corev1.ConfigMap) error {
+func (wf *WorkflowContext) LoadFromConfigMap(_ context.Context, cm corev1.ConfigMap) error {
 	if wf.store == nil {
 		wf.store = &cm
 	}

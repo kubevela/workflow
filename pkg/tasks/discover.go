@@ -39,7 +39,7 @@ func NewTaskDiscover(ctx monitorContext.Context, options types.StepGeneratorOpti
 		builtin: map[string]types.TaskGenerator{
 			types.WorkflowStepTypeStepGroup: builtin.StepGroup,
 		},
-		customTaskDiscover: custom.NewTaskLoader(options.TemplateLoader.LoadTemplate, options.LogLevel, options.ProcessCtx),
+		customTaskDiscover: custom.NewTaskLoader(options.TemplateLoader.LoadTemplate, options.LogLevel, options.ProcessCtx, options.Compiler),
 	}
 }
 

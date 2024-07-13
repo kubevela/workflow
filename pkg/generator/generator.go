@@ -33,6 +33,7 @@ import (
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
@@ -132,12 +133,15 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 	return instance, nil
 }
 
-func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
+func initStepGeneratorOptions(_ monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
 	}
 	if options.TemplateLoader == nil {
 		options.TemplateLoader = template.NewWorkflowStepTemplateLoader()
+	}
+	if options.Compiler == nil {
+		options.Compiler = providers.Compiler.Get()
 	}
 	return options
 }

@@ -94,7 +94,7 @@ func TestTaskLoader(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
 
 	steps := []v1alpha1.WorkflowStep{
 		{
@@ -154,9 +154,7 @@ func TestTaskLoader(t *testing.T) {
 		r.NoError(err)
 		run, err := gen(step, &types.TaskGeneratorOptions{})
 		r.NoError(err)
-		status, action, err := run.Run(wfCtx, &types.TaskRunOptions{
-			Compiler: compiler,
-		})
+		status, action, err := run.Run(wfCtx, &types.TaskRunOptions{})
 		r.NoError(err)
 		if step.Name == "wait" {
 			r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseRunning)
@@ -218,7 +216,7 @@ func TestErrCases(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
 
 	steps := []v1alpha1.WorkflowStep{
 		{
@@ -278,7 +276,7 @@ func TestErrCases(t *testing.T) {
 		r.NoError(err)
 		run, err := gen(step, &types.TaskGeneratorOptions{})
 		r.NoError(err)
-		status, operation, _ := run.Run(wfCtx, &types.TaskRunOptions{Compiler: compiler})
+		status, operation, _ := run.Run(wfCtx, &types.TaskRunOptions{})
 		switch step.Name {
 		case "input-replace":
 			r.Equal(status.Message, "")
@@ -334,7 +332,7 @@ func TestPendingInputCheck(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
@@ -364,7 +362,7 @@ func TestPendingDependsOnCheck(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
@@ -393,7 +391,7 @@ func TestSkip(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	runner, err := gen(step, &types.TaskGeneratorOptions{})
@@ -432,7 +430,7 @@ func TestTimeout(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx)
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	runner, err := gen(step, &types.TaskGeneratorOptions{})
@@ -444,7 +442,6 @@ func TestTimeout(t *testing.T) {
 				return &types.PreCheckResult{Timeout: true}, nil
 			},
 		},
-		Compiler: compiler,
 	})
 	r.NoError(err)
 	r.Equal(status.Phase, v1alpha1.WorkflowStepPhaseFailed)

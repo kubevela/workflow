@@ -43,6 +43,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -2373,7 +2374,7 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 	resetter := tr.fillContext(logCtx, options.PCtx)
 	defer resetter(options.PCtx)
 
-	basicVal, err := custom.MakeBasicValue(logCtx, nil, options.PCtx)
+	basicVal, err := custom.MakeBasicValue(logCtx, providers.Compiler.Get(), nil, options.PCtx)
 	if err != nil {
 		return v1alpha1.StepStatus{}, nil, err
 	}

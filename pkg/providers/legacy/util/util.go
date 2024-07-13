@@ -48,7 +48,7 @@ type PatchResult struct {
 }
 
 // PatchK8sObject patch k8s object
-func PatchK8sObject(ctx context.Context, params *providertypes.LegacyParams[cue.Value]) (cue.Value, error) {
+func PatchK8sObject(_ context.Context, params *providertypes.LegacyParams[cue.Value]) (cue.Value, error) {
 	base, err := model.NewBase(params.Params.LookupPath(cue.ParsePath("value")))
 	if err != nil {
 		return cue.Value{}, err
@@ -78,7 +78,7 @@ type StringReturns struct {
 type StringParams = providertypes.LegacyParams[StringVars]
 
 // String convert byte to string
-func String(ctx context.Context, params *StringParams) (*StringReturns, error) {
+func String(_ context.Context, params *StringParams) (*StringReturns, error) {
 	return &StringReturns{
 		String: string(params.Params.Byte),
 	}, nil
@@ -155,7 +155,7 @@ func Log(ctx context.Context, params *LogParams) (*any, error) {
 	return nil, nil
 }
 
-func printDataInLog(ctx context.Context, data any, level int, pCtx process.Context) error {
+func printDataInLog(_ context.Context, data any, level int, pCtx process.Context) error {
 	var message string
 	switch v := data.(type) {
 	case string:

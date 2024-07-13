@@ -145,6 +145,7 @@ type StepGeneratorOptions struct {
 	TemplateLoader template.Loader
 	StepConvertor  map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
 	LogLevel       int
+	Compiler       *cuex.Compiler
 }
 
 // Action is that workflow provider can do.

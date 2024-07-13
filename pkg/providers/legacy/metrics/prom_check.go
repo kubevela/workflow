@@ -177,7 +177,7 @@ func getQueryResult(ctx context.Context, vars PromVars) (string, error) {
 	return valueStr, nil
 }
 
-func compareValueWithCondition(ctx context.Context, valueStr string, vars PromVars) (bool, error) {
+func compareValueWithCondition(_ context.Context, valueStr string, vars PromVars) (bool, error) {
 	template := fmt.Sprintf("if: %s %s", valueStr, vars.Condition)
 	res, err := cuecontext.New().CompileString(template).LookupPath(cue.ParsePath("if")).Bool()
 	if err != nil {

@@ -179,12 +179,9 @@ func SuspendWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	if !found {
 		return fmt.Errorf("can not find step %s", stepName)
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // OperateSteps handles the operations to the steps
@@ -232,12 +229,9 @@ func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workfl
 	if !found {
 		return fmt.Errorf("can not find step %s", stepName)
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // Rollback is not supported for WorkflowRun
@@ -284,11 +278,7 @@ func RestartWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	// reset the workflow status to restart the workflow
 	run.Status = v1alpha1.WorkflowRunStatus{}
 
-	if err := cli.Status().Update(ctx, run); err != nil {
-		return err
-	}
-
-	return nil
+	return cli.Status().Update(ctx, run)
 }
 
 // Terminate terminate workflow
@@ -332,12 +322,9 @@ func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Wor
 		}
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // RestartFromStep restart workflow from a failed step
@@ -380,13 +367,9 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	}); err != nil {
 		return err
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Update(ctx, cm)
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 // CleanStatusFromStep cleans status and context data from a specified step

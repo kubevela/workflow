@@ -168,6 +168,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				Action:          exec,
 			})
 
+			fmt.Println("===make task generator compiler", options.Compiler)
 			basicVal, err := MakeBasicValue(tracer, options.Compiler, wfStep.Properties, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")
@@ -257,7 +258,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 // ValidateIfValue validates the if value
 func ValidateIfValue(ctx wfContext.Context, step v1alpha1.WorkflowStep, stepStatus map[string]v1alpha1.StepStatus, basicVal cue.Value) (bool, error) {
 	s, _ := util.ToString(basicVal)
-	template := fmt.Sprintf("if: %s\n%s\n%s\n%s", step.If, getInputsTemplate(ctx, step, basicVal), buildValueForStatus(ctx, step, stepStatus), s)
+	template := fmt.Sprintf("if: %s\n%s\n%s\n%s", step.If, getInputsTemplate(ctx, step, basicVal), buildValueForStatus(ctx, stepStatus), s)
 	v := cuecontext.New().CompileString(template).LookupPath(cue.ParsePath("if"))
 	if v.Err() != nil {
 		return false, errors.WithMessage(v.Err(), "invalid if value")
@@ -269,7 +270,7 @@ func ValidateIfValue(ctx wfContext.Context, step v1alpha1.WorkflowStep, stepStat
 	return check, nil
 }
 
-func buildValueForStatus(ctx wfContext.Context, step v1alpha1.WorkflowStep, stepStatus map[string]v1alpha1.StepStatus) string {
+func buildValueForStatus(_ wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) string {
 	statusMap := make(map[string]interface{})
 	for name, ss := range stepStatus {
 		abbrStatus := struct {
@@ -342,7 +343,7 @@ func getInputsTemplate(ctx wfContext.Context, step v1alpha1.WorkflowStep, basicV
 }
 
 // NewTaskLoader create a tasks loader.
-func NewTaskLoader(lt LoadTaskTemplate, logLevel int, pCtx process.Context) *TaskLoader {
+func NewTaskLoader(lt LoadTaskTemplate, logLevel int, pCtx process.Context, compiler *cuex.Compiler) *TaskLoader {
 	return &TaskLoader{
 		loadTemplate: lt,
 		runOptionsProcess: func(options *types.TaskRunOptions) {
@@ -353,6 +354,7 @@ func NewTaskLoader(lt LoadTaskTemplate, logLevel int, pCtx process.Context) *Tas
 				options.PostStopHooks = append(options.PostStopHooks, hooks.Output)
 			}
 			options.PCtx = pCtx
+			options.Compiler = compiler
 		},
 		logLevel: logLevel,
 	}
