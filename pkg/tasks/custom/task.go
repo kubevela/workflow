@@ -168,7 +168,6 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				Action:          exec,
 			})
 
-			fmt.Println("===make task generator compiler", options.Compiler)
 			basicVal, err := MakeBasicValue(tracer, options.Compiler, wfStep.Properties, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")

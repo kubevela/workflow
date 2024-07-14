@@ -28,14 +28,20 @@ import (
 	"github.com/kubevela/workflow/pkg/types"
 )
 
-type contextKey string
+// ContextKey is the key type for context values.
+type ContextKey string
 
 const (
-	workflowContextKey contextKey = "workflowContext"
-	processContextKey  contextKey = "processContext"
-	actionKey          contextKey = "action"
-	labelsKey          contextKey = "labels"
-	kubeHandlersKey    contextKey = "kubeHandlers"
+	// WorkflowContextKey is the key for workflow context.
+	WorkflowContextKey ContextKey = "workflowContext"
+	// ProcessContextKey is the key for process context.
+	ProcessContextKey ContextKey = "processContext"
+	// ActionKey is the key for action.
+	ActionKey ContextKey = "action"
+	// LabelsKey is the key for labels.
+	LabelsKey ContextKey = "labels"
+	// KubeHandlersKey is the key for kube handlers.
+	KubeHandlersKey ContextKey = "kubeHandlers"
 )
 
 // Dispatcher is a client for apply resources.
@@ -102,33 +108,33 @@ func (fn LegacyNativeProviderFn) Call(ctx context.Context, value cue.Value) (cue
 
 // WithLabelParams returns a copy of parent in which the labels value is set
 func WithLabelParams(parent context.Context, labels map[string]string) context.Context {
-	return context.WithValue(parent, labelsKey, labels)
+	return context.WithValue(parent, LabelsKey, labels)
 }
 
 // WithRuntimeParams returns a copy of parent in which the runtime params value is set
 func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Context {
-	ctx := context.WithValue(parent, workflowContextKey, params.WorkflowContext)
-	ctx = context.WithValue(ctx, processContextKey, params.ProcessContext)
-	ctx = context.WithValue(ctx, actionKey, params.Action)
+	ctx := context.WithValue(parent, WorkflowContextKey, params.WorkflowContext)
+	ctx = context.WithValue(ctx, ProcessContextKey, params.ProcessContext)
+	ctx = context.WithValue(ctx, ActionKey, params.Action)
 	return ctx
 }
 
 // RuntimeParamsFrom returns the runtime params value stored in ctx, if any.
 func RuntimeParamsFrom(ctx context.Context) RuntimeParams {
 	params := RuntimeParams{}
-	if wfCtx, ok := ctx.Value(workflowContextKey).(wfContext.Context); ok {
+	if wfCtx, ok := ctx.Value(WorkflowContextKey).(wfContext.Context); ok {
 		params.WorkflowContext = wfCtx
 	}
-	if pCtx, ok := ctx.Value(processContextKey).(process.Context); ok {
+	if pCtx, ok := ctx.Value(ProcessContextKey).(process.Context); ok {
 		params.ProcessContext = pCtx
 	}
-	if action, ok := ctx.Value(actionKey).(types.Action); ok {
+	if action, ok := ctx.Value(ActionKey).(types.Action); ok {
 		params.Action = action
 	}
-	if labels, ok := ctx.Value(labelsKey).(map[string]string); ok {
+	if labels, ok := ctx.Value(LabelsKey).(map[string]string); ok {
 		params.Labels = labels
 	}
-	if kubeHandlers, ok := ctx.Value(kubeHandlersKey).(*KubeHandlers); ok {
+	if kubeHandlers, ok := ctx.Value(KubeHandlersKey).(*KubeHandlers); ok {
 		params.KubeHandlers = kubeHandlers
 	}
 	return params
