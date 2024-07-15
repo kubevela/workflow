@@ -380,7 +380,7 @@ func CheckPending(ctx wfContext.Context, step v1alpha1.WorkflowStep, id string, 
 	for _, input := range step.Inputs {
 		pStatus.Message = fmt.Sprintf("Pending on Input: %s", input.From)
 		if _, err := ctx.GetVar(strings.Split(input.From, ".")...); err != nil {
-			if v := basicValue.LookupPath(cue.ParsePath(input.From)); !v.Exists() {
+			if v := basicValue.LookupPath(value.FieldPath(input.From)); !v.Exists() {
 				return true, pStatus
 			}
 		}
