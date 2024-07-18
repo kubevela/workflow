@@ -245,7 +245,8 @@ func Read(ctx context.Context, params *ResourceParams) (*ResourceReturns, error)
 	readCtx := handleContext(ctx, params.Params.Cluster)
 	if err := singleton.KubeClient.Get().Get(readCtx, key, workload); err != nil {
 		return &ResourceReturns{
-			Error: err,
+			Resource: workload,
+			Error:    err,
 		}, nil
 	}
 	return &ResourceReturns{
@@ -275,7 +276,8 @@ func List(ctx context.Context, params *ResourceParams) (*ListReturns, error) {
 	readCtx := handleContext(ctx, params.Params.Cluster)
 	if err := singleton.KubeClient.Get().List(readCtx, list, listOpts...); err != nil {
 		return &ListReturns{
-			Error: err,
+			Resources: list,
+			Error:     err,
 		}, nil
 	}
 	return &ListReturns{
@@ -296,7 +298,8 @@ func Delete(ctx context.Context, params *ResourceParams) (*ResourceReturns, erro
 		}
 		if err := singleton.KubeClient.Get().DeleteAllOf(deleteCtx, workload, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: filter.Namespace, LabelSelector: labelSelector}}); err != nil {
 			return &ResourceReturns{
-				Error: err,
+				Resource: workload,
+				Error:    err,
 			}, nil
 		}
 		return nil, nil
@@ -304,7 +307,8 @@ func Delete(ctx context.Context, params *ResourceParams) (*ResourceReturns, erro
 
 	if err := handlers.Delete(deleteCtx, params.Params.Cluster, WorkflowResourceCreator, workload); err != nil {
 		return &ResourceReturns{
-			Error: err,
+			Resource: workload,
+			Error:    err,
 		}, nil
 	}
 
