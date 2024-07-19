@@ -12,7 +12,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubevela/kube-trigger v0.1.1-0.20230403060228-6582e7595db6
-	github.com/kubevela/pkg v1.8.1-0.20230522085329-7d5e1241a86d
+	github.com/kubevela/pkg v1.9.2
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.5
 	github.com/pkg/errors v0.9.1

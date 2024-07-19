@@ -43,6 +43,9 @@ func Input(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowSt
 			}
 		}
 		if input.ParameterKey != "" {
+			fmt.Println("===filledVal", filledVal)
+			fmt.Println("===inputValue", inputValue)
+			fmt.Println("====path", strings.Join([]string{"parameter", input.ParameterKey}, "."))
 			filledVal, err = value.SetValueByScript(filledVal, inputValue, strings.Join([]string{"parameter", input.ParameterKey}, "."))
 			if err != nil || filledVal.Err() != nil {
 				if err != nil {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -108,12 +109,18 @@ func setValue(orig ast.Node, expr ast.Expr, selectors []cue.Selector) error {
 	return nil
 }
 
+var syntaxLock sync.Mutex
+
 // SetValueByScript set the value v at the given script path.
 // nolint:staticcheck
 func SetValueByScript(base, v cue.Value, path ...string) (cue.Value, error) {
 	cuepath := FieldPath(path...)
 	selectors := cuepath.Selectors()
+
+	syntaxLock.Lock()
 	node := base.Syntax(cue.ResolveReferences(true))
+	syntaxLock.Unlock()
+
 	if err := setValue(node, v.Syntax(cue.ResolveReferences(true)).(ast.Expr), selectors); err != nil {
 		return cue.Value{}, err
 	}
