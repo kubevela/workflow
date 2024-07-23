@@ -22,7 +22,9 @@ import (
 
 	"cuelang.org/go/cue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/util/singleton"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/types"
@@ -42,13 +44,15 @@ const (
 	LabelsKey ContextKey = "labels"
 	// KubeHandlersKey is the key for kube handlers.
 	KubeHandlersKey ContextKey = "kubeHandlers"
+	// KubeClientKey is the key for kube client.
+	KubeClientKey ContextKey = "kubeClient"
 )
 
 // Dispatcher is a client for apply resources.
-type Dispatcher func(ctx context.Context, cluster, owner string, manifests ...*unstructured.Unstructured) error
+type Dispatcher func(ctx context.Context, client client.Client, cluster, owner string, manifests ...*unstructured.Unstructured) error
 
 // Deleter is a client for delete resources.
-type Deleter func(ctx context.Context, cluster, owner string, manifest *unstructured.Unstructured) error
+type Deleter func(ctx context.Context, client client.Client, cluster, owner string, manifest *unstructured.Unstructured) error
 
 // KubeHandlers handles resources.
 type KubeHandlers struct {
@@ -64,6 +68,7 @@ type RuntimeParams struct {
 	FieldLabel      string
 	Labels          map[string]string
 	KubeHandlers    *KubeHandlers
+	KubeClient      client.Client
 }
 
 // LegacyParams is the legacy input parameters of a provider.
@@ -116,6 +121,9 @@ func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Con
 	ctx := context.WithValue(parent, WorkflowContextKey, params.WorkflowContext)
 	ctx = context.WithValue(ctx, ProcessContextKey, params.ProcessContext)
 	ctx = context.WithValue(ctx, ActionKey, params.Action)
+	ctx = context.WithValue(ctx, LabelsKey, params.Labels)
+	ctx = context.WithValue(ctx, KubeHandlersKey, params.KubeHandlers)
+	ctx = context.WithValue(ctx, KubeClientKey, params.KubeClient)
 	return ctx
 }
 
@@ -136,6 +144,11 @@ func RuntimeParamsFrom(ctx context.Context) RuntimeParams {
 	}
 	if kubeHandlers, ok := ctx.Value(KubeHandlersKey).(*KubeHandlers); ok {
 		params.KubeHandlers = kubeHandlers
+	}
+	if kubeClient, ok := ctx.Value(KubeClientKey).(client.Client); ok {
+		params.KubeClient = kubeClient
+	} else {
+		params.KubeClient = singleton.KubeClient.Get()
 	}
 	return params
 }

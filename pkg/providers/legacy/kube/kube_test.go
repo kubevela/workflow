@@ -40,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	"github.com/kubevela/pkg/util/singleton"
-
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
 
@@ -77,8 +75,6 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
-
-	singleton.KubeClient.Set(k8sClient)
 	close(done)
 }, 120)
 
@@ -104,6 +100,7 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 				Labels: map[string]string{
 					"hello": "world",
 				},
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -136,10 +133,11 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 				Labels: map[string]string{
 					"hello": "world",
 				},
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
-		Expect(res.Error).Should(BeNil())
+		Expect(res.Error).Should(Equal(""))
 		Expect(res.Resource.GetLabels()).Should(Equal(map[string]string{
 			"test":  "test",
 			"hello": "world",
@@ -157,6 +155,9 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 		_, err := Apply(ctx, &ResourceParams{
 			Params: ResourceVars{
 				Resource: &un,
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -180,6 +181,9 @@ patch: {
 `)
 		_, err = Patch(ctx, &providertypes.LegacyParams[cue.Value]{
 			Params: v,
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -235,6 +239,9 @@ patch: {
 					},
 				},
 			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(res.Resources.Items)).Should(Equal(5))
@@ -253,6 +260,9 @@ patch: {
 						"index": "test-1",
 					},
 				},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -294,6 +304,9 @@ patch: {
 						},
 					},
 				},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -349,6 +362,9 @@ patch: {
 					},
 				},
 			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
 		})
 		Expect(err).ToNot(HaveOccurred())
 		err = k8sClient.Get(ctx, k8stypes.NamespacedName{
@@ -368,6 +384,9 @@ patch: {
 		_, err := ApplyInParallel(ctx, &ApplyInParallelParams{
 			Params: ApplyInParallelVars{
 				Resources: []*unstructured.Unstructured{un1, un2},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -399,6 +418,9 @@ patch: {
 						},
 					},
 				},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())

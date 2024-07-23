@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
-	"github.com/kubevela/pkg/util/singleton"
 
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
@@ -143,7 +142,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	req.Trailer = trailer
 
 	if params.Params.TLSConfig != nil {
-		if tr, err := getTransport(ctx, params.Params.TLSConfig.Secret, params.Params.TLSConfig.Namespace); err == nil && tr != nil {
+		if tr, err := getTransport(ctx, params.KubeClient, params.Params.TLSConfig.Secret, params.Params.TLSConfig.Namespace); err == nil && tr != nil {
 			defaultClient.Transport = tr
 		}
 	}
@@ -164,7 +163,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}, nil
 }
 
-func getTransport(ctx context.Context, secretName, ns string) (http.RoundTripper, error) {
+func getTransport(ctx context.Context, cli client.Client, secretName, ns string) (http.RoundTripper, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			NextProtos: []string{"http/1.1"},
@@ -180,7 +179,7 @@ func getTransport(ctx context.Context, secretName, ns string) (http.RoundTripper
 		objectKey.Name = secretName[index:]
 	}
 	secret := new(v1.Secret)
-	if err := singleton.KubeClient.Get().Get(ctx, objectKey, secret); err != nil {
+	if err := cli.Get(ctx, objectKey, secret); err != nil {
 		return nil, err
 	}
 	if ca, ok := secret.Data["ca.crt"]; ok {

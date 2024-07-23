@@ -35,9 +35,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
+	"github.com/kubevela/workflow/pkg/providers/types"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -277,7 +277,6 @@ func TestHTTPSDo(t *testing.T) {
 			return nil
 		},
 	}
-	singleton.KubeClient.Set(cli)
 	r := require.New(t)
 	_, err := Do(ctx, &DoParams{
 		Params: RequestVars{
@@ -287,6 +286,9 @@ func TestHTTPSDo(t *testing.T) {
 				Secret:    "certs",
 				Namespace: "default",
 			},
+		},
+		RuntimeParams: types.RuntimeParams{
+			KubeClient: cli,
 		},
 	})
 	r.NoError(err)
