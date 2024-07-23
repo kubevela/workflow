@@ -121,9 +121,6 @@ func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Con
 	ctx := context.WithValue(parent, WorkflowContextKey, params.WorkflowContext)
 	ctx = context.WithValue(ctx, ProcessContextKey, params.ProcessContext)
 	ctx = context.WithValue(ctx, ActionKey, params.Action)
-	ctx = context.WithValue(ctx, LabelsKey, params.Labels)
-	ctx = context.WithValue(ctx, KubeHandlersKey, params.KubeHandlers)
-	ctx = context.WithValue(ctx, KubeClientKey, params.KubeClient)
 	return ctx
 }
 
