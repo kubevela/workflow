@@ -20,26 +20,26 @@ import (
 	"context"
 	"testing"
 
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 )
 
 func TestInput(t *testing.T) {
 	wfCtx := mockContext(t)
 	r := require.New(t)
-	paramValue, err := wfCtx.MakeParameter(`"name": "foo"`)
+	cuectx := cuecontext.New()
+	paramValue := cuectx.CompileString(`"name": "foo"`)
+	err := wfCtx.SetVar(cuectx.CompileString(`score: 99`), "foo")
 	r.NoError(err)
-	score, err := paramValue.MakeValue(`score: 99`)
-	r.NoError(err)
-	err = wfCtx.SetVar(score, "foo")
-	r.NoError(err)
-	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
+	val, err := Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			DependsOn: []string{"mystep"},
 			Inputs: v1alpha1.StepInputs{{
@@ -49,16 +49,15 @@ func TestInput(t *testing.T) {
 		},
 	})
 	r.NoError(err)
-	result, err := paramValue.LookupValue("parameter", "myscore")
+	result := val.LookupPath(cue.ParsePath("parameter.myscore"))
+	resultInt, err := result.Int64()
 	r.NoError(err)
-	s, err := result.String()
-	r.NoError(err)
-	r.Equal(s, `99
-`)
+	r.Equal(int(resultInt), 99)
+
 	// test set value
-	paramValue, err = wfCtx.MakeParameter(`parameter: {myscore: "test"}`)
+	paramValue = cuectx.CompileString(`parameter: {myscore: "test"}`)
 	r.NoError(err)
-	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
+	val, err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			DependsOn: []string{"mystep"},
 			Inputs: v1alpha1.StepInputs{{
@@ -68,15 +67,12 @@ func TestInput(t *testing.T) {
 		},
 	})
 	r.NoError(err)
-	result, err = paramValue.LookupValue("parameter", "myscore")
+	result = val.LookupPath(cue.ParsePath("parameter.myscore"))
+	resultInt, err = result.Int64()
 	r.NoError(err)
-	s, err = result.String()
-	r.NoError(err)
-	r.Equal(s, `99
-`)
-	paramValue, err = wfCtx.MakeParameter(`context: {name: "test"}`)
-	r.NoError(err)
-	err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
+	r.Equal(int(resultInt), 99)
+	paramValue = cuectx.CompileString(`context: {name: "test"}`)
+	val, err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			Inputs: v1alpha1.StepInputs{{
 				From:         "context.name",
@@ -85,23 +81,20 @@ func TestInput(t *testing.T) {
 		},
 	})
 	r.NoError(err)
-	result, err = paramValue.LookupValue("parameter", "contextname")
+	result = val.LookupPath(cue.ParsePath("parameter.contextname"))
 	r.NoError(err)
-	s, err = result.String()
+	s, err := result.String()
 	r.NoError(err)
-	r.Equal(s, `"test"
-`)
+	r.Equal(s, "test")
 }
 
 func TestOutput(t *testing.T) {
 	wfCtx := mockContext(t)
 	r := require.New(t)
-	taskValue, err := value.NewValue(`
-output: score: 99 
-`, nil, "")
-	r.NoError(err)
+	cuectx := cuecontext.New()
+	taskValue := cuectx.CompileString(`output: score: 99`)
 	stepStatus := make(map[string]v1alpha1.StepStatus)
-	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
+	err := Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
 		WorkflowStepBase: v1alpha1.WorkflowStepBase{
 			Properties: &runtime.RawExtension{
 				Raw: []byte("{\"name\":\"mystep\"}"),
@@ -117,10 +110,9 @@ output: score: 99
 	r.NoError(err)
 	result, err := wfCtx.GetVar("myscore")
 	r.NoError(err)
-	s, err := result.String()
+	resultInt, err := result.Int64()
 	r.NoError(err)
-	r.Equal(s, `99
-`)
+	r.Equal(int(resultInt), 99)
 	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
 }
 
@@ -136,7 +128,8 @@ func mockContext(t *testing.T) wfContext.Context {
 			return nil
 		},
 	}
-	wfCtx, err := wfContext.NewContext(context.Background(), cli, "default", "v1", nil)
+	singleton.KubeClient.Set(cli)
+	wfCtx, err := wfContext.NewContext(context.Background(), "default", "v1", nil)
 	require.NoError(t, err)
 	return wfCtx
 }

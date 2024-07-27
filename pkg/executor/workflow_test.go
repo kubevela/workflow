@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/google/go-cmp/cmp"
 	"github.com/kubevela/pkg/util/slices"
 	. "github.com/onsi/ginkgo"
@@ -40,10 +41,9 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
-	"github.com/kubevela/workflow/pkg/providers/workspace"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -94,7 +94,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
@@ -143,7 +143,7 @@ var _ = Describe("Test Workflow", func() {
 		})
 
 		instance.Status = v1alpha1.WorkflowRunStatus{}
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
@@ -205,7 +205,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -272,7 +272,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
@@ -357,7 +357,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -449,7 +449,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -540,7 +540,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -628,7 +628,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -715,7 +715,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -799,7 +799,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -862,7 +862,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -917,7 +917,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -970,7 +970,7 @@ var _ = Describe("Test Workflow", func() {
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -1042,7 +1042,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
@@ -1138,7 +1138,7 @@ var _ = Describe("Test Workflow", func() {
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateFailed))
@@ -1236,7 +1236,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
@@ -1323,7 +1323,7 @@ var _ = Describe("Test Workflow", func() {
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		state, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
@@ -1408,7 +1408,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -1500,7 +1500,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -1550,10 +1550,10 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		_, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
+		wfCtx, err := wfContext.LoadContext(ctx, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e := &engine{
 			status: &instance.Status,
@@ -1588,7 +1588,7 @@ var _ = Describe("Test Workflow", func() {
 		wfContext.CleanupMemoryStore(instance.Name, instance.Namespace)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
-		wfCtx, err = wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
+		wfCtx, err = wfContext.LoadContext(ctx, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		e = &engine{
 			status: &instance.Status,
@@ -1609,7 +1609,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		_, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1635,7 +1635,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		_, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1653,7 +1653,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1671,7 +1671,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1690,7 +1690,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1708,7 +1708,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		_, err = wf.ExecuteRunners(ctx, runners)
@@ -1726,7 +1726,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf = New(instance, k8sClient, nil)
+		wf = New(instance)
 		_, err = wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(0))
@@ -1754,7 +1754,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
@@ -1856,7 +1856,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -1910,7 +1910,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
@@ -1968,7 +1968,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
@@ -2026,7 +2026,7 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).To(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
@@ -2047,7 +2047,7 @@ var _ = Describe("Test Workflow", func() {
 	It("skip workflow", func() {
 		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
@@ -2078,7 +2078,7 @@ var _ = Describe("Test Workflow", func() {
 		instance.Mode = &v1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
@@ -2166,16 +2166,16 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
-		wf := New(instance, k8sClient, nil)
+		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
 		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
-		wfCtx, err := wfContext.LoadContext(k8sClient, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
+		wfCtx, err := wfContext.LoadContext(ctx, instance.Namespace, instance.Name, instance.Status.ContextBackend.Name)
 		Expect(err).ToNot(HaveOccurred())
 		v, err := wfCtx.GetVar("saved")
 		Expect(err).ToNot(HaveOccurred())
-		saved, err := v.CueValue().Bool()
+		saved, err := v.Bool()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(saved).Should(BeEquivalentTo(true))
 	})
@@ -2230,7 +2230,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 				_ = json.Unmarshal(b, &v)
 				if v["duration"] != "" {
 					d, _ := time.ParseDuration(v["duration"])
-					ctx.SetMutableValue(time.Now().Add(d).Format(time.RFC3339), step.Name, workspace.ResumeTimeStamp)
+					ctx.SetMutableValue(time.Now().Add(d).Format(time.RFC3339), step.Name, "resumeTimeStamp")
 				}
 			}
 			return v1alpha1.StepStatus{
@@ -2255,10 +2255,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 		}
 	case "success":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
-			v, err := value.NewValue(`"app"`, nil, "")
-			if err != nil {
-				return v1alpha1.StepStatus{}, nil, err
-			}
+			v := cuecontext.New().CompileString(`"app"`)
 			if err := ctx.SetVar(v, "test"); err != nil {
 				return v1alpha1.StepStatus{}, nil, err
 			}
@@ -2297,7 +2294,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 		}
 	case "wait-with-set-var":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
-			v, _ := value.NewValue(`saved: true`, nil, "")
+			v := cuecontext.New().CompileString(`saved: true`)
 			err := ctx.SetVar(v)
 			return v1alpha1.StepStatus{
 				Name:  step.Name,
@@ -2377,15 +2374,14 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 	resetter := tr.fillContext(logCtx, options.PCtx)
 	defer resetter(options.PCtx)
 
-	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, "", options.PCtx)
+	basicVal, err := custom.MakeBasicValue(logCtx, providers.Compiler.Get(), nil, options.PCtx)
 	if err != nil {
 		return v1alpha1.StepStatus{}, nil, err
 	}
 	if tr.step.Type != "step-group" && options != nil {
 		for _, hook := range options.PreCheckHooks {
 			result, err := hook(tr.step, &types.PreCheckOptions{
-				BasicTemplate: basicTemplate,
-				BasicValue:    basicVal,
+				BasicValue: basicVal,
 			})
 			if err != nil {
 				return v1alpha1.StepStatus{

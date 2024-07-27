@@ -17,15 +17,16 @@ limitations under the License.
 package context
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"context"
 
-	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"cuelang.org/go/cue"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Context is workflow context interface
 type Context interface {
-	GetVar(paths ...string) (*value.Value, error)
-	SetVar(v *value.Value, paths ...string) error
+	GetVar(paths ...string) (cue.Value, error)
+	SetVar(v cue.Value, paths ...string) error
 	GetStore() *corev1.ConfigMap
 	GetMutableValue(path ...string) string
 	SetMutableValue(data string, path ...string)
@@ -34,7 +35,6 @@ type Context interface {
 	SetValueInMemory(data interface{}, paths ...string)
 	GetValueInMemory(paths ...string) (interface{}, bool)
 	DeleteValueInMemory(paths ...string)
-	Commit() error
-	MakeParameter(parameter string) (*value.Value, error)
+	Commit(ctx context.Context) error
 	StoreRef() *corev1.ObjectReference
 }

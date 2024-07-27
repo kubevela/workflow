@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
+	"cuelang.org/go/cue"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/util/slices"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
-	"github.com/kubevela/workflow/pkg/cue/packages"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -40,7 +40,6 @@ func StepGroup(step v1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (typ
 		step:           step,
 		subTaskRunners: opt.SubTaskRunners,
 		mode:           opt.SubStepExecuteMode,
-		pd:             opt.PackageDiscover,
 		pCtx:           opt.ProcessContext,
 	}, nil
 }
@@ -50,7 +49,6 @@ type stepGroupTaskRunner struct {
 	name           string
 	step           v1alpha1.WorkflowStep
 	subTaskRunners []types.TaskRunner
-	pd             *packages.PackageDiscover
 	pCtx           process.Context
 	mode           v1alpha1.WorkflowMode
 }
@@ -64,7 +62,7 @@ func (tr *stepGroupTaskRunner) Name() string {
 func (tr *stepGroupTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus) {
 	resetter := tr.FillContextData(ctx, tr.pCtx)
 	defer resetter(tr.pCtx)
-	basicVal, _, _ := custom.MakeBasicValue(wfCtx, "", tr.pCtx)
+	basicVal, _ := custom.MakeBasicValue(ctx, providers.Compiler.Get(), nil, tr.pCtx)
 	return custom.CheckPending(wfCtx, tr.step, tr.id, stepStatus, basicVal)
 }
 
@@ -86,7 +84,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	tracer := options.GetTracer(tr.id, tr.step).AddTag("step_name", tr.name, "step_type", types.WorkflowStepTypeStepGroup)
 	resetter := tr.FillContextData(tracer, tr.pCtx)
 	defer resetter(tr.pCtx)
-	basicVal, basicTemplate, err := custom.MakeBasicValue(ctx, "", tr.pCtx)
+	basicVal, err := custom.MakeBasicValue(tracer, providers.Compiler.Get(), nil, tr.pCtx)
 	if err != nil {
 		return status, nil, err
 	}
@@ -94,9 +92,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 
 	for _, hook := range options.PreCheckHooks {
 		result, err := hook(tr.step, &types.PreCheckOptions{
-			PackageDiscover: tr.pd,
-			BasicTemplate:   basicTemplate,
-			BasicValue:      basicVal,
+			BasicValue: basicVal,
 		})
 		if err != nil {
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
@@ -200,7 +196,7 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 	return status, operation
 }
 
-func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal *value.Value) {
+func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal cue.Value) {
 	if len(step.Outputs) > 0 {
 		for _, hook := range postStopHooks {
 			if err := hook(ctx, basicVal, step, *stepStatus, nil); err != nil {

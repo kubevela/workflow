@@ -28,19 +28,12 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/util/rand"
 
-	"github.com/oam-dev/kubevela/pkg/config/provider"
-
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
+
 	"github.com/kubevela/workflow/pkg/providers"
-	"github.com/kubevela/workflow/pkg/providers/email"
-	"github.com/kubevela/workflow/pkg/providers/http"
-	"github.com/kubevela/workflow/pkg/providers/kube"
-	metrics2 "github.com/kubevela/workflow/pkg/providers/metrics"
-	"github.com/kubevela/workflow/pkg/providers/util"
-	"github.com/kubevela/workflow/pkg/providers/workspace"
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
@@ -58,9 +51,8 @@ func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstanc
 	var tasks []types.TaskRunner
 	for _, step := range instance.Steps {
 		opt := &types.TaskGeneratorOptions{
-			ID:              generateStepID(instance.Status, step.Name),
-			PackageDiscover: options.PackageDiscover,
-			ProcessContext:  options.ProcessCtx,
+			ID:             generateStepID(instance.Status, step.Name),
+			ProcessContext: options.ProcessCtx,
 		}
 		for typ, convertor := range options.StepConvertor {
 			if step.Type == typ {
@@ -141,31 +133,17 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 	return instance, nil
 }
 
-func initStepGeneratorOptions(ctx monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions { //nolint:revive,unused
-	if options.Providers == nil {
-		options.Providers = providers.NewProviders()
-	}
+func initStepGeneratorOptions(_ monitorContext.Context, instance *types.WorkflowInstance, options types.StepGeneratorOptions) types.StepGeneratorOptions {
 	if options.ProcessCtx == nil {
 		options.ProcessCtx = process.NewContext(generateContextDataFromWorkflowRun(instance))
 	}
-	installBuiltinProviders(instance, options.Client, options.Providers, options.ProcessCtx)
 	if options.TemplateLoader == nil {
-		options.TemplateLoader = template.NewWorkflowStepTemplateLoader(options.Client)
+		options.TemplateLoader = template.NewWorkflowStepTemplateLoader()
+	}
+	if options.Compiler == nil {
+		options.Compiler = providers.Compiler.Get()
 	}
 	return options
-}
-
-func installBuiltinProviders(instance *types.WorkflowInstance, client client.Client, providerHandlers types.Providers, pCtx process.Context) {
-	workspace.Install(providerHandlers, pCtx)
-	email.Install(providerHandlers)
-	util.Install(providerHandlers, pCtx)
-	http.Install(providerHandlers, client, instance.Namespace)
-	provider.Install(providerHandlers, client, nil)
-	metrics2.Install(providerHandlers)
-	kube.Install(providerHandlers, client, map[string]string{
-		types.LabelWorkflowRunName:      instance.Name,
-		types.LabelWorkflowRunNamespace: instance.Namespace,
-	}, nil)
 }
 
 func generateTaskRunner(ctx context.Context,
@@ -181,9 +159,8 @@ func generateTaskRunner(ctx context.Context,
 				WorkflowStepBase: subStep,
 			}
 			o := &types.TaskGeneratorOptions{
-				ID:              generateSubStepID(instance.Status, subStep.Name, step.Name),
-				PackageDiscover: options.PackageDiscover,
-				ProcessContext:  options.ProcessContext,
+				ID:             generateSubStepID(instance.Status, subStep.Name, step.Name),
+				ProcessContext: options.ProcessContext,
 			}
 			for typ, convertor := range stepOptions.StepConvertor {
 				if subStep.Type == typ {

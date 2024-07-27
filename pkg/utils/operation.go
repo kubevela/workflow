@@ -24,6 +24,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/format"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,7 +35,6 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
-	"github.com/kubevela/workflow/pkg/cue/model/value"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
@@ -179,12 +179,9 @@ func SuspendWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	if !found {
 		return fmt.Errorf("can not find step %s", stepName)
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // OperateSteps handles the operations to the steps
@@ -232,12 +229,9 @@ func ResumeWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workfl
 	if !found {
 		return fmt.Errorf("can not find step %s", stepName)
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // Rollback is not supported for WorkflowRun
@@ -284,11 +278,7 @@ func RestartWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	// reset the workflow status to restart the workflow
 	run.Status = v1alpha1.WorkflowRunStatus{}
 
-	if err := cli.Status().Update(ctx, run); err != nil {
-		return err
-	}
-
-	return nil
+	return cli.Status().Update(ctx, run)
 }
 
 // Terminate terminate workflow
@@ -332,12 +322,9 @@ func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Wor
 		}
 	}
 
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
 }
 
 // RestartFromStep restart workflow from a failed step
@@ -380,13 +367,9 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	}); err != nil {
 		return err
 	}
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Update(ctx, cm)
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 // CleanStatusFromStep cleans status and context data from a specified step
@@ -424,10 +407,7 @@ func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.Wo
 		return nil, nil, fmt.Errorf("failed step %s not found", stepName)
 	}
 	if contextCM != nil && contextCM.Data != nil {
-		v, err := value.NewValue(contextCM.Data[wfContext.ConfigMapKeyVars], nil, "")
-		if err != nil {
-			return nil, nil, err
-		}
+		v := cuecontext.New().CompileString(contextCM.Data[wfContext.ConfigMapKeyVars])
 		s, err := clearContextVars(steps, v, stepName, dependency)
 		if err != nil {
 			return nil, nil, err
@@ -438,7 +418,7 @@ func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.Wo
 }
 
 // nolint:staticcheck
-func clearContextVars(steps []v1alpha1.WorkflowStep, v *value.Value, stepName string, dependency []string) (string, error) {
+func clearContextVars(steps []v1alpha1.WorkflowStep, v cue.Value, stepName string, dependency []string) (string, error) {
 	outputs := make([]string, 0)
 	for _, step := range steps {
 		if step.Name == stepName || stringsContain(dependency, step.Name) {
@@ -454,7 +434,7 @@ func clearContextVars(steps []v1alpha1.WorkflowStep, v *value.Value, stepName st
 			}
 		}
 	}
-	node := v.CueValue().Syntax(cue.ResolveReferences(true))
+	node := v.Syntax(cue.ResolveReferences(true))
 	x, ok := node.(*ast.StructLit)
 	if !ok {
 		return "", fmt.Errorf("value is not a struct lit")
