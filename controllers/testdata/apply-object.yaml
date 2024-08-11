@@ -8,16 +8,18 @@ spec:
     cue:
       template: |
         import (
-                "vela/op"
+        	"vela/kube"
         )
 
-        apply: op.#Apply & {
-                value:   parameter.value
-                cluster: parameter.cluster
+        apply: kube.#Apply & {
+        	$params: {
+        		value:   parameter.value
+        		cluster: parameter.cluster
+        	}
         }
         parameter: {
-                // +usage=Specify the value of the object
-                value: {...}
-                // +usage=Specify the cluster of the object
-                cluster: *"" | string
+        	// +usage=Specify Kubernetes native resource object to be applied
+        	value: {...}
+        	// +usage=The cluster you want to apply the resource to, default is the current control plane cluster
+        	cluster: *"" | string
         }

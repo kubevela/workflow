@@ -2374,7 +2374,7 @@ func (tr *testTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOptio
 	resetter := tr.fillContext(logCtx, options.PCtx)
 	defer resetter(options.PCtx)
 
-	basicVal, err := custom.MakeBasicValue(logCtx, providers.Compiler.Get(), nil, options.PCtx)
+	basicVal, err := custom.MakeBasicValue(logCtx, providers.DefaultCompiler.Get(), nil, options.PCtx)
 	if err != nil {
 		return v1alpha1.StepStatus{}, nil, err
 	}

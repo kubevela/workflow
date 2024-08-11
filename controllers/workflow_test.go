@@ -336,7 +336,7 @@ var _ = Describe("Test Workflow", func() {
 					Outputs: v1alpha1.StepOutputs{
 						{
 							Name:      "message",
-							ValueFrom: `"message: " +output.value.status.conditions[0].message`,
+							ValueFrom: `"message: " +output.$returns.value.status.conditions[0].message`,
 						},
 					},
 				},
@@ -416,7 +416,7 @@ var _ = Describe("Test Workflow", func() {
 					Outputs: v1alpha1.StepOutputs{
 						{
 							Name:      "message",
-							ValueFrom: `"message: " +output.value.status.conditions[0].message`,
+							ValueFrom: `"message: " +output.$returns.value.status.conditions[0].message`,
 						},
 					},
 				},

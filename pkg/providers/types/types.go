@@ -71,6 +71,42 @@ type RuntimeParams struct {
 	KubeClient      client.Client
 }
 
+type Params[T any] struct {
+	Params T `json:"$params"`
+	RuntimeParams
+}
+
+type Returns[T any] struct {
+	Returns T `json:"$returns"`
+}
+
+// GenericProviderFn is the provider function
+type GenericProviderFn[T any, U any] func(context.Context, *Params[T]) (*U, error)
+
+// Call marshal value into json and decode into underlying function input
+// parameters, then fill back the returned output value
+func (fn GenericProviderFn[T, U]) Call(ctx context.Context, value cue.Value) (cue.Value, error) {
+	type p struct {
+		Params T `json:"$params"`
+	}
+	params := new(p)
+	bs, err := value.MarshalJSON()
+	if err != nil {
+		return value, err
+	}
+	if err = json.Unmarshal(bs, params); err != nil {
+		return value, err
+	}
+	runtimeParams := RuntimeParamsFrom(ctx)
+	label, _ := value.Label()
+	runtimeParams.FieldLabel = label
+	ret, err := fn(ctx, &Params[T]{Params: params.Params, RuntimeParams: runtimeParams})
+	if err != nil {
+		return value, err
+	}
+	return value.FillPath(cue.ParsePath(""), ret), nil
+}
+
 // LegacyParams is the legacy input parameters of a provider.
 type LegacyParams[T any] struct {
 	Params T
@@ -99,6 +135,16 @@ func (fn LegacyGenericProviderFn[T, U]) Call(ctx context.Context, value cue.Valu
 		return value, err
 	}
 	return value.FillPath(cue.ParsePath(""), ret), nil
+}
+
+// NativeProviderFn is the legacy native provider function
+type NativeProviderFn func(context.Context, *Params[cue.Value]) (cue.Value, error)
+
+// Call marshal value into json and decode into underlying function input
+// parameters, then fill back the returned output value
+func (fn NativeProviderFn) Call(ctx context.Context, value cue.Value) (cue.Value, error) {
+	runtimeParams := RuntimeParamsFrom(ctx)
+	return fn(ctx, &Params[cue.Value]{Params: value, RuntimeParams: runtimeParams})
 }
 
 // LegacyNativeProviderFn is the legacy native provider function

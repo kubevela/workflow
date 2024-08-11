@@ -332,7 +332,7 @@ func TestPendingInputCheck(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.DefaultCompiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
@@ -362,7 +362,7 @@ func TestPendingDependsOnCheck(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.DefaultCompiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	run, err := gen(step, &types.TaskGeneratorOptions{})
@@ -391,7 +391,7 @@ func TestSkip(t *testing.T) {
 		Name:      "app",
 		Namespace: "default",
 	})
-	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.Compiler.Get())
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.DefaultCompiler.Get())
 	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
 	r.NoError(err)
 	runner, err := gen(step, &types.TaskGeneratorOptions{})
@@ -458,7 +458,7 @@ func TestValidateIfValue(t *testing.T) {
 
 	r := require.New(t)
 	logCtx := monitorContext.NewTraceContext(context.Background(), "test-app")
-	basicVal, err := MakeBasicValue(logCtx, providers.Compiler.Get(), &runtime.RawExtension{Raw: []byte(`{"key": "value"}`)}, pCtx)
+	basicVal, err := MakeBasicValue(logCtx, providers.DefaultCompiler.Get(), &runtime.RawExtension{Raw: []byte(`{"key": "value"}`)}, pCtx)
 	r.NoError(err)
 
 	testCases := []struct {

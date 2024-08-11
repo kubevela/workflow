@@ -7,45 +7,48 @@ spec:
   schematic:
     cue:
       template: |
-        import ( "vela/op"
+        import (
+        	"vela/kube"
+        	"vela/op"
         )
 
-        output: op.#Apply & {
-                value: {
-                        apiVersion: "apps/v1"
-                        kind:       "Deployment"
-                        metadata: {
-                                name:      context.stepName
-                                namespace: context.namespace
-                        }
-                        spec: {
-                                selector: matchLabels: wr: context.stepName
-                                template: {
-                                        metadata: labels: wr: context.stepName
-                                        spec: containers: [{
-                                                name:  context.stepName
-                                                image: parameter.image
-                                                if parameter["cmd"] != _|_ {
-                                                        command: parameter.cmd
-                                                }
-                                                if parameter["message"] != _|_ {
-                                                        env: [{
-                                                                name:  "MESSAGE"
-                                                                value: parameter.message
-                                                        }]
-                                                }
-                                        }]
-                                }
-                        }
-                }
+        output: kube.#Apply & {
+        	$params: value: {
+        		apiVersion: "apps/v1"
+        		kind:       "Deployment"
+        		metadata: {
+        			name:      context.stepName
+        			namespace: context.namespace
+        		}
+        		spec: {
+        			selector: matchLabels: wr: context.stepName
+        			template: {
+        				metadata: labels: wr: context.stepName
+        				spec: containers: [{
+        					name:  context.stepName
+        					image: parameter.image
+        					if parameter["cmd"] != _|_ {
+        						command: parameter.cmd
+        					}
+        					if parameter["message"] != _|_ {
+        						env: [{
+        							name:  "MESSAGE"
+        							value: parameter.message
+        						}]
+        					}
+        				}]
+        			}
+        		}
+        	}
         }
         wait: op.#ConditionalWait & {
-                if len(output.value.status) > 0 if output.value.status.readyReplicas == 1 {
-                        continue: true
-                }
+        	if len(output.$returns.value.status) > 0 if output.$returns.value.status.readyReplicas == 1 {
+        		continue: true
+        	}
         }
         parameter: {
-                image: string
-                cmd?: [...string]
-                message?: string
+        	image: string
+        	cmd?: [...string]
+        	message?: string
         }
+
