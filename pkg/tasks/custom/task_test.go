@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
 	"github.com/kubevela/pkg/cue/cuex"
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -653,7 +654,9 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 		},
 	}
 	singleton.KubeClient.Set(cli)
-	fakeDynamicClient := fake.NewSimpleDynamicClient(runtime.NewScheme())
+	scheme := runtime.NewScheme()
+	r.NoError(cuexv1alpha1.AddToScheme(scheme))
+	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
 	wfCtx, err := wfContext.NewContext(context.Background(), "default", "app-v1", nil)
 	r.NoError(err)

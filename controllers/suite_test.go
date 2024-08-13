@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -72,6 +73,8 @@ var _ = BeforeSuite(func() {
 
 	testScheme = scheme.Scheme
 	err = v1alpha1.AddToScheme(testScheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = cuexv1alpha1.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
