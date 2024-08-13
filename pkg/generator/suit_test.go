@@ -24,8 +24,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
@@ -60,12 +62,15 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(cfg).ToNot(BeNil())
 	Expect(clientgoscheme.AddToScheme(scheme)).Should(BeNil())
 	Expect(crdv1.AddToScheme(scheme)).Should(BeNil())
+	Expect(cuexv1alpha1.AddToScheme(scheme)).Should(BeNil())
 	// +kubebuilder:scaffold:scheme
 	By("Create the k8s client")
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
 	singleton.KubeClient.Set(k8sClient)
+	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
+	singleton.DynamicClient.Set(fakeDynamicClient)
 
 	close(done)
 }, 60)

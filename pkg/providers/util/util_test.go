@@ -31,6 +31,7 @@ import (
 	"github.com/kubevela/pkg/cue/util"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
@@ -129,7 +130,7 @@ spec: template: metadata: name: "test-patchStrategy"`,
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
-			res, err := PatchK8sObject(ctx, &providertypes.LegacyParams[cue.Value]{
+			res, err := PatchK8sObject(ctx, &providertypes.Params[cue.Value]{
 				Params: cuectx.CompileString(tc.value),
 			})
 			if tc.expectedErr != nil {
@@ -137,7 +138,7 @@ spec: template: metadata: name: "test-patchStrategy"`,
 				return
 			}
 			r.NoError(err)
-			s, err := util.ToString(res.LookupPath(cue.ParsePath("result")))
+			s, err := util.ToString(res.LookupPath(value.FieldPath("$returns", "result")))
 			r.NoError(err)
 			r.Equal(tc.patchResult, s)
 		})
@@ -165,7 +166,7 @@ func TestConvertString(t *testing.T) {
 				},
 			})
 			r.NoError(err)
-			r.Equal(tc.expected, res.String)
+			r.Equal(tc.expected, res.Returns.String)
 		})
 	}
 }

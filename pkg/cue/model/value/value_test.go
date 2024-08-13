@@ -109,45 +109,6 @@ func TestFieldPath(t *testing.T) {
 	}
 }
 
-// func TestValueFix(t *testing.T) {
-// 	testCases := []struct {
-// 		original string
-// 		expected string
-// 	}{
-// 		{
-// 			original: `
-// parameter: test: _
-// // comment
-// y: {
-// 	for k, v in parameter.test.p {
-// 		"\(k)": v
-// 	}
-// }`,
-// 			expected: `{
-// 	parameter: {
-// 		test: _
-// 	}
-// 	// comment
-// 	y: {
-// 		for k, v in *parameter.test.p | {} {
-// 			"\(k)": v
-// 		}
-// 	}
-// }`,
-// 		},
-// 	}
-// 	for i, tc := range testCases {
-// 		t.Run(fmt.Sprint(i), func(t *testing.T) {
-// 			r := require.New(t)
-// 			v, err := NewValue(tc.original, nil, "")
-// 			r.NoError(err)
-// 			b, err := format.Node(v.CueValue().Syntax(cue.Docs(true)))
-// 			r.NoError(err)
-// 			r.Equal(tc.expected, string(b))
-// 		})
-// 	}
-// }
-
 func TestSetByScript(t *testing.T) {
 	testCases := []struct {
 		name     string

@@ -141,7 +141,7 @@ func initStepGeneratorOptions(_ monitorContext.Context, instance *types.Workflow
 		options.TemplateLoader = template.NewWorkflowStepTemplateLoader()
 	}
 	if options.Compiler == nil {
-		options.Compiler = providers.Compiler.Get()
+		options.Compiler = providers.DefaultCompiler.Get()
 	}
 	return options
 }
