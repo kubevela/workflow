@@ -272,17 +272,6 @@ func TestLog(t *testing.T) {
 	}
 }
 
-// func TestInstall(t *testing.T) {
-// 	p := providers.NewProviders()
-// 	pCtx := process.NewContext(process.ContextData{})
-// 	pCtx.PushData(model.ContextStepName, "test-step")
-// 	Install(p, pCtx)
-// 	h, ok := p.GetHandler("util", "string")
-// 	r := require.New(t)
-// 	r.Equal(ok, true)
-// 	r.Equal(h != nil, true)
-// }
-
 func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	cm := corev1.ConfigMap{}
 	r := require.New(t)
