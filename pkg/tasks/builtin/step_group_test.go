@@ -10,10 +10,13 @@ import (
 	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
+	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic/fake"
 )
 
 type testEngine struct {
@@ -206,6 +209,9 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	r.NoError(err)
 	err = json.Unmarshal(testCaseJson, &cm)
 	r.NoError(err)
+
+	fakeDynamicClient := fake.NewSimpleDynamicClient(runtime.NewScheme())
+	singleton.DynamicClient.Set(fakeDynamicClient)
 
 	wfCtx := new(wfContext.WorkflowContext)
 	err = wfCtx.LoadFromConfigMap(context.Background(), cm)

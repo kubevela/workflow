@@ -24,6 +24,7 @@ import (
 	"github.com/kubevela/pkg/util/runtime"
 	"github.com/kubevela/pkg/util/singleton"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
 
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/http"
@@ -66,7 +67,7 @@ var DefaultCompiler = singleton.NewSingleton[*cuex.Compiler](func() *cuex.Compil
 	c := compiler.Get()
 	if EnableExternalPackageForDefaultCompiler {
 		if err := c.LoadExternalPackages(context.Background()); err != nil && !kerrors.IsNotFound(err) {
-			// klog.Errorf("failed to load external packages for cuex default compiler: %s", err.Error())
+			klog.Errorf("failed to load external packages for cuex default compiler: %s", err.Error())
 		}
 	}
 	if EnableExternalPackageWatchForDefaultCompiler {

@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -652,6 +653,8 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 		},
 	}
 	singleton.KubeClient.Set(cli)
+	fakeDynamicClient := fake.NewSimpleDynamicClient(runtime.NewScheme())
+	singleton.DynamicClient.Set(fakeDynamicClient)
 	wfCtx, err := wfContext.NewContext(context.Background(), "default", "app-v1", nil)
 	r.NoError(err)
 	cuectx := cuecontext.New()
