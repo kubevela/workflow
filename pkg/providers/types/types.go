@@ -71,11 +71,13 @@ type RuntimeParams struct {
 	KubeClient      client.Client
 }
 
+// Params is the input parameters of a provider.
 type Params[T any] struct {
 	Params T `json:"$params"`
 	RuntimeParams
 }
 
+// Returns is the returns of a provider.
 type Returns[T any] struct {
 	Returns T `json:"$returns"`
 }
