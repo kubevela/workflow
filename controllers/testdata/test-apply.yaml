@@ -9,7 +9,7 @@ spec:
       template: |
         import (
         	"vela/kube"
-        	"vela/op"
+        	"vela/builtin"
         )
 
         output: kube.#Apply & {
@@ -41,9 +41,9 @@ spec:
         		}
         	}
         }
-        wait: op.#ConditionalWait & {
+        wait: builtin.#ConditionalWait & {
         	if len(output.$returns.value.status) > 0 if output.$returns.value.status.readyReplicas == 1 {
-        		continue: true
+        		$params: continue: true
         	}
         }
         parameter: {

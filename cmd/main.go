@@ -55,6 +55,7 @@ import (
 	"github.com/kubevela/workflow/pkg/common"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
+	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
 	"github.com/kubevela/workflow/pkg/webhook"
@@ -122,6 +123,8 @@ func main() {
 	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
+	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")
+	flag.BoolVar(&providers.EnableExternalPackageWatchForDefaultCompiler, "enable-external-package-watch-for-default-compiler", false, "Enable external package watch for default compiler")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 	sharding.AddControllerFlags(flag.CommandLine)

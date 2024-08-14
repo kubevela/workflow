@@ -26,6 +26,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 
+	"github.com/kubevela/workflow/pkg/providers/builtin"
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/http"
 	"github.com/kubevela/workflow/pkg/providers/kube"
@@ -59,6 +60,7 @@ var compiler = singleton.NewSingletonE[*cuex.Compiler](func() (*cuex.Compiler, e
 		runtime.Must(cuexruntime.NewInternalPackage("metrics", metrics.GetTemplate(), metrics.GetProviders())),
 		runtime.Must(cuexruntime.NewInternalPackage("time", time.GetTemplate(), time.GetProviders())),
 		runtime.Must(cuexruntime.NewInternalPackage("util", util.GetTemplate(), util.GetProviders())),
+		runtime.Must(cuexruntime.NewInternalPackage("builtin", builtin.GetTemplate(), builtin.GetProviders())),
 	), nil
 })
 
