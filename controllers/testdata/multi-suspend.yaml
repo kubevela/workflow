@@ -9,7 +9,7 @@ spec:
     cue:
       template: |
         import (
-        	"vela/op"
+        	"vela/builtin"
         )
-        suspend1: op.#Suspend & {}
-        suspend2: op.#Suspend & {}
+        suspend1: builtin.#Suspend & {}
+        suspend2: builtin.#Suspend & {}

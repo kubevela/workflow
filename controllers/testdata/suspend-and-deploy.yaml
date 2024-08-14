@@ -10,10 +10,10 @@ spec:
       template: |
         import (
         	"vela/kube"
-        	"vela/op"
+        	"vela/builtin"
         )
 
-        suspend: op.#Suspend & {duration: "1s"}
+        suspend: builtin.#Suspend & {$params: duration: "1s"}
         output: kube.#Apply & {
         	$params: {
         		cluster: parameter.cluster
@@ -41,8 +41,8 @@ spec:
         		}
         	}
         }
-        wait: op.#ConditionalWait & {
-        	continue: output.$returns.value.status.readyReplicas == parameter.replicas
+        wait: builtin.#ConditionalWait & {
+        	$params: continue: output.$returns.value.status.readyReplicas == parameter.replicas
         }
         parameter: {
         	image:    string

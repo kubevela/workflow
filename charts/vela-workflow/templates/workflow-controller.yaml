@@ -142,6 +142,8 @@ spec:
             - "--feature-gates=EnableSuspendOnFailure={{- .Values.workflow.enableSuspendOnFailure | toString -}}"
             - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
             - "--group-by-label={{ .Values.workflow.groupByLabel }}"
+            - "--enable-external-package-for-default-compiler={{- .Values.workflow.enableExternalPackageForDefaultCompiler | toString -}}"
+            - "--enable-external-package-watch-for-default-compiler={{- .Values.workflow.enableExternalPackageWatchForDefaultCompiler | toString -}}"
             {{ if .Values.backup.enable }}
             - "--backup-strategy={{ .Values.backup.strategy }}"
             - "--backup-ignore-strategy={{ .Values.backup.ignoreStrategy }}"
