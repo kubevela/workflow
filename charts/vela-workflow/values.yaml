@@ -26,7 +26,7 @@ workflow:
   enablePatchStatusAtOnce: false
   enableWatchEventListener: false 
   enableExternalPackageForDefaultCompiler: true
-  enableExternalPackageWatchForDefaultCompiler: fasle
+  enableExternalPackageWatchForDefaultCompiler: false
   backoff:
     maxTime:
       waitState: 60

@@ -50,11 +50,12 @@ type VarVars struct {
 	Value  any    `json:"value"`
 }
 
-// VarReturnVars
+// VarReturnVars .
 type VarReturnVars struct {
 	Value any `json:"value"`
 }
 
+// VarReturns .
 type VarReturns = providertypes.Returns[VarReturnVars]
 
 // VarParams .
