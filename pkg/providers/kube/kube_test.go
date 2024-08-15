@@ -163,19 +163,21 @@ var _ = Describe("Test Workflow Provider Kube", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		v := cuecontext.New().CompileString(`
-value: {
-	apiVersion: "v1"
-	kind:       "Pod"
-	metadata: name: "test-app-1"
-}
-cluster: ""
-patch: {
-	metadata: name: "test-app-1"
-	spec: {
-		containers: [{
-			// +patchStrategy=retainKeys
-			image: "nginx:notfound"
-		}]
+$params: {
+	value: {
+		apiVersion: "v1"
+		kind:       "Pod"
+		metadata: name: "test-app-1"
+	}
+	cluster: ""
+	patch: {
+		metadata: name: "test-app-1"
+		spec: {
+			containers: [{
+				// +patchStrategy=retainKeys
+				image: "nginx:notfound"
+			}]
+		}
 	}
 }
 `)

@@ -131,7 +131,7 @@ spec: template: metadata: name: "test-patchStrategy"`,
 		t.Run(name, func(t *testing.T) {
 			r := require.New(t)
 			res, err := PatchK8sObject(ctx, &providertypes.Params[cue.Value]{
-				Params: cuectx.CompileString(tc.value),
+				Params: cuectx.CompileString(fmt.Sprintf("$params:{%s}", tc.value)),
 			})
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
