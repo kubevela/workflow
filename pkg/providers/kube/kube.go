@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -198,7 +199,11 @@ func ApplyInParallel(ctx context.Context, params *ApplyInParallelParams) (*Apply
 // Patch patch CR in cluster.
 func Patch(ctx context.Context, params *providertypes.Params[cue.Value]) (cue.Value, error) {
 	handlers := getHandlers(params.RuntimeParams)
-	val := params.Params.LookupPath(cue.ParsePath("value"))
+	parameter := params.Params.LookupPath(cue.ParsePath("$params"))
+	if !parameter.Exists() {
+		return cue.Value{}, fmt.Errorf("$params not found")
+	}
+	val := parameter.LookupPath(cue.ParsePath("value"))
 	obj := new(unstructured.Unstructured)
 	b, err := val.MarshalJSON()
 	if err != nil {
@@ -211,7 +216,7 @@ func Patch(ctx context.Context, params *providertypes.Params[cue.Value]) (cue.Va
 	if key.Namespace == "" {
 		key.Namespace = "default"
 	}
-	cluster, err := params.Params.LookupPath(cue.ParsePath("cluster")).String()
+	cluster, err := parameter.LookupPath(cue.ParsePath("cluster")).String()
 	if err != nil {
 		return cue.Value{}, err
 	}
@@ -220,7 +225,7 @@ func Patch(ctx context.Context, params *providertypes.Params[cue.Value]) (cue.Va
 		return cue.Value{}, err
 	}
 	baseVal := cuecontext.New().CompileString("").FillPath(cue.ParsePath(""), obj)
-	patcher := params.Params.LookupPath(cue.ParsePath("patch"))
+	patcher := parameter.LookupPath(cue.ParsePath("patch"))
 
 	base, err := model.NewBase(baseVal)
 	if err != nil {

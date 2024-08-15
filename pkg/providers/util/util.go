@@ -43,17 +43,21 @@ type PatchVars struct {
 
 // PatchK8sObject patch k8s object
 func PatchK8sObject(_ context.Context, params *providertypes.Params[cue.Value]) (cue.Value, error) {
-	base, err := model.NewBase(params.Params.LookupPath(cue.ParsePath("value")))
+	parameter := params.Params.LookupPath(cue.ParsePath("$params"))
+	if !parameter.Exists() {
+		return cue.Value{}, fmt.Errorf("$params not found")
+	}
+	base, err := model.NewBase(parameter.LookupPath(cue.ParsePath("value")))
 	if err != nil {
 		return cue.Value{}, err
 	}
-	if err = base.Unify(params.Params.LookupPath(cue.ParsePath("patch"))); err != nil {
-		return params.Params.FillPath(cue.ParsePath("err"), err.Error()), nil
+	if err = base.Unify(parameter.LookupPath(cue.ParsePath("patch"))); err != nil {
+		return params.Params.FillPath(value.FieldPath("$returns", "err"), err.Error()), nil
 	}
 
 	workload, err := base.Compile()
 	if err != nil {
-		return params.Params.FillPath(cue.ParsePath("err"), err.Error()), nil
+		return params.Params.FillPath(value.FieldPath("$returns", "err"), err.Error()), nil
 	}
 	return params.Params.FillPath(value.FieldPath("$returns", "result"), params.Params.Context().CompileBytes(workload)), nil
 }
