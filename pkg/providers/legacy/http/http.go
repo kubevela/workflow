@@ -34,6 +34,7 @@ import (
 
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
+	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 )
@@ -69,7 +70,7 @@ type RateLimiter struct {
 // TLSConfig .
 type TLSConfig struct {
 	Secret    string `json:"secret"`
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // RequestVars is the vars for http request
@@ -142,6 +143,9 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	req.Trailer = trailer
 
 	if params.Params.TLSConfig != nil {
+		if params.Params.TLSConfig.Namespace == "" {
+			params.Params.TLSConfig.Namespace = fmt.Sprint(params.ProcessContext.GetData(model.ContextNamespace))
+		}
 		if tr, err := getTransport(ctx, params.KubeClient, params.Params.TLSConfig.Secret, params.Params.TLSConfig.Namespace); err == nil && tr != nil {
 			defaultClient.Transport = tr
 		}

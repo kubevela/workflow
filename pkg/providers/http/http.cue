@@ -29,7 +29,7 @@
 		// +usgae=The tls config of the request
 		tls_config?: {
 			secret:    string
-			namespace: context.namespace
+			namespace?: string
 		}
 	}
 
