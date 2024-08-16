@@ -28,7 +28,7 @@
 	// +usgae=The tls config of the request
 	tls_config?: {
 		secret:    string
-		namespace: context.namespace
+		namespace?: string
 	}
 	// +usage=The response of the request will be filled in this field after the action is executed
 	response: {
