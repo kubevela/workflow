@@ -437,7 +437,7 @@ func (exec *executor) Terminate(message string) {
 // Wait let workflow wait.
 func (exec *executor) Wait(message string) {
 	exec.wait = true
-	if exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseFailed {
+	if exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseFailed && exec.wfStatus.Phase != v1alpha1.WorkflowStepPhaseSuspending {
 		exec.wfStatus.Phase = v1alpha1.WorkflowStepPhaseRunning
 		exec.wfStatus.Reason = types.StatusReasonWait
 		if message != "" {

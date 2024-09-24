@@ -51,7 +51,7 @@ goimports:
 ifeq (, $(shell which goimports))
 	@{ \
 	set -e ;\
-	go install golang.org/x/tools/cmd/goimports@latest ;\
+	go install golang.org/x/tools/cmd/goimports@v0.1.12 ;\
 	}
 GOIMPORTS=$(GOBIN)/goimports
 else
@@ -99,4 +99,4 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230216140739-c98506dc3b8e
