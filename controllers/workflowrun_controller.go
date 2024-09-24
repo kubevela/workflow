@@ -36,7 +36,6 @@ import (
 	ctrlHandler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	triggerv1alpha1 "github.com/kubevela/kube-trigger/api/v1alpha1"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -203,9 +202,7 @@ func (r *WorkflowRunReconciler) matchControllerRequirement(wr *v1alpha1.Workflow
 func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	builder := ctrl.NewControllerManagedBy(mgr)
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnableWatchEventListener) {
-		builder = builder.Watches(&source.Kind{
-			Type: &triggerv1alpha1.EventListener{},
-		}, ctrlHandler.EnqueueRequestsFromMapFunc(findObjectForEventListener))
+		builder = builder.Watches(&triggerv1alpha1.EventListener{}, ctrlHandler.EnqueueRequestsFromMapFunc(findObjectForEventListener))
 	}
 	return builder.
 		WithOptions(controller.Options{
@@ -296,7 +293,7 @@ func timeReconcile(wr *v1alpha1.WorkflowRun) func() {
 	}
 }
 
-func findObjectForEventListener(object client.Object) []reconcile.Request {
+func findObjectForEventListener(_ context.Context, object client.Object) []reconcile.Request {
 	return []reconcile.Request{{
 		NamespacedName: k8stypes.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()},
 	}}

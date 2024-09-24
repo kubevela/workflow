@@ -35,19 +35,19 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `concurrentReconciles`                       | concurrentReconciles is the concurrent reconcile number of the controller                                             | `4`     |
 | `ignoreWorkflowWithoutControllerRequirement` | will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation | `false` |
 
-
 ### KubeVela workflow parameters
 
-| Name                                   | Description                                                                                                                                                                            | Value                   |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `workflow.enableSuspendOnFailure`      | Enable the capability of suspend an failed workflow automatically                                                                                                                      | `false`                 |
-| `workflow.enablePatchStatusAtOnce`     | Enable the capability of patch status at once                                                                                                                                          | `false`                 |
-| `workflow.enableWatchEventListener`    | Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature | `false`                 |
-| `workflow.backoff.maxTime.waitState`   | The max backoff time of workflow in a wait condition                                                                                                                                   | `60`                    |
-| `workflow.backoff.maxTime.failedState` | The max backoff time of workflow in a failed condition                                                                                                                                 | `300`                   |
-| `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step                                                                                                                                          | `10`                    |
-| `workflow.groupByLabel`                | The label used to group workflow record                                                                                                                                                | `pipeline.oam.dev/name` |
-
+| Name                                                    | Description                                                                                                                                                                            | Value                   |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `workflow.enableSuspendOnFailure`                       | Enable the capability of suspend an failed workflow automatically                                                                                                                      | `false`                 |
+| `workflow.enablePatchStatusAtOnce`                      | Enable the capability of patch status at once                                                                                                                                          | `false`                 |
+| `workflow.enableWatchEventListener`                     | Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature | `false`                 |
+| `workflow.enableExternalPackageForDefaultCompiler`      | Enable external package for default compiler                                                                                                                                           | `true`                  |
+| `workflow.enableExternalPackageWatchForDefaultCompiler` | Enable external package watch for default compiler                                                                                                                                     | `false`                 |
+| `workflow.backoff.maxTime.waitState`                    | The max backoff time of workflow in a wait condition                                                                                                                                   | `60`                    |
+| `workflow.backoff.maxTime.failedState`                  | The max backoff time of workflow in a failed condition                                                                                                                                 | `300`                   |
+| `workflow.step.errorRetryTimes`                         | The max retry times of a failed workflow step                                                                                                                                          | `10`                    |
+| `workflow.groupByLabel`                                 | The label used to group workflow record                                                                                                                                                | `pipeline.oam.dev/name` |
 
 ### KubeVela workflow backup parameters
 
@@ -60,7 +60,6 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `backup.persistType`           | The persist type for workflow record           | `""`                       |
 | `backup.configSecretName`      | The secret name of backup config               | `backup-config`            |
 | `backup.configSecretNamespace` | The secret name of backup config namespace     | `vela-system`              |
-
 
 ### KubeVela Workflow controller parameters
 
@@ -78,7 +77,6 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `webhookService.type`       | KubeVela webhook service type        | `ClusterIP`            |
 | `webhookService.port`       | KubeVela webhook service port        | `9443`                 |
 | `healthCheck.port`          | KubeVela health check port           | `9440`                 |
-
 
 ### Common parameters
 

@@ -115,7 +115,7 @@ func (r *recycleCronJob) run(ctx context.Context) error {
 				if err := r.cli.Delete(ctx, &item); err != nil {
 					klog.Errorf("Failed to delete workflowRun %s/%s, error: %v", item.Namespace, item.Name, err)
 				}
-				klog.Info("Successfully recycled completed workflowRun %s/%s", item.Namespace, item.Name)
+				klog.Infof("Successfully recycled completed workflowRun %s/%s", item.Namespace, item.Name)
 			}
 		}
 	}

@@ -86,8 +86,7 @@ var _ = BeforeSuite(func(done Done) {
 
 	handler = &ValidatingHandler{}
 
-	decoder, err = admission.NewDecoder(testScheme)
-	Expect(err).Should(BeNil())
+	decoder = admission.NewDecoder(testScheme)
 	Expect(decoder).ToNot(BeNil())
 
 	ctx := context.Background()

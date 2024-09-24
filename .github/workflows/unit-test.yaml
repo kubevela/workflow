@@ -15,7 +15,7 @@ env:
   # Common versions
   GO_VERSION: '1.22'
   GOLANGCI_VERSION: 'v1.59'
-  KIND_VERSION: 'v0.7.0'
+  KIND_VERSION: 'v0.23.0'
 
 jobs:
 
@@ -64,9 +64,9 @@ jobs:
       - name: install Kubebuilder
         uses: RyanSiu1995/kubebuilder-action@v1.2
         with:
-          version: 3.1.0
+          version: 3.15.1
           kubebuilderOnly: false
-          kubernetesVersion: v1.28.0
+          kubernetesVersion: v1.29.0
 
       - name: Run Make test
         run: make test

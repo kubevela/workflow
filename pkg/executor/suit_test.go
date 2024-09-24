@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -54,7 +54,7 @@ var _ = BeforeSuite(func(done Done) {
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
 		ControlPlaneStopTimeout:  time.Minute,
-		UseExistingCluster:       pointer.BoolPtr(false),
+		UseExistingCluster:       ptr.To(false),
 	}
 	var err error
 	cfg, err = testEnv.Start()
