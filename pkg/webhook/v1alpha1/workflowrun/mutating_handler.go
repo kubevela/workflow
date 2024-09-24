@@ -64,8 +64,7 @@ func (h *MutatingHandler) Handle(ctx context.Context, req admission.Request) adm
 // RegisterMutatingHandler will register workflow mutation handler to the webhook
 func RegisterMutatingHandler(mgr manager.Manager) {
 	server := mgr.GetWebhookServer()
-	handler := &MutatingHandler{
+	server.Register("/mutating-core-oam-dev-v1alpha1-workflowruns", &webhook.Admission{Handler: &MutatingHandler{
 		Decoder: admission.NewDecoder(mgr.GetScheme()),
-	}
-	server.Register("/mutating-core-oam-dev-v1alpha1-workflowruns", &webhook.Admission{Handler: handler})
+	}})
 }
