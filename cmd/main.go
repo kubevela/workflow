@@ -96,7 +96,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", "configmapsleases", "The resource lock to use for leader election")
+	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", "leases", "The resource lock to use for leader election")
 	flag.DurationVar(&leaseDuration, "leader-election-lease-duration", 15*time.Second,
 		"The duration that non-leader candidates will wait to force acquire leadership")
 	flag.DurationVar(&renewDeadline, "leader-election-renew-deadline", 10*time.Second,
