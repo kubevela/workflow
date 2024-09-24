@@ -22,7 +22,7 @@ import (
 	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -119,7 +119,7 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 					Kind:       v1alpha1.WorkflowRunKind,
 					Name:       run.Name,
 					UID:        run.UID,
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},

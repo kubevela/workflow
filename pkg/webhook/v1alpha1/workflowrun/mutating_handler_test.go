@@ -31,8 +31,9 @@ var _ = Describe("Test WorkflowRun Mutator", func() {
 	var mutatingHandler *MutatingHandler
 
 	BeforeEach(func() {
-		mutatingHandler = &MutatingHandler{}
-		Expect(mutatingHandler.InjectDecoder(decoder)).Should(BeNil())
+		mutatingHandler = &MutatingHandler{
+			Decoder: decoder,
+		}
 	})
 
 	It("Test WorkflowRun Mutator [bad request]", func() {

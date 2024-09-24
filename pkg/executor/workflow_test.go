@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -2193,7 +2193,7 @@ func makeTestCase(steps []v1alpha1.WorkflowStep) (*types.WorkflowInstance, []typ
 					Kind:       v1alpha1.WorkflowRunKind,
 					Name:       "app",
 					UID:        "test-uid",
-					Controller: pointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 			Name:      "app",
