@@ -115,12 +115,6 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		}
 		return v1alpha1.WorkflowStateFailed, nil
 	}
-	if checkWorkflowSuspended(status) {
-		return v1alpha1.WorkflowStateSuspending, nil
-	}
-	if allRunnersSucceeded {
-		return v1alpha1.WorkflowStateSucceeded, nil
-	}
 
 	wfCtx, err := w.makeContext(ctx, w.instance.Name)
 	if err != nil {
@@ -128,6 +122,13 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return v1alpha1.WorkflowStateExecuting, err
 	}
 	w.wfCtx = wfCtx
+
+	if checkWorkflowSuspended(status) {
+		return v1alpha1.WorkflowStateSuspending, nil
+	}
+	if allRunnersSucceeded {
+		return v1alpha1.WorkflowStateSucceeded, nil
+	}
 
 	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
 		// handle cache resource
@@ -175,11 +176,11 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 	// if workflow is suspended and the suspended step is still running, return false to run the suspended step
 	if status.Suspend {
 		for _, step := range status.Steps {
-			if step.Phase == v1alpha1.WorkflowStepPhaseSuspending {
+			if step.Reason == types.StatusReasonSuspend && step.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 				return false
 			}
 			for _, sub := range step.SubStepsStatus {
-				if sub.Phase == v1alpha1.WorkflowStepPhaseSuspending {
+				if sub.Reason == types.StatusReasonSuspend && sub.Phase == v1alpha1.WorkflowStepPhaseSuspending {
 					return false
 				}
 			}
