@@ -1772,10 +1772,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			}, {
 				StepStatus: v1alpha1.StepStatus{
-					Name:  "s2",
-					ID:    "s2",
-					Type:  "suspend",
-					Phase: v1alpha1.WorkflowStepPhaseSuspending,
+					Name:   "s2",
+					ID:     "s2",
+					Type:   "suspend",
+					Reason: types.StatusReasonSuspend,
+					Phase:  v1alpha1.WorkflowStepPhaseSuspending,
 				},
 			}},
 		})).Should(BeEquivalentTo(""))
@@ -1805,10 +1806,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			}, {
 				StepStatus: v1alpha1.StepStatus{
-					Name:  "s2",
-					ID:    "s2",
-					Type:  "suspend",
-					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+					Name:   "s2",
+					ID:     "s2",
+					Type:   "suspend",
+					Reason: types.StatusReasonSuspend,
+					Phase:  v1alpha1.WorkflowStepPhaseSucceeded,
 				},
 			}, {
 				StepStatus: v1alpha1.StepStatus{
@@ -1884,10 +1886,11 @@ var _ = Describe("Test Workflow", func() {
 						Type:  "success",
 						Phase: v1alpha1.WorkflowStepPhaseSucceeded,
 					}, {
-						Name:  "s2-sub2",
-						ID:    "s2-sub2",
-						Type:  "suspend",
-						Phase: v1alpha1.WorkflowStepPhaseSuspending,
+						Name:   "s2-sub2",
+						ID:     "s2-sub2",
+						Type:   "suspend",
+						Reason: types.StatusReasonSuspend,
+						Phase:  v1alpha1.WorkflowStepPhaseSuspending,
 					},
 				},
 			}},
@@ -2234,10 +2237,11 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 				}
 			}
 			return v1alpha1.StepStatus{
-					Name:  step.Name,
-					Type:  "suspend",
-					ID:    step.Name,
-					Phase: v1alpha1.WorkflowStepPhaseSuspending,
+					Name:   step.Name,
+					Type:   "suspend",
+					ID:     step.Name,
+					Phase:  v1alpha1.WorkflowStepPhaseSuspending,
+					Reason: types.StatusReasonSuspend,
 				}, &types.Operation{
 					Suspend: true,
 				}, nil
