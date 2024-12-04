@@ -40,10 +40,12 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	crtlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	triggerv1alpha1 "github.com/kubevela/kube-trigger/api/v1alpha1"
 	velaclient "github.com/kubevela/pkg/controller/client"
@@ -94,7 +96,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", "configmapsleases", "The resource lock to use for leader election")
+	flag.StringVar(&leaderElectionResourceLock, "leader-election-resource-lock", "leases", "The resource lock to use for leader election")
 	flag.DurationVar(&leaseDuration, "leader-election-lease-duration", 15*time.Second,
 		"The duration that non-leader candidates will wait to force acquire leadership")
 	flag.DurationVar(&renewDeadline, "leader-election-renew-deadline", 10*time.Second,
@@ -177,7 +179,7 @@ func main() {
 		_ = flag.Set("log_file_max_size", strconv.FormatUint(logFileMaxSize, 10))
 	}
 
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(textlogger.NewLogger(textlogger.NewConfig()))
 
 	klog.InfoS("KubeVela Workflow information", "version", version.VelaVersion, "revision", version.GitRevision)
 
@@ -197,9 +199,14 @@ func main() {
 	leaderElectionID := fmt.Sprintf("workflow-%s", strings.ToLower(strings.ReplaceAll(version.VelaVersion, ".", "-")))
 	leaderElectionID += sharding.GetShardIDSuffix()
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
-		Scheme:                     scheme,
-		MetricsBindAddress:         metricsAddr,
-		Port:                       webhookPort,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: crtlwebhook.NewServer(crtlwebhook.Options{
+			CertDir: certDir,
+			Port:    webhookPort,
+		}),
 		HealthProbeBindAddress:     probeAddr,
 		LeaderElection:             enableLeaderElection,
 		LeaderElectionID:           leaderElectionID,
@@ -208,8 +215,7 @@ func main() {
 		RenewDeadline:              &renewDeadline,
 		RetryPeriod:                &retryPeriod,
 		NewClient:                  velaclient.DefaultNewControllerClient,
-		NewCache:                   sharding.BuildCache(scheme, &v1alpha1.WorkflowRun{}),
-		CertDir:                    certDir,
+		NewCache:                   sharding.BuildCache(&v1alpha1.WorkflowRun{}),
 	})
 	if err != nil {
 		klog.Error(err, "unable to start manager")

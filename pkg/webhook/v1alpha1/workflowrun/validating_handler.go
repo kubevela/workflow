@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -42,28 +41,6 @@ type ValidatingHandler struct {
 	Client client.Client
 	// Decoder decodes objects
 	Decoder *admission.Decoder
-}
-
-var _ inject.Client = &ValidatingHandler{}
-
-// InjectClient injects the client into the ApplicationValidateHandler
-func (h *ValidatingHandler) InjectClient(c client.Client) error {
-	if h.Client != nil {
-		return nil
-	}
-	h.Client = c
-	return nil
-}
-
-var _ admission.DecoderInjector = &ValidatingHandler{}
-
-// InjectDecoder injects the decoder into the ApplicationValidateHandler
-func (h *ValidatingHandler) InjectDecoder(d *admission.Decoder) error {
-	if h.Decoder != nil {
-		return nil
-	}
-	h.Decoder = d
-	return nil
 }
 
 func mergeErrors(errs field.ErrorList) error {
@@ -103,5 +80,8 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) a
 // RegisterValidatingHandler will register application validate handler to the webhook
 func RegisterValidatingHandler(mgr manager.Manager, _ controllers.Args) {
 	server := mgr.GetWebhookServer()
-	server.Register("/validating-core-oam-dev-v1alpha1-workflowruns", &webhook.Admission{Handler: &ValidatingHandler{}})
+	server.Register("/validating-core-oam-dev-v1alpha1-workflowruns", &webhook.Admission{Handler: &ValidatingHandler{
+		Client:  mgr.GetClient(),
+		Decoder: admission.NewDecoder(mgr.GetScheme()),
+	}})
 }
