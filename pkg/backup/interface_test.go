@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewPersister(t *testing.T) {
-	cli := fake.NewFakeClientWithScheme(scheme.Scheme)
+	cli := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	ctx := context.Background()
 	testCases := map[string]struct {
 		persistType string

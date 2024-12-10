@@ -27,8 +27,8 @@ import (
 
 var _ = Describe("Test WorkflowRun Validator", func() {
 	BeforeEach(func() {
-		Expect(handler.InjectClient(k8sClient)).Should(BeNil())
-		Expect(handler.InjectDecoder(decoder)).Should(BeNil())
+		handler.Client = k8sClient
+		handler.Decoder = decoder
 	})
 
 	It("Test WorkflowRun Validator [bad request]", func() {

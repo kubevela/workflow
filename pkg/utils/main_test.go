@@ -34,7 +34,7 @@ var (
 func TestMain(m *testing.M) {
 	sc := scheme.Scheme
 	_ = v1alpha1.AddToScheme(sc)
-	cli = fake.NewFakeClientWithScheme(sc)
+	cli = fake.NewClientBuilder().WithScheme(sc).WithStatusSubresource(&v1alpha1.WorkflowRun{}).Build()
 	singleton.KubeClient.Set(cli)
 	m.Run()
 }
