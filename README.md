@@ -88,7 +88,7 @@ spec:
 
 ## Quick Start
 
-After installation, you can either run a WorkflowRun directly or from a Workflow Template. Every step in the workflow should have a type and some parameters, in which defines how this step works. You can use the [built-in step type definitions](./examples/built-in-workflow-def.md) or [write your own custom step types](#how-to-write-custom-steps).
+After installation, you can either run a WorkflowRun directly or from a Workflow Template. Every step in the workflow should have a type and some parameters, in which defines how this step works. You can use the [built-in step type definitions](https://kubevela.io/docs/next/end-user/workflow/built-in-workflow-defs) or [write your own custom step types](#how-to-write-custom-steps).
 
 > Please checkout the [WorkflowRun Specification](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#workflowrun) and [WorkflowRun Status](https://kubevela.io/docs/next/end-user/pipeline/workflowrun#status) for more details.
 
