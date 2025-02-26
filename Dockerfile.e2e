@@ -1,8 +1,6 @@
 ARG BASE_IMAGE
 # Build the manager binary
 FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.22-alpine as builder
-ARG GOPROXY
-ENV GOPROXY=${GOPROXY:-https://goproxy.cn}
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
