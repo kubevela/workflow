@@ -114,6 +114,53 @@ func TestOutput(t *testing.T) {
 	r.NoError(err)
 	r.Equal(int(resultInt), 99)
 	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
+
+	taskValue = cuectx.CompileString(`output: $returns: score: 99`)
+	stepStatus = make(map[string]v1alpha1.StepStatus)
+	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
+		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			Properties: &runtime.RawExtension{
+				Raw: []byte("{\"name\":\"mystep\"}"),
+			},
+			Outputs: v1alpha1.StepOutputs{{
+				ValueFrom: "output.$returns.score",
+				Name:      "myscore2",
+			}},
+		},
+	}, v1alpha1.StepStatus{
+		Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+	}, stepStatus)
+	r.NoError(err)
+	result, err = wfCtx.GetVar("myscore2")
+	r.NoError(err)
+	resultInt, err = result.Int64()
+	r.NoError(err)
+	r.Equal(int(resultInt), 99)
+	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
+
+
+	taskValue = cuectx.CompileString(`output: $returns: score: 99`)
+	stepStatus = make(map[string]v1alpha1.StepStatus)
+	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
+		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			Properties: &runtime.RawExtension{
+				Raw: []byte("{\"name\":\"mystep\"}"),
+			},
+			Outputs: v1alpha1.StepOutputs{{
+				ValueFrom: "output.score",
+				Name:      "myscore3",
+			}},
+		},
+	}, v1alpha1.StepStatus{
+		Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+	}, stepStatus)
+	r.NoError(err)
+	result, err = wfCtx.GetVar("myscore3")
+	r.NoError(err)
+	resultInt, err = result.Int64()
+	r.NoError(err)
+	r.Equal(int(resultInt), 99)
+	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
 }
 
 func mockContext(t *testing.T) wfContext.Context {
