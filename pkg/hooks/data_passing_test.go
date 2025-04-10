@@ -138,7 +138,6 @@ func TestOutput(t *testing.T) {
 	r.Equal(int(resultInt), 99)
 	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
 
-
 	taskValue = cuectx.CompileString(`output: $returns: score: 99`)
 	stepStatus = make(map[string]v1alpha1.StepStatus)
 	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{

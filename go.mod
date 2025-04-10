@@ -16,7 +16,7 @@ require (
 	github.com/kubevela/kube-trigger v0.1.1-0.20230403060228-6582e7595db6
 	github.com/kubevela/pkg v1.9.3-0.20241203070234-2cf98778c0a9
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.30.0
+	github.com/onsi/gomega v1.31.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/common v0.45.0
@@ -26,9 +26,9 @@ require (
 	golang.org/x/time v0.5.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	k8s.io/api v0.29.2
+	k8s.io/api v0.30.2
 	k8s.io/apiextensions-apiserver v0.29.2
-	k8s.io/apimachinery v0.29.2
+	k8s.io/apimachinery v0.30.2
 	k8s.io/apiserver v0.29.2
 	k8s.io/client-go v0.29.2
 	k8s.io/component-base v0.29.2
@@ -68,7 +68,7 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/cel-go v0.17.7 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -122,7 +122,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	google.golang.org/grpc v1.61.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
