@@ -71,6 +71,13 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowSt
 				} else {
 					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns", output.ValueFrom))
 				}
+			} else if v.Err() != nil && !strings.Contains(output.ValueFrom, "$returns.") {
+				parts := strings.Split(output.ValueFrom, "output.")
+				if len(parts) > 1 {
+					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%soutput.$returns.%s", parts[0], strings.Join(parts[1:], ".")))
+				} else {
+					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns", output.ValueFrom))
+				}
 			}
 			// if the error is not nil and the step is not skipped, return the error
 			if err != nil && status.Phase != v1alpha1.WorkflowStepPhaseSkipped {
