@@ -64,10 +64,15 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowSt
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)
 		for _, output := range step.Outputs {
 			v, err := value.LookupValueByScript(taskValue, output.ValueFrom)
-			if err != nil && strings.Contains(err.Error(), "not exist") && !strings.Contains(output.ValueFrom, "$returns.") {
-				parts := strings.Split(output.ValueFrom, ".")
+			if (err != nil && strings.Contains(err.Error(), "not exist") || v.Err() != nil) && !strings.Contains(output.ValueFrom, "$returns.") {
+				parts := strings.Split(output.ValueFrom, "output.")
 				if len(parts) > 1 {
-					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns.%s", parts[0], strings.Join(parts[1:], ".")))
+					if parts[0] == "" {
+						v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("output.$returns.%s", strings.Join(parts[1:], ".")))
+					} else {
+						v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%soutput.$returns.%s", parts[0], strings.Join(parts[1:], ".")))
+					}
+
 				} else {
 					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns", output.ValueFrom))
 				}

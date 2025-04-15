@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kubevela/pkg/cue/util"
 	"github.com/kubevela/pkg/util/rand"
 	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
@@ -160,7 +159,7 @@ func (wf *WorkflowContext) Commit(ctx context.Context) error {
 }
 
 func (wf *WorkflowContext) writeToStore() error {
-	varStr, err := util.ToString(wf.vars)
+	varStr, err := sets.ToString(wf.vars)
 	if err != nil {
 		return err
 	}
