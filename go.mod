@@ -1,8 +1,6 @@
 module github.com/kubevela/workflow
 
-go 1.22.0
-
-toolchain go1.22.5
+go 1.23.8
 
 require (
 	cuelang.org/go v0.9.2

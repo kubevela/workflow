@@ -48,7 +48,7 @@ func mergeErrors(errs field.ErrorList) error {
 	for _, err := range errs {
 		s += fmt.Sprintf("field \"%s\": %s error encountered, %s. ", err.Field, err.Type, err.Detail)
 	}
-	return fmt.Errorf(s)
+	return fmt.Errorf("%s", s)
 }
 
 // Handle validate Application Spec here

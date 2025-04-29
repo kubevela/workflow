@@ -13,8 +13,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.22'
-  GOLANGCI_VERSION: 'v1.59'
+  GO_VERSION: '1.23.8'
+  GOLANGCI_VERSION: 'v1.60.1'
   KIND_VERSION: 'v0.23.0'
 
 jobs:
