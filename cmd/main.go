@@ -166,7 +166,7 @@ func main() {
 				}
 			}()
 
-			if err := pprofServer.ListenAndServe(); !errors.Is(http.ErrServerClosed, err) {
+			if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 				klog.Error(err, "Failed to start debug HTTP server")
 				panic(err)
 			}

@@ -168,7 +168,7 @@ func getQueryResult(ctx context.Context, vars PromVars) (string, error) {
 		valueStr = v.Value.String()
 	case prommodel.Vector:
 		if len(v) != 1 {
-			return "", fmt.Errorf(fmt.Sprintf("ehe query is returning %d results when it should only return one. Please review the query to identify and fix the issue", len(v)))
+			return "", fmt.Errorf("the query is returning %d results when it should only return one. Please review the query to identify and fix the issue", len(v))
 		}
 		valueStr = v[0].Value.String()
 	default:

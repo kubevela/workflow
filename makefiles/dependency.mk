@@ -39,7 +39,7 @@ ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
 	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@2023.1.7 ;\
+	go install honnef.co/go/tools/cmd/staticcheck@v0.5.1 ;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
@@ -58,7 +58,7 @@ else
 GOIMPORTS=$(shell which goimports)
 endif
 
-GOLANGCILINT_VERSION ?= v1.59.0
+GOLANGCILINT_VERSION ?= v1.60.0
 
 .PHONY: golangci
 golangci:

@@ -13,14 +13,14 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.22'
-  GOLANGCI_VERSION: 'v1.59'
+  GO_VERSION: '1.23.8'
+  GOLANGCI_VERSION: 'v1.60.1'
   KIND_VERSION: 'v0.23.0'
 
 jobs:
 
   detect-noop:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       noop: ${{ steps.noop.outputs.should_skip }}
     steps:
@@ -34,7 +34,7 @@ jobs:
           concurrent_skipping: false
 
   unit-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 

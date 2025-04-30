@@ -13,13 +13,13 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.22'
-  GOLANGCI_VERSION: 'v1.59'
+  GO_VERSION: '1.23.8'
+  GOLANGCI_VERSION: 'v1.60.1'
 
 jobs:
 
   detect-noop:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       noop: ${{ steps.noop.outputs.should_skip }}
     steps:
@@ -33,7 +33,7 @@ jobs:
           concurrent_skipping: false
 
   staticcheck:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
@@ -56,13 +56,13 @@ jobs:
           restore-keys: ${{ runner.os }}-pkg-
 
       - name: Install StaticCheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@2023.1.7
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
 
       - name: Static Check
         run: staticcheck ./...
 
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
