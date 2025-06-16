@@ -34,18 +34,15 @@
 	}
 
 	$returns?: {
-		// +usage=The response of the request will be filled in this field after the action is executed
-		response: {
-			// +usage=The body of the response
-			body: string
-			// +usage=The header of the response
-			header?: [string]: [...string]
-			// +usage=The trailer of the response
-			trailer?: [string]: [...string]
-			// +usage=The status code of the response
-			statusCode: int
-			...
-		}
+		// +usage=The body of the response
+		body: string
+		// +usage=The header of the response
+		header?: [string]: [...string]
+		// +usage=The trailer of the response
+		trailer?: [string]: [...string]
+		// +usage=The status code of the response
+		statusCode: int
+		...
 	}
 	...
 }
