@@ -192,7 +192,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				}
 				for _, hook := range options.PostStopHooks {
 					if err := hook(wfCtx, taskv, wfStep, exec.status(), options.StepStatus); err != nil {
-						exec.wfStatus.Message = err.Error()
+						exec.err(wfCtx, false, errors.Wrapf(err, "post-stop hook failed for step '%s': %v", wfStep.Name, err), types.StatusReasonOutput)
 						stepStatus = exec.status()
 						operations = exec.operation()
 						return
