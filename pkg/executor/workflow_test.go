@@ -895,7 +895,7 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test for failed after retries with suspend", func() {
 		By("Test failed-after-retries in StepByStep mode with suspend")
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -1469,7 +1469,7 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Test failed after retries with sub steps", func() {
 		By("Test failed-after-retries with step group in StepByStep mode")
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{

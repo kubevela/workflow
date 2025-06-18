@@ -591,7 +591,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test failed after retries in step mode with suspend on failure", func() {
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
@@ -654,8 +654,8 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test reconcile with patch status at once", func() {
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
@@ -718,7 +718,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test failed after retries in dag mode with running step and suspend on failure", func() {
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{

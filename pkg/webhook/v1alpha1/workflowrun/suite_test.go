@@ -86,8 +86,8 @@ var _ = BeforeSuite(func(done Done) {
 
 	handler = &ValidatingHandler{}
 
-	decoder = admission.NewDecoder(testScheme)
-	Expect(decoder).ToNot(BeNil())
+	*decoder = admission.NewDecoder(testScheme)
+	Expect(&decoder).ToNot(BeNil())
 
 	ctx := context.Background()
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}
