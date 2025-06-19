@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,8 +86,8 @@ var _ = BeforeSuite(func(done Done) {
 
 	handler = &ValidatingHandler{}
 
-	decoder = admission.NewDecoder(testScheme)
-	Expect(decoder).ToNot(BeNil())
+	*decoder = admission.NewDecoder(testScheme)
+	Expect(&decoder).ToNot(BeNil())
 
 	ctx := context.Background()
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}

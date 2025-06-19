@@ -17,7 +17,7 @@ limitations under the License.
 package workflowrun
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,7 @@ import (
 var _ = Describe("Test WorkflowRun Validator", func() {
 	BeforeEach(func() {
 		handler.Client = k8sClient
-		handler.Decoder = decoder
+		handler.Decoder = *decoder
 	})
 
 	It("Test WorkflowRun Validator [bad request]", func() {
