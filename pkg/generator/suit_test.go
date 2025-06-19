@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kubevela/pkg/util/singleton"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
