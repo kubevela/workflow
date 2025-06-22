@@ -46,7 +46,7 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var testScheme = runtime.NewScheme()
-var decoder *admission.Decoder
+var decoder admission.Decoder
 var ctx = context.Background()
 var handler *ValidatingHandler
 
@@ -86,8 +86,8 @@ var _ = BeforeSuite(func() {
 
 	handler = &ValidatingHandler{}
 
-	*decoder = admission.NewDecoder(testScheme)
-	Expect(&decoder).ToNot(BeNil())
+	decoder = admission.NewDecoder(testScheme)
+	Expect(decoder).ToNot(BeNil())
 
 	ctx := context.Background()
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}

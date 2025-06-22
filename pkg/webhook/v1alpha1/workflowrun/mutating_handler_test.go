@@ -32,7 +32,7 @@ var _ = Describe("Test WorkflowRun Mutator", func() {
 
 	BeforeEach(func() {
 		mutatingHandler = &MutatingHandler{
-			Decoder: *decoder,
+			Decoder: decoder,
 		}
 	})
 
