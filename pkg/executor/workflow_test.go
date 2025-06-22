@@ -19,8 +19,11 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/kubevela/workflow/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"math"
-	"testing"
 	"time"
 
 	"cuelang.org/go/cue/cuecontext"
@@ -33,8 +36,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
@@ -42,7 +43,6 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
-	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
@@ -895,7 +895,8 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test for failed after retries with suspend", func() {
 		By("Test failed-after-retries in StepByStep mode with suspend")
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		cleanup := setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		defer cleanup()
 		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -1469,7 +1470,8 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Test failed after retries with sub steps", func() {
 		By("Test failed-after-retries with step group in StepByStep mode")
-		defer featuregatetesting.SetFeatureGateDuringTest(&testing.T{}, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		cleanup := setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		defer cleanup()
 		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
 			{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
@@ -2437,6 +2439,30 @@ func cleanStepTimeStamp(wfStatus *v1alpha1.WorkflowRunStatus) {
 				wfStatus.Steps[index].SubStepsStatus[indexSubStep].FirstExecuteTime = metav1.Time{}
 				wfStatus.Steps[index].SubStepsStatus[indexSubStep].LastExecuteTime = metav1.Time{}
 			}
+		}
+	}
+}
+
+func setFeatureGateForTest(gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
+	// The Kubernetes feature gate interface requires a MutableVersionedFeatureGate for setting/resetting.
+	mutableGate, ok := gate.(featuregate.MutableVersionedFeatureGate)
+	Expect(ok).To(BeTrue(), "The provided feature gate must be a MutableVersionedFeatureGate to be modified in tests")
+
+	originalValue := mutableGate.Enabled(f)
+	originalExplicitlySet := mutableGate.ExplicitlySet(f)
+
+	// Set the desired value for the test.
+	err := mutableGate.Set(fmt.Sprintf("%s=%v", f, value))
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to set feature gate %q to %v: %v", f, value, err))
+
+	// Return a cleanup function to restore the original state.
+	return func() {
+		if originalExplicitlySet {
+			err := mutableGate.Set(fmt.Sprintf("%s=%v", f, originalValue))
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to restore feature gate %q to original value %v: %v", f, originalValue, err))
+		} else {
+			err := mutableGate.ResetFeatureValueToDefault(f)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to reset feature gate %q to default: %v", f, err))
 		}
 	}
 }
