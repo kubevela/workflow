@@ -49,7 +49,7 @@ func TestSteps(t *testing.T) {
 	RunSpecs(t, "Test Definition Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	By("Bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
@@ -72,8 +72,7 @@ var _ = BeforeSuite(func(done Done) {
 	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
 
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	By("Tearing down the test environment")

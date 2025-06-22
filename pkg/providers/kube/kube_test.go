@@ -57,7 +57,7 @@ func TestProvider(t *testing.T) {
 	RunSpecs(t, "Test Definition Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	By("Bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
@@ -75,8 +75,7 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
-	close(done)
-}, 120)
+})
 
 var _ = AfterSuite(func() {
 	By("Tearing down the test environment")
