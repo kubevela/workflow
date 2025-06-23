@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/component-base/featuregate"
 	"path/filepath"
 	sysruntime "runtime"
 	"strings"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -590,8 +590,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test failed after retries in step mode with suspend on failure", func() {
-		cleanup := setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
-		defer cleanup()
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
@@ -654,10 +653,8 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test reconcile with patch status at once", func() {
-		cleanup := setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
-		defer cleanup()
-		cleanup = setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)
-		defer cleanup()
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
@@ -720,8 +717,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test failed after retries in dag mode with running step and suspend on failure", func() {
-		cleanup := setFeatureGateForTest(utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
-		defer cleanup()
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
 		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
@@ -1960,29 +1956,5 @@ func setupTestDefinitions(ctx context.Context, defs []string, namespace string) 
 		Expect(definition.InstallDefinitionFromYAML(ctx, k8sClient, filepath.Join(filepath.Dir(filepath.Dir(file)), fmt.Sprintf("./controllers/testdata/%s.yaml", def)), func(s string) string {
 			return strings.ReplaceAll(s, "vela-system", namespace)
 		})).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
-	}
-}
-
-func setFeatureGateForTest(gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
-	// The Kubernetes feature gate interface requires a MutableVersionedFeatureGate for setting/resetting.
-	mutableGate, ok := gate.(featuregate.MutableVersionedFeatureGate)
-	Expect(ok).To(BeTrue(), "The provided feature gate must be a MutableVersionedFeatureGate to be modified in tests")
-
-	originalValue := mutableGate.Enabled(f)
-	originalExplicitlySet := mutableGate.ExplicitlySet(f)
-
-	// Set the desired value for the test.
-	err := mutableGate.Set(fmt.Sprintf("%s=%v", f, value))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to set feature gate %q to %v: %v", f, value, err))
-
-	// Return a cleanup function to restore the original state.
-	return func() {
-		if originalExplicitlySet {
-			err := mutableGate.Set(fmt.Sprintf("%s=%v", f, originalValue))
-			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to restore feature gate %q to original value %v: %v", f, originalValue, err))
-		} else {
-			err := mutableGate.ResetFeatureValueToDefault(f)
-			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to reset feature gate %q to default: %v", f, err))
-		}
 	}
 }
