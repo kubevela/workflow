@@ -15,7 +15,6 @@ env:
   # Common versions
   GO_VERSION: '1.23.8'
   GOLANGCI_VERSION: 'v1.60.1'
-  KIND_VERSION: 'v1.31.1'
 
 jobs:
 
