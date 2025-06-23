@@ -17,8 +17,8 @@ env:
   # Common versions
   GO_VERSION: '1.23.8'
   GOLANGCI_VERSION: 'v1.60.1'
-  K3D_IMAGE_VERSION: '[\"v1.31.10\"]'
-  K3D_IMAGE_VERSIONS: '[\"v1.31.10\"]'
+  K3D_IMAGE_VERSION: '[\"v1.31\"]'
+  K3D_IMAGE_VERSIONS: '[\"v1.31\"]'
 
 jobs:
 
