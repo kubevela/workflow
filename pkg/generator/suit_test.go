@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kubevela/pkg/util/singleton"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
@@ -49,7 +49,7 @@ func TestSteps(t *testing.T) {
 	RunSpecs(t, "Test Definition Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	By("Bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
@@ -71,9 +71,7 @@ var _ = BeforeSuite(func(done Done) {
 	singleton.KubeClient.Set(k8sClient)
 	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
-
-	close(done)
-}, 60)
+}, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
 	By("Tearing down the test environment")

@@ -14,8 +14,8 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
 )
 
-func registerProviders(providers map[string]cuexruntime.ProviderFn, new map[string]cuexruntime.ProviderFn) map[string]cuexruntime.ProviderFn {
-	for k, v := range new {
+func registerProviders(providers map[string]cuexruntime.ProviderFn, providerFuncs map[string]cuexruntime.ProviderFn) map[string]cuexruntime.ProviderFn {
+	for k, v := range providerFuncs {
 		providers[k] = v
 	}
 	return providers

@@ -15,7 +15,6 @@ env:
   # Common versions
   GO_VERSION: '1.23.8'
   GOLANGCI_VERSION: 'v1.60.1'
-  KIND_VERSION: 'v0.23.0'
 
 jobs:
 
@@ -40,18 +39,18 @@ jobs:
 
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: true
 
       - name: Cache Go Dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .work/pkg
           key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
@@ -62,19 +61,19 @@ jobs:
           sudo apt-get install -y golang-ginkgo-dev
 
       - name: install Kubebuilder
-        uses: RyanSiu1995/kubebuilder-action@v1.2
+        uses: RyanSiu1995/kubebuilder-action@v1.3.1
         with:
           version: 3.15.1
           kubebuilderOnly: false
-          kubernetesVersion: v1.29.0
+          kubernetesVersion: v1.31.10
 
       - name: Run Make test
         run: make test
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.txt
+          files: ./coverage.txt
           flags: unit-test
           name: codecov-umbrella

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +46,7 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var testScheme = runtime.NewScheme()
-var decoder *admission.Decoder
+var decoder admission.Decoder
 var ctx = context.Background()
 var handler *ValidatingHandler
 
@@ -57,7 +57,7 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter)))
 	By("bootstrapping test environment")
 
@@ -89,12 +89,9 @@ var _ = BeforeSuite(func(done Done) {
 	decoder = admission.NewDecoder(testScheme)
 	Expect(decoder).ToNot(BeNil())
 
-	ctx := context.Background()
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}
 	Expect(k8sClient.Create(ctx, &ns)).Should(BeNil())
-
-	close(done)
-}, 60)
+}, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")

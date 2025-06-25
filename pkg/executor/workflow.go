@@ -227,41 +227,41 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	}
 	stepStatus := make(map[string]v1alpha1.StepStatus)
 	setStepStatus(stepStatus, w.instance.Status.Steps)
-	max := time.Duration(1<<63 - 1)
-	min := max
+	maxTime := time.Duration(1<<63 - 1)
+	minTime := maxTime
 	for _, step := range w.instance.Steps {
-		min = handleSuspendBackoffTime(w.wfCtx, step, stepStatus[step.Name], min)
+		minTime = handleSuspendBackoffTime(w.wfCtx, step, stepStatus[step.Name], minTime)
 		for _, sub := range step.SubSteps {
-			min = handleSuspendBackoffTime(w.wfCtx, v1alpha1.WorkflowStep{
+			minTime = handleSuspendBackoffTime(w.wfCtx, v1alpha1.WorkflowStep{
 				WorkflowStepBase: v1alpha1.WorkflowStepBase{
 					Name:       sub.Name,
 					Type:       sub.Type,
 					Timeout:    sub.Timeout,
 					Properties: sub.Properties,
 				},
-			}, stepStatus[sub.Name], min)
+			}, stepStatus[sub.Name], minTime)
 		}
 	}
-	if min == max {
+	if minTime == maxTime {
 		return 0
 	}
-	return min
+	return minTime
 }
 
-func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, min time.Duration) time.Duration {
+func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, minTime time.Duration) time.Duration {
 	if status.Phase != v1alpha1.WorkflowStepPhaseSuspending {
-		return min
+		return minTime
 	}
 	if step.Timeout != "" {
 		duration, err := time.ParseDuration(step.Timeout)
 		if err != nil {
-			return min
+			return minTime
 		}
 		timeout := status.FirstExecuteTime.Add(duration)
 		if time.Now().Before(timeout) {
 			d := time.Until(timeout)
-			if duration < min {
-				min = d
+			if duration < minTime {
+				minTime = d
 			}
 		}
 	}
@@ -269,14 +269,14 @@ func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowSte
 	if ts := wfCtx.GetMutableValue(status.ID, workspace.ResumeTimeStamp); ts != "" {
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
-			return min
+			return minTime
 		}
 		d := time.Until(t)
-		if d < min {
-			min = d
+		if d < minTime {
+			minTime = d
 		}
 	}
-	return min
+	return minTime
 }
 
 func (w *workflowExecutor) GetBackoffWaitTime() time.Duration {
@@ -396,26 +396,26 @@ func (e *engine) getMaxBackoffWaitTime() int {
 }
 
 func (e *engine) getNextTimeout() int64 {
-	max := time.Duration(1<<63 - 1)
-	min := time.Duration(1<<63 - 1)
+	maxTime := time.Duration(1<<63 - 1)
+	minTime := time.Duration(1<<63 - 1)
 	now := time.Now()
 	for _, step := range e.status.Steps {
 		if step.Phase == v1alpha1.WorkflowStepPhaseRunning {
 			if timeout, ok := e.stepTimeout[step.Name]; ok {
 				duration := timeout.Sub(now)
-				if duration < min {
-					min = duration
+				if duration < minTime {
+					minTime = duration
 				}
 			}
 		}
 	}
-	if min == max {
+	if minTime == maxTime {
 		return -1
 	}
-	if min.Seconds() < 1 {
+	if minTime.Seconds() < 1 {
 		return minWorkflowBackoffWaitTime
 	}
-	return int64(math.Ceil(min.Seconds()))
+	return int64(math.Ceil(minTime.Seconds()))
 }
 
 func (e *engine) setNextExecuteTime(ctx monitorContext.Context) {
@@ -814,8 +814,8 @@ func skipExecutionOfNextStep(phase v1alpha1.WorkflowStepPhase, dependsOn bool) b
 	return phase != v1alpha1.WorkflowStepPhaseSucceeded && phase != v1alpha1.WorkflowStepPhaseSkipped
 }
 
-func handleBackoffTimes(ctx context.Context, wfCtx wfContext.Context, status v1alpha1.StepStatus, clear bool) error {
-	if clear {
+func handleBackoffTimes(ctx context.Context, wfCtx wfContext.Context, status v1alpha1.StepStatus, ok bool) error {
+	if ok {
 		wfCtx.DeleteValueInMemory(types.ContextPrefixBackoffTimes, status.ID)
 		wfCtx.DeleteValueInMemory(types.ContextPrefixBackoffReason, status.ID)
 	} else {
