@@ -29,8 +29,8 @@ type RateLimiter struct {
 }
 
 // NewRateLimiter returns a new rate limiter.
-func NewRateLimiter(len int) *RateLimiter {
-	store := lru.New(len)
+func NewRateLimiter(length int) *RateLimiter {
+	store := lru.New(length)
 	store.Clear()
 	return &RateLimiter{store: store}
 }
