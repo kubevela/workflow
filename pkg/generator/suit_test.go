@@ -49,7 +49,7 @@ func TestSteps(t *testing.T) {
 	RunSpecs(t, "Test Definition Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	By("Bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
@@ -71,8 +71,7 @@ var _ = BeforeSuite(func() {
 	singleton.KubeClient.Set(k8sClient)
 	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
-
-})
+}, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
 	By("Tearing down the test environment")

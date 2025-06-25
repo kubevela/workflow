@@ -19,6 +19,7 @@ package controllers
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
@@ -56,7 +57,7 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
@@ -91,8 +92,7 @@ var _ = BeforeSuite(func() {
 		Scheme:   testScheme,
 		Recorder: event.NewAPIRecorder(recorder),
 	}
-
-})
+}, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")

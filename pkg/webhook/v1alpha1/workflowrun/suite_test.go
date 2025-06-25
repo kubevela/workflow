@@ -57,7 +57,7 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter)))
 	By("bootstrapping test environment")
 
@@ -89,11 +89,9 @@ var _ = BeforeSuite(func() {
 	decoder = admission.NewDecoder(testScheme)
 	Expect(decoder).ToNot(BeNil())
 
-	ctx := context.Background()
 	ns := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}
 	Expect(k8sClient.Create(ctx, &ns)).Should(BeNil())
-
-})
+}, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
