@@ -37,26 +37,26 @@ func TestToString(t *testing.T) {
 foo: int
 lacy: string
 `,
-			expected: `lacy: string
-foo:  int
+			expected: `foo:  int
+lacy: string
 `},
 		{
 			s: ` import "strconv"
 foo: strconv.Atoi("100")
 lacy: string
 `,
-			expected: `lacy: string
-foo:  100
+			expected: `foo:  100
+lacy: string
 `},
 		{
-			s: ` 
+			s: `
 if true {
 	foo: int
 }
 lacy: string
 `,
-			expected: `lacy: string
-foo:  int
+			expected: `foo:  int
+lacy: string
 `},
 		{
 			s: ` 
@@ -76,7 +76,7 @@ if foo > 5 {
 		inst := cuecontext.New().CompileString(tcase.s)
 		str, err := ToString(inst)
 		r.NoError(err)
-		r.Equal(str, tcase.expected)
+		r.Equal(tcase.expected, str)
 	}
 }
 
