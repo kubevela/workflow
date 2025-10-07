@@ -92,8 +92,8 @@ containers: [{
 containers: [{name: "x2"},{name: "x1"}]`,
 			result: `// +patchKey=name
 containers: [{
-	namex: "x1"
 	name:  "x2"
+	namex: "x1"
 }, {
 	name: "x1"
 }, ...]
@@ -394,12 +394,12 @@ containers: [{
 	}]
 }, ...]`,
 			result: `containers: [{
-	name: "x1"
 	// +patchKey=name
 	env: [{
 		name:  "k"
 		value: "v"
 	}]
+	name: "x1"
 }, ...]
 `,
 		},
@@ -628,7 +628,7 @@ metadata: {
 	name: "New"
 }
 `,
-			result: `	// +patchStrategy=retainKeys
+			result: `// +patchStrategy=retainKeys
 kind: "New"
 metadata: {
 	// +patchStrategy=retainKeys
