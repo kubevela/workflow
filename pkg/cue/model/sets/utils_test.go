@@ -37,16 +37,16 @@ func TestToString(t *testing.T) {
 foo: int
 lacy: string
 `,
-			expected: `foo:  int
-lacy: string
+			expected: `lacy: string
+foo:  int
 `},
 		{
 			s: ` import "strconv"
 foo: strconv.Atoi("100")
 lacy: string
 `,
-			expected: `foo:  100
-lacy: string
+			expected: `lacy: string
+foo:  100
 `},
 		{
 			s: ` 
