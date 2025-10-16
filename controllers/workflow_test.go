@@ -43,6 +43,8 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 var _ = Describe("Test Workflow", func() {
@@ -59,10 +61,10 @@ var _ = Describe("Test Workflow", func() {
 			Namespace: namespace,
 		},
 		Spec: v1alpha1.WorkflowRunSpec{
-			WorkflowSpec: &v1alpha1.WorkflowSpec{
-				Steps: []v1alpha1.WorkflowStep{
+			WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
 					{
-						WorkflowStepBase: v1alpha1.WorkflowStepBase{
+						WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 							Name: "step-1",
 							Type: "suspend",
 						},
@@ -86,7 +88,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("get steps from workflow ref", func() {
-		workflow := &v1alpha1.Workflow{
+		workflow := &oamv1alpha1.Workflow{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Workflow",
 				APIVersion: "core.oam.dev/v1alpha1",
@@ -95,13 +97,13 @@ var _ = Describe("Test Workflow", func() {
 				Name:      "workflow",
 				Namespace: namespace,
 			},
-			Mode: &v1alpha1.WorkflowExecuteMode{
+			Mode: &oamv1alpha1.WorkflowExecuteMode{
 				Steps: v1alpha1.WorkflowModeDAG,
 			},
-			WorkflowSpec: v1alpha1.WorkflowSpec{
-				Steps: []v1alpha1.WorkflowStep{
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
 					{
-						WorkflowStepBase: v1alpha1.WorkflowStepBase{
+						WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 							Name: "step-1",
 							Type: "suspend",
 						},
@@ -133,7 +135,7 @@ var _ = Describe("Test Workflow", func() {
 		wr2.Name = "wr-template-with-mode"
 		wr2.Spec = v1alpha1.WorkflowRunSpec{
 			WorkflowRef: "workflow",
-			Mode: &v1alpha1.WorkflowExecuteMode{
+			Mode: &oamv1alpha1.WorkflowExecuteMode{
 				Steps:    v1alpha1.WorkflowModeStep,
 				SubSteps: v1alpha1.WorkflowModeStep,
 			},
@@ -157,9 +159,9 @@ var _ = Describe("Test Workflow", func() {
 	It("get failed to generate", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "failed-generate"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "failed-generate",
 					Type: "invalid",
 				},
@@ -224,13 +226,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test workflow suspend in sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "test-wr-sub-suspend"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "suspend",
 						Type: "suspend",
@@ -282,15 +284,15 @@ var _ = Describe("Test Workflow", func() {
 	It("test workflow terminate a suspend workflow", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "test-terminate-suspend-wr"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "suspend",
 					Type: "suspend",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "suspend-1",
 					Type: "suspend",
 				},
@@ -326,13 +328,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test input/output in step mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-with-inout"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "message",
 							ValueFrom: `"message: " +output.$returns.value.status.conditions[0].message`,
@@ -341,11 +343,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox","message":"test"}`)},
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "message",
 							ParameterKey: "message",
@@ -393,13 +395,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test input/output in dag mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-with-inout"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "message",
 							ParameterKey: "message",
@@ -408,11 +410,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "message",
 							ValueFrom: `"message: " +output.$returns.value.status.conditions[0].message`,
@@ -421,7 +423,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}
-		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 
@@ -463,16 +465,16 @@ var _ = Describe("Test Workflow", func() {
 	It("test depends on in step mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-depends-on"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -517,9 +519,9 @@ var _ = Describe("Test Workflow", func() {
 	It("test depends on in dag mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-depends-on"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -527,21 +529,21 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "step3",
 					Type: "suspend",
 					If:   "false",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step4",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -549,7 +551,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}
-		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 
@@ -593,16 +595,16 @@ var _ = Describe("Test Workflow", func() {
 		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2-failed",
 					Type:       "apply-object",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"value":[{"apiVersion":"v1","kind":"invalid","metadata":{"name":"test1"}}]}`)},
@@ -657,16 +659,16 @@ var _ = Describe("Test Workflow", func() {
 		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnablePatchStatusAtOnce, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2-failed",
 					Type:       "apply-object",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"value":[{"apiVersion":"v1","kind":"invalid","metadata":{"name":"test1"}}]}`)},
@@ -720,23 +722,23 @@ var _ = Describe("Test Workflow", func() {
 		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-after-retries"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2-failed",
 					Type:       "apply-object",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"value":[{"apiVersion":"v1","kind":"invalid","metadata":{"name":"test1"}}]}`)},
 				},
 			},
 		}
-		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 
@@ -766,16 +768,16 @@ var _ = Describe("Test Workflow", func() {
 	It("test failed render", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-failed-render"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "failed-render",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -807,20 +809,20 @@ var _ = Describe("Test Workflow", func() {
 	It("test workflow run with mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-mode"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "step2",
 						Type:       "test-apply",
@@ -834,7 +836,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}
-		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeDAG,
 			SubSteps: v1alpha1.WorkflowModeStep,
 		}
@@ -872,7 +874,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
-		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(v1alpha1.WorkflowExecuteMode{
+		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(oamv1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeDAG,
 			SubSteps: v1alpha1.WorkflowModeStep,
 		}))
@@ -881,21 +883,21 @@ var _ = Describe("Test Workflow", func() {
 	It("test workflow run with mode in step groups", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-group-mode"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
 				Mode: v1alpha1.WorkflowModeStep,
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "step2",
 						Type:       "test-apply",
@@ -909,7 +911,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}
-		wr.Spec.Mode = &v1alpha1.WorkflowExecuteMode{
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 
@@ -946,7 +948,7 @@ var _ = Describe("Test Workflow", func() {
 
 		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
-		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(v1alpha1.WorkflowExecuteMode{
+		Expect(checkRun.Status.Mode).Should(BeEquivalentTo(oamv1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeDAG,
 			SubSteps: v1alpha1.WorkflowModeDAG,
 		}))
@@ -955,20 +957,20 @@ var _ = Describe("Test Workflow", func() {
 	It("test sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-substeps"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "step2",
 						Type:       "test-apply",
@@ -1025,13 +1027,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test failed step's outputs", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-timeout-output"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "step1",
 					Type:    "test-apply",
 					Timeout: "1s",
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "output",
 							ValueFrom: "context.name",
@@ -1041,9 +1043,9 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "step2",
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "output",
 							ParameterKey: "",
@@ -1084,16 +1086,16 @@ var _ = Describe("Test Workflow", func() {
 	It("test if always", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-always"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step-failed",
 					Type:       "apply-object",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"value":[{"apiVersion":"v1","kind":"invalid","metadata":{"name":"test1"}}]}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					If:         "always",
@@ -1101,7 +1103,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1142,13 +1144,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test if always in sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-always-substeps"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "sub1",
 						Type:       "test-apply",
@@ -1170,7 +1172,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					If:         "always",
@@ -1178,7 +1180,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step3",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1237,13 +1239,13 @@ var _ = Describe("Test Workflow", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-expressions"
 		wr.Spec.Context = &runtime.RawExtension{Raw: []byte(`{"mycontext":{"a":1,"b":2,"c":["hello", "world"]}}`)}
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "suspend",
 					Type:    "suspend",
 					Timeout: "1s",
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "suspend-output",
 							ValueFrom: "context.name",
@@ -1256,11 +1258,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "suspend-output",
 							ParameterKey: "",
@@ -1278,7 +1280,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step3",
 					If:         "status.suspend.succeeded",
 					Type:       "test-apply",
@@ -1321,12 +1323,12 @@ var _ = Describe("Test Workflow", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-if-expressions-substeps"
 		wr.Spec.Context = &runtime.RawExtension{Raw: []byte(`{"mycontext":{"a":1,"b":2,"c":["hello", "world"]}}`)}
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "context.mycontext.c[1]",
 							ParameterKey: "",
@@ -1334,7 +1336,7 @@ var _ = Describe("Test Workflow", func() {
 					},
 					If: `context.mycontext.b == 2`,
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "sub1",
 						Type:       "test-apply",
@@ -1347,7 +1349,7 @@ var _ = Describe("Test Workflow", func() {
 						Type:       "suspend",
 						Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"1s"}`)},
 						If:         `inputs["context.mycontext.c[0]"] == "hello" && context.mycontext.c[1] == "world"`,
-						Outputs: v1alpha1.StepOutputs{
+						Outputs: oamv1alpha1.StepOutputs{
 							{
 								Name:      "suspend-output",
 								ValueFrom: "context.name",
@@ -1357,7 +1359,7 @@ var _ = Describe("Test Workflow", func() {
 								ValueFrom: "context.mycontext.a",
 							},
 						},
-						Inputs: v1alpha1.StepInputs{
+						Inputs: oamv1alpha1.StepInputs{
 							{
 								From:         "context.mycontext.c[0]",
 								ParameterKey: "",
@@ -1368,7 +1370,7 @@ var _ = Describe("Test Workflow", func() {
 						Name:      "sub3",
 						Type:      "test-apply",
 						DependsOn: []string{"sub1"},
-						Inputs: v1alpha1.StepInputs{
+						Inputs: oamv1alpha1.StepInputs{
 							{
 								From:         "suspend-output",
 								ParameterKey: "",
@@ -1380,7 +1382,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1388,18 +1390,18 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step3",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:    "group2-sub",
 						Type:    "suspend",
@@ -1462,9 +1464,9 @@ var _ = Describe("Test Workflow", func() {
 	It("test suspend and deploy", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-suspend-and-deploy"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "suspend-and-deploy",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1502,9 +1504,9 @@ var _ = Describe("Test Workflow", func() {
 	It("test multiple suspend", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-multi-suspend"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "step1",
 					Type: "multi-suspend",
 				},
@@ -1540,9 +1542,9 @@ var _ = Describe("Test Workflow", func() {
 	It("test timeout", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-timeout"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Timeout:    "1s",
@@ -1550,7 +1552,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					If:         "always",
@@ -1558,7 +1560,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step3",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1602,13 +1604,13 @@ var _ = Describe("Test Workflow", func() {
 	It("test timeout in sub steps", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-timeout-substeps"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "group",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "sub1",
 						Type:       "test-apply",
@@ -1631,7 +1633,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					If:         "always",
@@ -1639,20 +1641,20 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step3",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "group2",
 					If:      "always",
 					Type:    "step-group",
 					Timeout: "1s",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "group2-sub",
 						Type: "suspend",
@@ -1719,15 +1721,15 @@ var _ = Describe("Test Workflow", func() {
 	It("test terminate manually", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-terminate-manually"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "step1",
 					Type: "suspend",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step2",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
@@ -1760,20 +1762,20 @@ var _ = Describe("Test Workflow", func() {
 	It("test debug", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-debug"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "step1",
 					Type:       "test-apply",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "step2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:       "step2-sub",
 						Type:       "test-apply",
@@ -1829,12 +1831,12 @@ var _ = Describe("Test Workflow", func() {
 	It("test step context data", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "test-step-context-data"
-		wr.Spec.WorkflowSpec.Steps = []v1alpha1.WorkflowStep{{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "group1",
 				Type: "step-group",
 			},
-			SubSteps: []v1alpha1.WorkflowStepBase{
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
 				{
 					Name:       "step1",
 					Type:       "save-process-context",
@@ -1847,11 +1849,11 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}, {
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "group2",
 				Type: "step-group",
 			},
-			SubSteps: []v1alpha1.WorkflowStepBase{
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
 				{
 					Name:       "step3",
 					Type:       "save-process-context",
@@ -1864,7 +1866,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		}, {
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name:       "step5",
 				Type:       "save-process-context",
 				Properties: &runtime.RawExtension{Raw: []byte(`{"name":"process-context-step5"}`)},

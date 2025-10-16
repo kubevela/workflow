@@ -47,16 +47,18 @@ import (
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 var _ = Describe("Test Workflow", func() {
 
-	defaultMode := v1alpha1.WorkflowExecuteMode{
+	defaultMode := oamv1alpha1.WorkflowExecuteMode{
 		Steps:    v1alpha1.WorkflowModeStep,
 		SubSteps: v1alpha1.WorkflowModeDAG,
 	}
 
-	dagMode := v1alpha1.WorkflowExecuteMode{
+	dagMode := oamv1alpha1.WorkflowExecuteMode{
 		Steps:    v1alpha1.WorkflowModeDAG,
 		SubSteps: v1alpha1.WorkflowModeDAG,
 	}
@@ -73,21 +75,21 @@ var _ = Describe("Test Workflow", func() {
 		}
 	})
 	It("Workflow test for failed", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "failed",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -121,21 +123,21 @@ var _ = Describe("Test Workflow", func() {
 			},
 		})).Should(BeEquivalentTo(""))
 
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -175,19 +177,19 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test failed with sub steps", func() {
 		By("Test failed with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -199,7 +201,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -242,15 +244,15 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("Workflow test for timeout", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s2",
 					If:      "status.s1.succeeded",
 					Type:    "running",
@@ -258,13 +260,13 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s4",
 					If:   "status.s2.timeout",
 					Type: "success",
@@ -320,15 +322,15 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("Workflow test for timeout with suspend", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s2",
 					If:      "status.s1.timeout",
 					Type:    "suspend",
@@ -336,13 +338,13 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s4",
 					If:      "status.s1.succeeded",
 					Type:    "suspend",
@@ -350,7 +352,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s5",
 					Type: "success",
 				},
@@ -412,19 +414,19 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("Workflow test for timeout with sub steps", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -442,7 +444,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -504,20 +506,20 @@ var _ = Describe("Test Workflow", func() {
 			}},
 		})).Should(BeEquivalentTo(""))
 
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s2",
 					Type:    "step-group",
 					Timeout: "1s",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -533,7 +535,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -598,19 +600,19 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test skipped with sub steps", func() {
 		By("Test skipped with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -622,7 +624,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -678,20 +680,20 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test if-always with sub steps", func() {
 		By("Test if-always with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					If:   "always",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name:      "s2-sub1",
 						DependsOn: []string{"s2-sub2"},
@@ -709,7 +711,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -769,19 +771,19 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test success with sub steps", func() {
 		By("Test success with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -793,7 +795,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -841,22 +843,22 @@ var _ = Describe("Test Workflow", func() {
 		})).Should(BeEquivalentTo(""))
 
 		By("Test success with step group and empty subSteps")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{},
+				SubSteps: []oamv1alpha1.WorkflowStepBase{},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -896,21 +898,21 @@ var _ = Describe("Test Workflow", func() {
 	It("Workflow test for failed after retries with suspend", func() {
 		By("Test failed-after-retries in StepByStep mode with suspend")
 		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -946,27 +948,27 @@ var _ = Describe("Test Workflow", func() {
 		})).Should(BeEquivalentTo(""))
 
 		By("Test failed-after-retries in DAG mode with suspend")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
 			},
 		})
-		instance.Mode = &v1alpha1.WorkflowExecuteMode{
+		instance.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
@@ -1007,34 +1009,34 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test if always", func() {
 		By("Test if always in StepByStep mode")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					If:   "always",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s4",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s5",
 					If:   "always",
 					Type: "success",
@@ -1090,21 +1092,21 @@ var _ = Describe("Test Workflow", func() {
 		})).Should(BeEquivalentTo(""))
 
 		By("Test if always in DAG mode")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "failed-after-retries",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s3",
 					DependsOn: []string{"s2"},
 					If:        "always",
@@ -1112,14 +1114,14 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s4",
 					DependsOn: []string{"s3"},
 					Type:      "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s5",
 					DependsOn: []string{"s3"},
 					If:        "always",
@@ -1127,14 +1129,14 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s6",
 					DependsOn: []string{"s1", "s5"},
 					Type:      "success",
 				},
 			},
 		})
-		instance.Mode = &v1alpha1.WorkflowExecuteMode{
+		instance.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
@@ -1194,26 +1196,26 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test if expressions", func() {
 		By("Test if expressions in StepByStep mode")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					If:   "status.s1.failed",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					If:   "status.s1.succeeded",
 					Type: "success",
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "test",
 							ValueFrom: "context.name",
@@ -1222,9 +1224,9 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s4",
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "test",
 							ParameterKey: "",
@@ -1276,27 +1278,27 @@ var _ = Describe("Test Workflow", func() {
 		})).Should(BeEquivalentTo(""))
 
 		By("Test if expressions in DAG mode")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					If:   "status.s1.failed",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s3",
 					DependsOn: []string{"s2"},
 					If:        "status.s1.succeeded",
 					Type:      "success",
-					Outputs: v1alpha1.StepOutputs{
+					Outputs: oamv1alpha1.StepOutputs{
 						{
 							Name:      "test",
 							ValueFrom: "context.name",
@@ -1305,10 +1307,10 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:      "s4",
 					DependsOn: []string{"s3"},
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From:         "test",
 							ParameterKey: "",
@@ -1319,7 +1321,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 		})
-		instance.Mode = &v1alpha1.WorkflowExecuteMode{
+		instance.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		ctx = monitorContext.NewTraceContext(context.Background(), "test-app")
@@ -1364,20 +1366,20 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Workflow test if expressions with sub steps", func() {
 		By("Test if expressions with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					If:   "status.s1.timeout",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2_sub1",
 						If:   "always",
@@ -1390,12 +1392,12 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					If:   "status.s1.succeeded",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s3_sub1",
 						If:   "status.s2_sub1.skipped",
@@ -1470,19 +1472,19 @@ var _ = Describe("Test Workflow", func() {
 	It("Test failed after retries with sub steps", func() {
 		By("Test failed-after-retries with step group in StepByStep mode")
 		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -1494,7 +1496,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -1541,9 +1543,9 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("Test get backoff time and clean", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "wait-with-set-var",
 				},
@@ -1599,9 +1601,9 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("Test get backoff time with timeout", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s1",
 					Timeout: "30s",
 					Type:    "wait-with-set-var",
@@ -1626,9 +1628,9 @@ var _ = Describe("Test Workflow", func() {
 
 	It("Test get suspend backoff time", func() {
 		By("if there's no timeout and duration, return 0")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "suspend",
 				},
@@ -1643,9 +1645,9 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(0))
 
 		By("return timeout if it's specified")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s1",
 					Type:    "suspend",
 					Timeout: "1m",
@@ -1661,9 +1663,9 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(60))
 
 		By("return duration if it's specified")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "s1",
 					Type:       "suspend",
 					Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"30s"}`)},
@@ -1679,9 +1681,9 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(30))
 
 		By("return the minimum of the timeout and duration")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "s1",
 					Type:       "suspend",
 					Timeout:    "1m",
@@ -1697,9 +1699,9 @@ var _ = Describe("Test Workflow", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(30))
 
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       "s1",
 					Type:       "suspend",
 					Timeout:    "30s",
@@ -1716,9 +1718,9 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(30))
 
 		By("return 0 if the value is invalid")
-		instance, runners = makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:    "s1",
 					Type:    "suspend",
 					Timeout: "test",
@@ -1733,21 +1735,21 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test for suspend", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "suspend",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -1828,19 +1830,19 @@ var _ = Describe("Test Workflow", func() {
 
 	It("test for suspend with sub steps", func() {
 		By("Test suspend with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -1852,7 +1854,7 @@ var _ = Describe("Test Workflow", func() {
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
@@ -1898,15 +1900,15 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test for terminate", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "terminate",
 				},
@@ -1946,19 +1948,19 @@ var _ = Describe("Test Workflow", func() {
 	It("test for terminate with sub steps", func() {
 
 		By("Test terminate with step group")
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "step-group",
 				},
-				SubSteps: []v1alpha1.WorkflowStepBase{
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
 					{
 						Name: "s2-sub1",
 						Type: "success",
@@ -2014,15 +2016,15 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test for error", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "error",
 				},
@@ -2048,7 +2050,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("skip workflow", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{})
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{})
 		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
 		wf := New(instance)
 		state, err := wf.ExecuteRunners(ctx, runners)
@@ -2057,28 +2059,28 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("test for DAG", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "success",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "pending",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s3",
 					Type: "success",
 				},
 			},
 		})
 		pending = true //nolint
-		instance.Mode = &v1alpha1.WorkflowExecuteMode{
+		instance.Mode = &oamv1alpha1.WorkflowExecuteMode{
 			Steps: v1alpha1.WorkflowModeDAG,
 		}
 		wf := New(instance)
@@ -2154,15 +2156,15 @@ var _ = Describe("Test Workflow", func() {
 	})
 
 	It("step commit data without success", func() {
-		instance, runners := makeTestCase([]v1alpha1.WorkflowStep{
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s1",
 					Type: "wait-with-set-var",
 				},
 			},
 			{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name: "s2",
 					Type: "success",
 				},
@@ -2184,7 +2186,7 @@ var _ = Describe("Test Workflow", func() {
 	})
 })
 
-func makeTestCase(steps []v1alpha1.WorkflowStep) (*types.WorkflowInstance, []types.TaskRunner) {
+func makeTestCase(steps []oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, []types.TaskRunner) {
 	instance := &types.WorkflowInstance{
 		WorkflowMeta: types.WorkflowMeta{
 			ChildOwnerReferences: []metav1.OwnerReference{
@@ -2207,7 +2209,7 @@ func makeTestCase(steps []v1alpha1.WorkflowStep) (*types.WorkflowInstance, []typ
 		if step.SubSteps != nil {
 			subStepRunners := []types.TaskRunner{}
 			for _, subStep := range step.SubSteps {
-				step := v1alpha1.WorkflowStep{
+				step := oamv1alpha1.WorkflowStep{
 					WorkflowStepBase: subStep,
 				}
 				subStepRunners = append(subStepRunners, makeRunner(step, nil))
@@ -2222,7 +2224,7 @@ func makeTestCase(steps []v1alpha1.WorkflowStep) (*types.WorkflowInstance, []typ
 
 var pending bool
 
-func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) types.TaskRunner {
+func makeRunner(step oamv1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) types.TaskRunner {
 	var run func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
 	switch step.Type {
 	case "suspend":
@@ -2358,7 +2360,7 @@ func makeRunner(step v1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) t
 }
 
 type testTaskRunner struct {
-	step         v1alpha1.WorkflowStep
+	step         oamv1alpha1.WorkflowStep
 	run          func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
 	checkPending func(ctx monitorContext.Context, wfCtx wfContext.Context, stepStatus map[string]v1alpha1.StepStatus) (bool, v1alpha1.StepStatus)
 	fillContext  func(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter

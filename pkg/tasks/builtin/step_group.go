@@ -30,10 +30,12 @@ import (
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 // StepGroup is the step group runner
-func StepGroup(step v1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
+func StepGroup(step oamv1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
 	return &stepGroupTaskRunner{
 		id:             opt.ID,
 		name:           step.Name,
@@ -47,10 +49,10 @@ func StepGroup(step v1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (typ
 type stepGroupTaskRunner struct {
 	id             string
 	name           string
-	step           v1alpha1.WorkflowStep
+	step           oamv1alpha1.WorkflowStep
 	subTaskRunners []types.TaskRunner
 	pCtx           process.Context
-	mode           v1alpha1.WorkflowMode
+	mode           oamv1alpha1.WorkflowMode
 }
 
 // Name return suspend step name.
@@ -77,7 +79,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 
 	pStatus := &status
 	if options.GetTracer == nil {
-		options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context {
+		options.GetTracer = func(id string, step oamv1alpha1.WorkflowStep) monitorContext.Context {
 			return monitorContext.NewTraceContext(context.Background(), "")
 		}
 	}
@@ -196,7 +198,7 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 	return status, operation
 }
 
-func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step v1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal cue.Value) {
+func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step oamv1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal cue.Value) {
 	if len(step.Outputs) > 0 {
 		for _, hook := range postStopHooks {
 			if err := hook(ctx, basicVal, step, *stepStatus, nil); err != nil {

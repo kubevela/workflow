@@ -32,6 +32,7 @@ import (
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/pkg/util/slices"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
@@ -89,7 +90,7 @@ func (tr *taskRunner) FillContextData(ctx monitorContext.Context, processCtx pro
 
 // nolint:gocyclo
 func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error) {
-	return func(wfStep v1alpha1.WorkflowStep, genOpt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
+	return func(wfStep oamv1alpha1.WorkflowStep, genOpt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
 
 		initialStatus := v1alpha1.StepStatus{
 			Name:  wfStep.Name,
@@ -145,7 +146,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 		}
 		tRunner.run = func(wfCtx wfContext.Context, options *types.TaskRunOptions) (stepStatus v1alpha1.StepStatus, operations *types.Operation, rErr error) {
 			if options.GetTracer == nil {
-				options.GetTracer = func(id string, step v1alpha1.WorkflowStep) monitorContext.Context { //nolint:revive,unused
+				options.GetTracer = func(id string, step oamv1alpha1.WorkflowStep) monitorContext.Context { //nolint:revive,unused
 					return monitorContext.NewTraceContext(context.Background(), "")
 				}
 			}
@@ -255,7 +256,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 }
 
 // ValidateIfValue validates the if value
-func ValidateIfValue(ctx wfContext.Context, step v1alpha1.WorkflowStep, stepStatus map[string]v1alpha1.StepStatus, basicVal cue.Value) (bool, error) {
+func ValidateIfValue(ctx wfContext.Context, step oamv1alpha1.WorkflowStep, stepStatus map[string]v1alpha1.StepStatus, basicVal cue.Value) (bool, error) {
 	s, _ := util.ToString(basicVal)
 	template := fmt.Sprintf("if: %s\n%s\n%s\n%s", step.If, getInputsTemplate(ctx, step, basicVal), buildValueForStatus(ctx, stepStatus), s)
 	v := cuecontext.New().CompileString(template).LookupPath(cue.ParsePath("if"))
@@ -322,7 +323,7 @@ func getContextTemplate(pCtx process.Context) string {
 	return c
 }
 
-func getInputsTemplate(ctx wfContext.Context, step v1alpha1.WorkflowStep, basicVal cue.Value) string {
+func getInputsTemplate(ctx wfContext.Context, step oamv1alpha1.WorkflowStep, basicVal cue.Value) string {
 	var inputsTempl string
 	for _, input := range step.Inputs {
 		inputValue, err := ctx.GetVar(input.From)
@@ -360,7 +361,7 @@ func NewTaskLoader(lt LoadTaskTemplate, logLevel int, pCtx process.Context, comp
 }
 
 // CheckPending checks whether to pending task run
-func CheckPending(ctx wfContext.Context, step v1alpha1.WorkflowStep, id string, stepStatus map[string]v1alpha1.StepStatus, basicValue cue.Value) (bool, v1alpha1.StepStatus) {
+func CheckPending(ctx wfContext.Context, step oamv1alpha1.WorkflowStep, id string, stepStatus map[string]v1alpha1.StepStatus, basicValue cue.Value) (bool, v1alpha1.StepStatus) {
 	pStatus := v1alpha1.StepStatus{
 		Phase: v1alpha1.WorkflowStepPhasePending,
 		Type:  step.Type,

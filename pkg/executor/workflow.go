@@ -31,6 +31,7 @@ import (
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/debug"
@@ -75,7 +76,7 @@ func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
 func InitializeWorkflowInstance(instance *types.WorkflowInstance) {
 	if instance.Status.StartTime.IsZero() && len(instance.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
-		mode := v1alpha1.WorkflowExecuteMode{
+		mode := oamv1alpha1.WorkflowExecuteMode{
 			Steps:    v1alpha1.WorkflowModeStep,
 			SubSteps: v1alpha1.WorkflowModeDAG,
 		}
@@ -232,8 +233,8 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	for _, step := range w.instance.Steps {
 		minTime = handleSuspendBackoffTime(w.wfCtx, step, stepStatus[step.Name], minTime)
 		for _, sub := range step.SubSteps {
-			minTime = handleSuspendBackoffTime(w.wfCtx, v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			minTime = handleSuspendBackoffTime(w.wfCtx, oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					Name:       sub.Name,
 					Type:       sub.Type,
 					Timeout:    sub.Timeout,
@@ -248,7 +249,7 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	return minTime
 }
 
-func handleSuspendBackoffTime(wfCtx wfContext.Context, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, minTime time.Duration) time.Duration {
+func handleSuspendBackoffTime(wfCtx wfContext.Context, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, minTime time.Duration) time.Duration {
 	if status.Phase != v1alpha1.WorkflowStepPhaseSuspending {
 		return minTime
 	}
@@ -574,7 +575,7 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 
 func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v1alpha1.WorkflowStepPhase) *types.TaskRunOptions {
 	options := &types.TaskRunOptions{
-		GetTracer: func(id string, stepStatus v1alpha1.WorkflowStep) monitorContext.Context {
+		GetTracer: func(id string, stepStatus oamv1alpha1.WorkflowStep) monitorContext.Context {
 			return ctx.Fork(id, monitorContext.DurationMetric(func(v float64) {
 				metrics.WorkflowRunStepDurationHistogram.WithLabelValues("workflowrun", stepStatus.Type).Observe(v)
 			}))
@@ -582,7 +583,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 		StepStatus: e.stepStatus,
 		Engine:     e,
 		PreCheckHooks: []types.TaskPreCheckHook{
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				if feature.DefaultMutableFeatureGate.Enabled(features.EnableSuspendOnFailure) {
 					return &types.PreCheckResult{Skip: false}, nil
 				}
@@ -608,7 +609,7 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 					return &types.PreCheckResult{Skip: !ifValue}, nil
 				}
 			},
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) { //nolint:revive,unused
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) { //nolint:revive,unused
 				status := e.stepStatus[step.Name]
 				if e.parentRunner != "" {
 					if status, ok := e.stepStatus[e.parentRunner]; ok && status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonTimeout {

@@ -40,6 +40,7 @@ import (
 	pkgruntime "github.com/kubevela/pkg/util/runtime"
 	"github.com/kubevela/pkg/util/singleton"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
@@ -98,53 +99,53 @@ func TestTaskLoader(t *testing.T) {
 	})
 	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
 
-	steps := []v1alpha1.WorkflowStep{
+	steps := []oamv1alpha1.WorkflowStep{
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "output",
 				Type: "output",
-				Outputs: v1alpha1.StepOutputs{{
+				Outputs: oamv1alpha1.StepOutputs{{
 					ValueFrom: "myIP.value",
 					Name:      "podIP",
 				}},
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "input",
 				Type: "input",
-				Inputs: v1alpha1.StepInputs{{
+				Inputs: oamv1alpha1.StepInputs{{
 					From:         "podIP",
 					ParameterKey: "set.prefixIP",
 				}},
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "wait",
 				Type: "wait",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "terminate",
 				Type: "terminate",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "template",
 				Type: "templateError",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "execute",
 				Type: "executeFailed",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "ok",
 				Type: "ok",
 			},
@@ -220,54 +221,54 @@ func TestErrCases(t *testing.T) {
 	})
 	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
 
-	steps := []v1alpha1.WorkflowStep{
+	steps := []oamv1alpha1.WorkflowStep{
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "input-replace",
 				Type: "ok",
 				Properties: &runtime.RawExtension{Raw: []byte(`
 {"score": {"x": 101}}
 		`)},
-				Inputs: v1alpha1.StepInputs{{
+				Inputs: oamv1alpha1.StepInputs{{
 					From:         "score",
 					ParameterKey: "score",
 				}},
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "input",
 				Type: "input",
-				Inputs: v1alpha1.StepInputs{{
+				Inputs: oamv1alpha1.StepInputs{{
 					From:         "podIP",
 					ParameterKey: "prefixIP",
 				}},
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "output-var-conflict",
 				Type: "ok",
-				Outputs: v1alpha1.StepOutputs{{
+				Outputs: oamv1alpha1.StepOutputs{{
 					Name:      "score",
 					ValueFrom: "name",
 				}},
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "wait",
 				Type: "wait",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "err",
 				Type: "error",
 			},
 		},
 		{
-			WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 				Name: "failed-after-retries",
 				Type: "error",
 			},
@@ -320,11 +321,11 @@ func TestErrCases(t *testing.T) {
 func TestPendingInputCheck(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	r := require.New(t)
-	step := v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name: "pending",
 			Type: "ok",
-			Inputs: v1alpha1.StepInputs{{
+			Inputs: oamv1alpha1.StepInputs{{
 				From:         "score",
 				ParameterKey: "score",
 			}},
@@ -353,8 +354,8 @@ func TestPendingInputCheck(t *testing.T) {
 func TestPendingDependsOnCheck(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	r := require.New(t)
-	step := v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name:      "pending",
 			Type:      "ok",
 			DependsOn: []string{"depend"},
@@ -383,8 +384,8 @@ func TestPendingDependsOnCheck(t *testing.T) {
 
 func TestSkip(t *testing.T) {
 	r := require.New(t)
-	step := v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name: "skip",
 			Type: "ok",
 		},
@@ -401,7 +402,7 @@ func TestSkip(t *testing.T) {
 	wfCtx := newWorkflowContextForTest(t)
 	status, operations, err := runner.Run(wfCtx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Skip: true}, nil
 			},
 		},
@@ -422,8 +423,8 @@ func TestTimeout(t *testing.T) {
 			}),
 		})),
 	)
-	step := v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name: "timeout",
 			Type: "ok",
 		},
@@ -440,7 +441,7 @@ func TestTimeout(t *testing.T) {
 	ctx := newWorkflowContextForTest(t)
 	status, _, err := runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Timeout: true}, nil
 			},
 		},
@@ -465,15 +466,15 @@ func TestValidateIfValue(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		step        v1alpha1.WorkflowStep
+		step        oamv1alpha1.WorkflowStep
 		status      map[string]v1alpha1.StepStatus
 		expected    bool
 		expectedErr string
 	}{
 		{
 			name: "timeout true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: "status.step1.timeout",
 				},
 			},
@@ -486,8 +487,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "context true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `context.name == "app"`,
 				},
 			},
@@ -495,8 +496,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "context arr true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `context.arr[0] == "a"`,
 				},
 			},
@@ -504,8 +505,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "parameter true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `parameter.key == "value"`,
 				},
 			},
@@ -513,8 +514,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "failed true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `status.step1.phase != "failed"`,
 				},
 			},
@@ -527,10 +528,10 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "input true",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `inputs.test == "yes"`,
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From: "test",
 						},
@@ -541,10 +542,10 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "input with arr in context",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `inputs["context.arr[0]"] == "a"`,
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From: "context.arr[0]",
 						},
@@ -555,10 +556,10 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "input false with dash",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `inputs["test-input"] == "yes"`,
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From: "test-input",
 						},
@@ -570,10 +571,10 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "input value is struct",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `inputs["test-struct"].hello == "world"`,
-					Inputs: v1alpha1.StepInputs{
+					Inputs: oamv1alpha1.StepInputs{
 						{
 							From: "test-struct",
 						},
@@ -584,8 +585,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "dash in if",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: "status.step1-test.timeout",
 				},
 			},
@@ -594,8 +595,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "dash in status",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `status["step1-test"].timeout`,
 				},
 			},
@@ -608,8 +609,8 @@ func TestValidateIfValue(t *testing.T) {
 		},
 		{
 			name: "error if",
-			step: v1alpha1.WorkflowStep{
-				WorkflowStepBase: v1alpha1.WorkflowStepBase{
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 					If: `test == true`,
 				},
 			},

@@ -30,6 +30,8 @@ import (
 	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 func TestInput(t *testing.T) {
@@ -39,10 +41,10 @@ func TestInput(t *testing.T) {
 	paramValue := cuectx.CompileString(`"name": "foo"`)
 	err := wfCtx.SetVar(cuectx.CompileString(`score: 99`), "foo")
 	r.NoError(err)
-	val, err := Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	val, err := Input(wfCtx, paramValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			DependsOn: []string{"mystep"},
-			Inputs: v1alpha1.StepInputs{{
+			Inputs: oamv1alpha1.StepInputs{{
 				From:         "foo.score",
 				ParameterKey: "myscore",
 			}},
@@ -57,10 +59,10 @@ func TestInput(t *testing.T) {
 	// test set value
 	paramValue = cuectx.CompileString(`parameter: {myscore: "test"}`)
 	r.NoError(err)
-	val, err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	val, err = Input(wfCtx, paramValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			DependsOn: []string{"mystep"},
-			Inputs: v1alpha1.StepInputs{{
+			Inputs: oamv1alpha1.StepInputs{{
 				From:         "foo.score",
 				ParameterKey: "myscore",
 			}},
@@ -72,9 +74,9 @@ func TestInput(t *testing.T) {
 	r.NoError(err)
 	r.Equal(int(resultInt), 99)
 	paramValue = cuectx.CompileString(`context: {name: "test"}`)
-	val, err = Input(wfCtx, paramValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
-			Inputs: v1alpha1.StepInputs{{
+	val, err = Input(wfCtx, paramValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Inputs: oamv1alpha1.StepInputs{{
 				From:         "context.name",
 				ParameterKey: "contextname",
 			}},
@@ -94,12 +96,12 @@ func TestOutput(t *testing.T) {
 	cuectx := cuecontext.New()
 	taskValue := cuectx.CompileString(`output: score: 99`)
 	stepStatus := make(map[string]v1alpha1.StepStatus)
-	err := Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	err := Output(wfCtx, taskValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Properties: &runtime.RawExtension{
 				Raw: []byte("{\"name\":\"mystep\"}"),
 			},
-			Outputs: v1alpha1.StepOutputs{{
+			Outputs: oamv1alpha1.StepOutputs{{
 				ValueFrom: "output.score",
 				Name:      "myscore",
 			}},
@@ -117,12 +119,12 @@ func TestOutput(t *testing.T) {
 
 	taskValue = cuectx.CompileString(`output: $returns: score: 99`)
 	stepStatus = make(map[string]v1alpha1.StepStatus)
-	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	err = Output(wfCtx, taskValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Properties: &runtime.RawExtension{
 				Raw: []byte("{\"name\":\"mystep\"}"),
 			},
-			Outputs: v1alpha1.StepOutputs{{
+			Outputs: oamv1alpha1.StepOutputs{{
 				ValueFrom: "output.$returns.score",
 				Name:      "myscore2",
 			}},
@@ -140,12 +142,12 @@ func TestOutput(t *testing.T) {
 
 	taskValue = cuectx.CompileString(`output: $returns: score: 99`)
 	stepStatus = make(map[string]v1alpha1.StepStatus)
-	err = Output(wfCtx, taskValue, v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	err = Output(wfCtx, taskValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Properties: &runtime.RawExtension{
 				Raw: []byte("{\"name\":\"mystep\"}"),
 			},
-			Outputs: v1alpha1.StepOutputs{{
+			Outputs: oamv1alpha1.StepOutputs{{
 				ValueFrom: "output.score",
 				Name:      "myscore3",
 			}},

@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/condition"
 )
 
@@ -72,19 +73,19 @@ func (w WorkflowRunList) Less(i, j int) bool {
 // WorkflowRunSpec is the spec for the WorkflowRun
 type WorkflowRunSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Context      *runtime.RawExtension `json:"context,omitempty"`
-	Mode         *WorkflowExecuteMode  `json:"mode,omitempty"`
-	WorkflowSpec *WorkflowSpec         `json:"workflowSpec,omitempty"`
-	WorkflowRef  string                `json:"workflowRef,omitempty"`
+	Context      *runtime.RawExtension            `json:"context,omitempty"`
+	Mode         *oamv1alpha1.WorkflowExecuteMode `json:"mode,omitempty"`
+	WorkflowSpec *oamv1alpha1.WorkflowSpec        `json:"workflowSpec,omitempty"`
+	WorkflowRef  string                           `json:"workflowRef,omitempty"`
 }
 
 // WorkflowRunStatus record the status of workflow run
 type WorkflowRunStatus struct {
 	condition.ConditionedStatus `json:",inline"`
 
-	Mode    WorkflowExecuteMode `json:"mode"`
-	Phase   WorkflowRunPhase    `json:"status"`
-	Message string              `json:"message,omitempty"`
+	Mode    oamv1alpha1.WorkflowExecuteMode `json:"mode"`
+	Phase   WorkflowRunPhase                `json:"status"`
+	Message string                          `json:"message,omitempty"`
 
 	Suspend      bool   `json:"suspend"`
 	SuspendState string `json:"suspendState,omitempty"`
@@ -97,19 +98,6 @@ type WorkflowRunStatus struct {
 
 	StartTime metav1.Time `json:"startTime,omitempty"`
 	EndTime   metav1.Time `json:"endTime,omitempty"`
-}
-
-// WorkflowSpec defines workflow steps and other attributes
-type WorkflowSpec struct {
-	Steps []WorkflowStep `json:"steps,omitempty"`
-}
-
-// WorkflowExecuteMode defines the mode of workflow execution
-type WorkflowExecuteMode struct {
-	// Steps is the mode of workflow steps execution
-	Steps WorkflowMode `json:"steps,omitempty"`
-	// SubSteps is the mode of workflow sub steps execution
-	SubSteps WorkflowMode `json:"subSteps,omitempty"`
 }
 
 // WorkflowRunPhase is a label for the condition of a WorkflowRun at the current time
@@ -132,77 +120,11 @@ const (
 	WorkflowStateSkipped WorkflowRunPhase = "skipped"
 )
 
-// +kubebuilder:object:root=true
-
-// Workflow is the Schema for the workflow API
-// +kubebuilder:storageversion
-// +kubebuilder:resource:categories={oam}
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type Workflow struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Mode         *WorkflowExecuteMode `json:"mode,omitempty"`
-	WorkflowSpec `json:",inline"`
-}
-
-// +kubebuilder:object:root=true
-
-// WorkflowList contains a list of Workflow
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type WorkflowList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Workflow `json:"items"`
-}
-
-// WorkflowStep defines how to execute a workflow step.
-type WorkflowStep struct {
-	WorkflowStepBase `json:",inline"`
-	// Mode is only valid for sub steps, it defines the mode of the sub steps
-	// +nullable
-	Mode     WorkflowMode       `json:"mode,omitempty"`
-	SubSteps []WorkflowStepBase `json:"subSteps,omitempty"`
-}
-
-// WorkflowStepMeta contains the meta data of a workflow step
-type WorkflowStepMeta struct {
-	Alias string `json:"alias,omitempty"`
-}
-
-// WorkflowStepBase defines the workflow step base
-type WorkflowStepBase struct {
-	// Name is the unique name of the workflow step.
-	Name string `json:"name,omitempty"`
-	// Type is the type of the workflow step.
-	Type string `json:"type"`
-	// Meta is the meta data of the workflow step.
-	Meta *WorkflowStepMeta `json:"meta,omitempty"`
-	// If is the if condition of the step
-	If string `json:"if,omitempty"`
-	// Timeout is the timeout of the step
-	Timeout string `json:"timeout,omitempty"`
-	// DependsOn is the dependency of the step
-	DependsOn []string `json:"dependsOn,omitempty"`
-	// Inputs is the inputs of the step
-	Inputs StepInputs `json:"inputs,omitempty"`
-	// Outputs is the outputs of the step
-	Outputs StepOutputs `json:"outputs,omitempty"`
-
-	// Properties is the properties of the step
-	// +kubebuilder:pruning:PreserveUnknownFields
-	Properties *runtime.RawExtension `json:"properties,omitempty"`
-}
-
-// WorkflowMode describes the mode of workflow
-type WorkflowMode string
-
 const (
 	// WorkflowModeDAG describes the DAG mode of workflow
-	WorkflowModeDAG WorkflowMode = "DAG"
+	WorkflowModeDAG oamv1alpha1.WorkflowMode = "DAG"
 	// WorkflowModeStep describes the step by step mode of workflow
-	WorkflowModeStep WorkflowMode = "StepByStep"
+	WorkflowModeStep oamv1alpha1.WorkflowMode = "StepByStep"
 )
 
 // StepStatus record the base status of workflow step, which could be workflow step or subStep
@@ -257,21 +179,3 @@ const (
 	// WorkflowStepPhaseSuspending will make the controller suspend the workflow.
 	WorkflowStepPhaseSuspending WorkflowStepPhase = "suspending"
 )
-
-// StepOutputs defines output variable of WorkflowStep
-type StepOutputs []OutputItem
-
-// StepInputs defines variable input of WorkflowStep
-type StepInputs []InputItem
-
-// InputItem defines an input variable of WorkflowStep
-type InputItem struct {
-	ParameterKey string `json:"parameterKey,omitempty"`
-	From         string `json:"from"`
-}
-
-// OutputItem defines an output variable of WorkflowStep
-type OutputItem struct {
-	ValueFrom string `json:"valueFrom"`
-	Name      string `json:"name"`
-}

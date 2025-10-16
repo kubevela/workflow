@@ -18,6 +18,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 type testEngine struct {
@@ -47,14 +49,14 @@ func (e *testEngine) GetOperation() *types.Operation {
 func TestStepGroupStep(t *testing.T) {
 	r := require.New(t)
 	ctx := newWorkflowContextForTest(t)
-	subRunner, err := StepGroup(v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	subRunner, err := StepGroup(oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name: "sub",
 		},
 	}, &types.TaskGeneratorOptions{ID: "1"})
 	r.NoError(err)
-	runner, err := StepGroup(v1alpha1.WorkflowStep{
-		WorkflowStepBase: v1alpha1.WorkflowStepBase{
+	runner, err := StepGroup(oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 			Name:      "test",
 			DependsOn: []string{"depend"},
 		},
@@ -77,7 +79,7 @@ func TestStepGroupStep(t *testing.T) {
 	// test skip
 	status, operations, err := runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Skip: true}, nil
 			},
 		},
@@ -95,7 +97,7 @@ func TestStepGroupStep(t *testing.T) {
 	// test timeout
 	status, operations, err = runner.Run(ctx, &types.TaskRunOptions{
 		PreCheckHooks: []types.TaskPreCheckHook{
-			func(step v1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
 				return &types.PreCheckResult{Timeout: true}, nil
 			},
 		},
