@@ -35,7 +35,7 @@ check-diff: reviewable ## Execute auto-gen code commands and ensure branch is cl
 	@$(OK) branch is clean
 
 .PHONY: manifests
-manifests: controller-gen ## Generate CustomResourceDefinition objects.
+manifests: controller-gen sync-crds ## Generate CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=config/crd/bases
 	mv config/crd/bases/* charts/vela-workflow/crds/
 

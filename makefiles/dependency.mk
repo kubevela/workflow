@@ -25,12 +25,12 @@ else
 		echo $(shell kustomize version);\
 		echo $(KUSTOMIZE_VERSION);\
 		echo $(shell kustomize version | grep $(KUSTOMIZE_VERSION));\
-    echo "installing kustomize-v$(KUSTOMIZE_VERSION) into $(shell pwd)/bin" ;\
-    mkdir -p $(shell pwd)/bin ;\
-    rm -f $(KUSTOMIZE) ;\
+	echo "installing kustomize-v$(KUSTOMIZE_VERSION) into $(shell pwd)/bin" ;\
+	mkdir -p $(shell pwd)/bin ;\
+	rm -f $(KUSTOMIZE) ;\
 	curl -sS https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash -s $(KUSTOMIZE_VERSION) $(shell pwd)/bin;\
 	echo 'Install succeed' ;\
-    }
+	}
 endif
 
 .PHONY: staticchecktool
@@ -100,3 +100,11 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+.PHONY: sync-crds
+PKG_MODULE = github.com/kubevela/pkg # fetch common crds from the pkg repo instead of generating locally
+sync-crds: ## Copy CRD from pinned module version in go.mod
+	go mod tidy
+	@moddir=$$(go list -m -f '{{.Dir}}' $(PKG_MODULE) 2>/dev/null); \
+	src="$$moddir/crds/core.oam.dev_workflows.yaml"; \
+	cp "$$src" "charts/vela-workflow/crds/"
