@@ -14,6 +14,10 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 KUSTOMIZE_VERSION ?= 4.5.5
 CONTROLLER_TOOLS_VERSION ?= v0.18
 
+.PHONY: tidy
+tidy:
+	go mod tidy
+
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
 kustomize:
@@ -104,7 +108,6 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: sync-crds
 PKG_MODULE = github.com/kubevela/pkg # fetch common crds from the pkg repo instead of generating locally
 sync-crds: ## Copy CRD from pinned module version in go.mod
-	go mod tidy
 	@moddir=$$(go list -m -f '{{.Dir}}' $(PKG_MODULE) 2>/dev/null); \
 	src="$$moddir/crds/core.oam.dev_workflows.yaml"; \
 	cp "$$src" "charts/vela-workflow/crds/"

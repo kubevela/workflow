@@ -26,7 +26,6 @@ help: ## Display this help.
 
 .PHONY: reviewable
 reviewable: manifests fmt vet lint staticcheck helm-doc-gen
-	go mod tidy
 
 .PHONY: check-diff
 check-diff: reviewable ## Execute auto-gen code commands and ensure branch is clean.
@@ -35,7 +34,7 @@ check-diff: reviewable ## Execute auto-gen code commands and ensure branch is cl
 	@$(OK) branch is clean
 
 .PHONY: manifests
-manifests: controller-gen sync-crds ## Generate CustomResourceDefinition objects.
+manifests: tidy controller-gen sync-crds ## Generate CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=config/crd/bases
 	mv config/crd/bases/* charts/vela-workflow/crds/
 
