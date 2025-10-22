@@ -109,5 +109,8 @@ $(ENVTEST): $(LOCALBIN)
 PKG_MODULE = github.com/kubevela/pkg # fetch common crds from the pkg repo instead of generating locally
 sync-crds: ## Copy CRD from pinned module version in go.mod
 	@moddir=$$(go list -m -f '{{.Dir}}' $(PKG_MODULE) 2>/dev/null); \
-	src="$$moddir/crds/core.oam.dev_workflows.yaml"; \
-	cp -f "$$src" "charts/vela-workflow/crds/"
+	mkdir -p config/crd/bases; \
+	for file in $(COMMON_CRD_FILES); do \
+		src="$$moddir/crds/$$file"; \
+		cp -f "$$src" "config/crd/bases/"; \
+	done
