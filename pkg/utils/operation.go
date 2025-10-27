@@ -36,6 +36,8 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 // WorkflowOperator is operation handler for workflow's suspend/resume/rollback/restart/terminate
@@ -340,11 +342,11 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	}
 	mode := run.Status.Mode
 
-	var steps []v1alpha1.WorkflowStep
+	var steps []oamv1alpha1.WorkflowStep
 	if run.Spec.WorkflowSpec != nil {
 		steps = run.Spec.WorkflowSpec.Steps
 	} else {
-		workflow := &v1alpha1.Workflow{}
+		workflow := &oamv1alpha1.Workflow{}
 		if err := cli.Get(ctx, client.ObjectKey{Namespace: run.Namespace, Name: run.Spec.WorkflowRef}, workflow); err != nil {
 			return err
 		}
@@ -373,7 +375,7 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 }
 
 // CleanStatusFromStep cleans status and context data from a specified step
-func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode v1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
+func CleanStatusFromStep(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode oamv1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
 	found := false
 	dependency := make([]string, 0)
 	for i, step := range stepStatus {
@@ -418,7 +420,7 @@ func CleanStatusFromStep(steps []v1alpha1.WorkflowStep, stepStatus []v1alpha1.Wo
 }
 
 // nolint:staticcheck
-func clearContextVars(steps []v1alpha1.WorkflowStep, v cue.Value, stepName string, dependency []string) (string, error) {
+func clearContextVars(steps []oamv1alpha1.WorkflowStep, v cue.Value, stepName string, dependency []string) (string, error) {
 	outputs := make([]string, 0)
 	for _, step := range steps {
 		if step.Name == stepName || stringsContain(dependency, step.Name) {
@@ -489,7 +491,7 @@ func stringsContain(items []string, source string) bool {
 	return false
 }
 
-func getStepDependency(steps []v1alpha1.WorkflowStep, stepName string, dag bool) []string {
+func getStepDependency(steps []oamv1alpha1.WorkflowStep, stepName string, dag bool) []string {
 	if !dag {
 		dependency := make([]string, 0)
 		for i, step := range steps {

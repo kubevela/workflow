@@ -37,6 +37,8 @@ import (
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 // GenerateRunners generates task runners
@@ -70,13 +72,13 @@ func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstanc
 
 // GenerateWorkflowInstance generates a workflow instance
 func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) (*types.WorkflowInstance, error) {
-	var steps []v1alpha1.WorkflowStep
+	var steps []oamv1alpha1.WorkflowStep
 	mode := run.Spec.Mode
 	switch {
 	case run.Spec.WorkflowSpec != nil:
 		steps = run.Spec.WorkflowSpec.Steps
 	case run.Spec.WorkflowRef != "":
-		template := new(v1alpha1.Workflow)
+		template := new(oamv1alpha1.Workflow)
 		if err := cli.Get(ctx, client.ObjectKey{
 			Name:      run.Spec.WorkflowRef,
 			Namespace: run.Namespace,
@@ -148,14 +150,14 @@ func initStepGeneratorOptions(_ monitorContext.Context, instance *types.Workflow
 
 func generateTaskRunner(ctx context.Context,
 	instance *types.WorkflowInstance,
-	step v1alpha1.WorkflowStep,
+	step oamv1alpha1.WorkflowStep,
 	taskDiscover types.TaskDiscover,
 	options *types.TaskGeneratorOptions,
 	stepOptions types.StepGeneratorOptions) (types.TaskRunner, error) {
 	if step.Type == types.WorkflowStepTypeStepGroup {
 		var subTaskRunners []types.TaskRunner
 		for _, subStep := range step.SubSteps {
-			workflowStep := v1alpha1.WorkflowStep{
+			workflowStep := oamv1alpha1.WorkflowStep{
 				WorkflowStepBase: subStep,
 			}
 			o := &types.TaskGeneratorOptions{

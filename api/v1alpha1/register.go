@@ -51,6 +51,5 @@ var (
 )
 
 func init() {
-	SchemeBuilder.Register(&Workflow{}, &WorkflowList{})
 	SchemeBuilder.Register(&WorkflowRun{}, &WorkflowRunList{})
 }

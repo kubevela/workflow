@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/utils"
 )
@@ -47,10 +48,10 @@ var _ = Describe("Test Backup", func() {
 			Namespace: namespace,
 		},
 		Spec: v1alpha1.WorkflowRunSpec{
-			WorkflowSpec: &v1alpha1.WorkflowSpec{
-				Steps: []v1alpha1.WorkflowStep{
+			WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
 					{
-						WorkflowStepBase: v1alpha1.WorkflowStepBase{
+						WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 							Name: "step-1",
 							Type: "suspend",
 						},

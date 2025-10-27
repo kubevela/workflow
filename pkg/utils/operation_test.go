@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
@@ -691,8 +692,8 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "not-found",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{},
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{},
 					},
 				},
 				Status: v1alpha1.WorkflowRunStatus{},
@@ -706,8 +707,8 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "step-not-failed",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{},
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{},
 					},
 				},
 				Status: v1alpha1.WorkflowRunStatus{
@@ -738,12 +739,12 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "retry-step",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step1",
-									Outputs: v1alpha1.StepOutputs{
+									Outputs: oamv1alpha1.StepOutputs{
 										{
 											Name: "step1-output1",
 										},
@@ -751,9 +752,9 @@ func TestRestartRunStep(t *testing.T) {
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step2",
-									Outputs: v1alpha1.StepOutputs{
+									Outputs: oamv1alpha1.StepOutputs{
 										{
 											Name: "step2-output1",
 										},
@@ -764,9 +765,9 @@ func TestRestartRunStep(t *testing.T) {
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step3",
-									Outputs: v1alpha1.StepOutputs{
+									Outputs: oamv1alpha1.StepOutputs{
 										{
 											Name: "step3-output1",
 										},
@@ -788,7 +789,7 @@ func TestRestartRunStep(t *testing.T) {
 						Name:      "workflow-retry-step-context",
 						Namespace: "default",
 					},
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps: v1alpha1.WorkflowModeStep,
 					},
 					Steps: []v1alpha1.WorkflowStepStatus{
@@ -820,7 +821,7 @@ func TestRestartRunStep(t *testing.T) {
 			},
 			expected: &v1alpha1.WorkflowRun{
 				Status: v1alpha1.WorkflowRunStatus{
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps: v1alpha1.WorkflowModeStep,
 					},
 					ContextBackend: &corev1.ObjectReference{
@@ -850,18 +851,18 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "retry-step",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name:      "step1",
 									DependsOn: []string{"step3"},
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step2",
-									Outputs: v1alpha1.StepOutputs{
+									Outputs: oamv1alpha1.StepOutputs{
 										{
 											Name: "step2-output1",
 										},
@@ -872,9 +873,9 @@ func TestRestartRunStep(t *testing.T) {
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step3",
-									Inputs: v1alpha1.StepInputs{
+									Inputs: oamv1alpha1.StepInputs{
 										{
 											From: "step2-output1",
 										},
@@ -893,7 +894,7 @@ func TestRestartRunStep(t *testing.T) {
 						Name:      "workflow-retry-step-context",
 						Namespace: "default",
 					},
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps: v1alpha1.WorkflowModeDAG,
 					},
 					Steps: []v1alpha1.WorkflowStepStatus{
@@ -925,7 +926,7 @@ func TestRestartRunStep(t *testing.T) {
 			},
 			expected: &v1alpha1.WorkflowRun{
 				Status: v1alpha1.WorkflowRunStatus{
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps: v1alpha1.WorkflowModeDAG,
 					},
 					ContextBackend: &corev1.ObjectReference{
@@ -948,17 +949,17 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "retry-sub-step",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step1",
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step2",
-									Outputs: v1alpha1.StepOutputs{
+									Outputs: oamv1alpha1.StepOutputs{
 										{
 											Name: "step2-output1",
 										},
@@ -967,13 +968,13 @@ func TestRestartRunStep(t *testing.T) {
 										},
 									},
 								},
-								SubSteps: []v1alpha1.WorkflowStepBase{
+								SubSteps: []oamv1alpha1.WorkflowStepBase{
 									{
 										Name: "step2-sub1",
 									},
 									{
 										Name: "step2-sub2",
-										Outputs: v1alpha1.StepOutputs{
+										Outputs: oamv1alpha1.StepOutputs{
 											{
 												Name: "step2-sub2-output1",
 											},
@@ -985,7 +986,7 @@ func TestRestartRunStep(t *testing.T) {
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step3",
 								},
 							},
@@ -997,7 +998,7 @@ func TestRestartRunStep(t *testing.T) {
 					Finished:   true,
 					Suspend:    true,
 					EndTime:    metav1.Time{Time: time.Now()},
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps:    v1alpha1.WorkflowModeStep,
 						SubSteps: v1alpha1.WorkflowModeStep,
 					},
@@ -1043,7 +1044,7 @@ func TestRestartRunStep(t *testing.T) {
 			},
 			expected: &v1alpha1.WorkflowRun{
 				Status: v1alpha1.WorkflowRunStatus{
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps:    v1alpha1.WorkflowModeStep,
 						SubSteps: v1alpha1.WorkflowModeStep,
 					},
@@ -1085,25 +1086,25 @@ func TestRestartRunStep(t *testing.T) {
 					Name: "retry-sub-step",
 				},
 				Spec: v1alpha1.WorkflowRunSpec{
-					WorkflowSpec: &v1alpha1.WorkflowSpec{
-						Steps: []v1alpha1.WorkflowStep{
+					WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+						Steps: []oamv1alpha1.WorkflowStep{
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step1",
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name: "step2",
 								},
-								SubSteps: []v1alpha1.WorkflowStepBase{
+								SubSteps: []oamv1alpha1.WorkflowStepBase{
 									{
 										Name:      "step2-sub1",
 										DependsOn: []string{"step2-sub2"},
 									},
 									{
 										Name: "step2-sub2",
-										Outputs: v1alpha1.StepOutputs{
+										Outputs: oamv1alpha1.StepOutputs{
 											{
 												Name: "step2-sub2-output1",
 											},
@@ -1111,7 +1112,7 @@ func TestRestartRunStep(t *testing.T) {
 									},
 									{
 										Name: "step2-sub3",
-										Inputs: v1alpha1.StepInputs{
+										Inputs: oamv1alpha1.StepInputs{
 											{
 												From: "step2-sub2-output1",
 											},
@@ -1120,7 +1121,7 @@ func TestRestartRunStep(t *testing.T) {
 								},
 							},
 							{
-								WorkflowStepBase: v1alpha1.WorkflowStepBase{
+								WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 									Name:      "step3",
 									DependsOn: []string{"step2"},
 								},
@@ -1137,7 +1138,7 @@ func TestRestartRunStep(t *testing.T) {
 						Name:      "workflow-retry-sub-step-context",
 						Namespace: "default",
 					},
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps:    v1alpha1.WorkflowModeDAG,
 						SubSteps: v1alpha1.WorkflowModeDAG,
 					},
@@ -1179,7 +1180,7 @@ func TestRestartRunStep(t *testing.T) {
 			},
 			expected: &v1alpha1.WorkflowRun{
 				Status: v1alpha1.WorkflowRunStatus{
-					Mode: v1alpha1.WorkflowExecuteMode{
+					Mode: oamv1alpha1.WorkflowExecuteMode{
 						Steps:    v1alpha1.WorkflowModeDAG,
 						SubSteps: v1alpha1.WorkflowModeDAG,
 					},

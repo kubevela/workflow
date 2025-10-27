@@ -29,10 +29,12 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 // Input set data to parameter.
-func Input(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowStep) (cue.Value, error) {
+func Input(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.WorkflowStep) (cue.Value, error) {
 	filledVal := paramValue
 	for _, input := range step.Inputs {
 		inputValue, err := ctx.GetVar(strings.Split(input.From, ".")...)
@@ -58,7 +60,7 @@ func Input(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowSt
 }
 
 // Output get data from task value.
-func Output(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
+func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
 	errMsg := ""
 	if wfTypes.IsStepFinish(status.Phase, status.Reason) {
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)

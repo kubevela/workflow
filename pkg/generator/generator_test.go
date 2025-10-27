@@ -30,6 +30,8 @@ import (
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/types"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 var _ = Describe("Test workflow step runner generator", func() {
@@ -65,13 +67,13 @@ var _ = Describe("Test workflow step runner generator", func() {
 				Namespace: namespaceName,
 			},
 			Spec: v1alpha1.WorkflowRunSpec{
-				WorkflowSpec: &v1alpha1.WorkflowSpec{
-					Steps: []v1alpha1.WorkflowStep{
+				WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+					Steps: []oamv1alpha1.WorkflowStep{
 						{
-							WorkflowStepBase: v1alpha1.WorkflowStepBase{
+							WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 								Name: "step-1",
 								Type: "suspend",
-								Inputs: v1alpha1.StepInputs{
+								Inputs: oamv1alpha1.StepInputs{
 									{
 										From:         "test",
 										ParameterKey: "test",
@@ -103,14 +105,14 @@ var _ = Describe("Test workflow step runner generator", func() {
 				Namespace: namespaceName,
 			},
 			Spec: v1alpha1.WorkflowRunSpec{
-				WorkflowSpec: &v1alpha1.WorkflowSpec{
-					Steps: []v1alpha1.WorkflowStep{
+				WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+					Steps: []oamv1alpha1.WorkflowStep{
 						{
-							WorkflowStepBase: v1alpha1.WorkflowStepBase{
+							WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
 								Name: "step-1",
 								Type: "step-group",
 							},
-							SubSteps: []v1alpha1.WorkflowStepBase{
+							SubSteps: []oamv1alpha1.WorkflowStepBase{
 								{
 									Name: "step-1-1",
 									Type: "suspend",

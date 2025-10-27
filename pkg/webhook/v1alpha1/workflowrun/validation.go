@@ -24,17 +24,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
 
 // ValidateWorkflow validates the Application workflow
 func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.WorkflowRun) field.ErrorList {
 	var errs field.ErrorList
-	var steps []v1alpha1.WorkflowStep
+	var steps []oamv1alpha1.WorkflowStep
 	if wr.Spec.WorkflowSpec != nil {
 		steps = wr.Spec.WorkflowSpec.Steps
 	} else {
-		w := &v1alpha1.Workflow{}
+		w := &oamv1alpha1.Workflow{}
 		if err := h.Client.Get(ctx, client.ObjectKey{Namespace: wr.Namespace, Name: wr.Spec.WorkflowRef}, w); err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "workflowRef"), wr.Spec.WorkflowRef, fmt.Sprintf("failed to get workflow ref: %v", err)))
 			return errs

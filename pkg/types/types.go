@@ -27,6 +27,7 @@ import (
 	"github.com/kubevela/pkg/cue/cuex"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
@@ -40,8 +41,8 @@ type WorkflowInstance struct {
 	OwnerInfo []metav1.OwnerReference
 	Debug     bool
 	Context   map[string]interface{}
-	Mode      *v1alpha1.WorkflowExecuteMode
-	Steps     []v1alpha1.WorkflowStep
+	Mode      *oamv1alpha1.WorkflowExecuteMode
+	Steps     []oamv1alpha1.WorkflowStep
 	Status    v1alpha1.WorkflowRunStatus
 }
 
@@ -86,7 +87,7 @@ type TaskRunOptions struct {
 	PreCheckHooks []TaskPreCheckHook
 	PreStartHooks []TaskPreStartHook
 	PostStopHooks []TaskPostStopHook
-	GetTracer     func(id string, step v1alpha1.WorkflowStep) monitorContext.Context
+	GetTracer     func(id string, step oamv1alpha1.WorkflowStep) monitorContext.Context
 	RunSteps      func(isDag bool, runners ...TaskRunner) (*v1alpha1.WorkflowRunStatus, error)
 	Debug         func(step string, v cue.Value) error
 	StepStatus    map[string]v1alpha1.StepStatus
@@ -109,13 +110,13 @@ type PreCheckOptions struct {
 type StatusPatcher func(ctx context.Context, status *v1alpha1.WorkflowRunStatus, isUpdate bool) error
 
 // TaskPreCheckHook is the hook for pre check.
-type TaskPreCheckHook func(step v1alpha1.WorkflowStep, options *PreCheckOptions) (*PreCheckResult, error)
+type TaskPreCheckHook func(step oamv1alpha1.WorkflowStep, options *PreCheckOptions) (*PreCheckResult, error)
 
 // TaskPreStartHook run before task execution.
-type TaskPreStartHook func(ctx wfContext.Context, paramValue cue.Value, step v1alpha1.WorkflowStep) (cue.Value, error)
+type TaskPreStartHook func(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.WorkflowStep) (cue.Value, error)
 
 // TaskPostStopHook  run after task execution.
-type TaskPostStopHook func(ctx wfContext.Context, taskValue cue.Value, step v1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error
+type TaskPostStopHook func(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error
 
 // Operation is workflow operation object.
 type Operation struct {
@@ -127,15 +128,15 @@ type Operation struct {
 }
 
 // TaskGenerator will generate taskRunner.
-type TaskGenerator func(wfStep v1alpha1.WorkflowStep, options *TaskGeneratorOptions) (TaskRunner, error)
+type TaskGenerator func(wfStep oamv1alpha1.WorkflowStep, options *TaskGeneratorOptions) (TaskRunner, error)
 
 // TaskGeneratorOptions is the options for generate task.
 type TaskGeneratorOptions struct {
 	ID                 string
 	PrePhase           v1alpha1.WorkflowStepPhase
-	StepConvertor      func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	StepConvertor      func(step oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error)
 	SubTaskRunners     []TaskRunner
-	SubStepExecuteMode v1alpha1.WorkflowMode
+	SubStepExecuteMode oamv1alpha1.WorkflowMode
 	ProcessContext     process.Context
 }
 
@@ -143,7 +144,7 @@ type TaskGeneratorOptions struct {
 type StepGeneratorOptions struct {
 	ProcessCtx     process.Context
 	TemplateLoader template.Loader
-	StepConvertor  map[string]func(step v1alpha1.WorkflowStep) (v1alpha1.WorkflowStep, error)
+	StepConvertor  map[string]func(step oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error)
 	LogLevel       int
 	Compiler       *cuex.Compiler
 }
