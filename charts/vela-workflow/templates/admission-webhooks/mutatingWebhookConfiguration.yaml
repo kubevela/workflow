@@ -37,6 +37,5 @@ webhooks:
     admissionReviewVersions:
       - v1beta1
       - v1
-    timeoutSeconds: 5
 
 {{- end -}}
