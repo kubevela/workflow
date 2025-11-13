@@ -21,6 +21,7 @@ webhooks:
     failurePolicy: Fail
     {{- end }}
     name: mutating.core.oam.dev.v1alpha1.workflowruns
+    timeoutSeconds: {{ .Values.admissionWebhookTimeout }}
     sideEffects: None
     rules:
       - apiGroups:
@@ -36,6 +37,5 @@ webhooks:
     admissionReviewVersions:
       - v1beta1
       - v1
-    timeoutSeconds: 5
 
 {{- end -}}
