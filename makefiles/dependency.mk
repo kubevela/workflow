@@ -107,10 +107,16 @@ $(ENVTEST): $(LOCALBIN)
 
 .PHONY: sync-crds
 PKG_MODULE = github.com/kubevela/pkg # fetch common crds from the pkg repo instead of generating locally
-sync-crds: ## Copy CRD from pinned module version in go.mod
+sync-crds: ## Copy CRD from pinned module version in go.mod and fetch workflowstepdefinitions from kubevela repo
+	@echo "Syncing CRDs from pkg module..."
 	@moddir=$$(go list -m -f '{{.Dir}}' $(PKG_MODULE) 2>/dev/null); \
 	mkdir -p config/crd/bases; \
 	for file in $(COMMON_CRD_FILES); do \
 		src="$$moddir/crds/$$file"; \
 		cp -f "$$src" "config/crd/bases/"; \
 	done
+	@echo "Fetching workflowstepdefinitions CRD from kubevela repo ($(KUBEVELA_VERSION))..."
+	@curl -fsSL $(KUBEVELA_RAW_URL)/core.oam.dev_workflowstepdefinitions.yaml \
+		-o config/crd/bases/core.oam.dev_workflowstepdefinitions.yaml || \
+		(echo "Failed to fetch workflowstepdefinitions CRD from kubevela repo" && exit 1)
+	@echo "Successfully synced all CRDs"

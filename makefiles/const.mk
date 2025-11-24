@@ -70,5 +70,9 @@ VELA_RUNTIME_ROLLOUT_TEST_IMAGE  ?= vela-runtime-rollout-test:$(GIT_COMMIT)
 RUNTIME_CLUSTER_CONFIG ?= /tmp/worker.client.kubeconfig
 RUNTIME_CLUSTER_NAME ?= worker
 
+# KubeVela version/branch to fetch workflowstepdefinitions CRD from
+KUBEVELA_VERSION ?= master
+KUBEVELA_RAW_URL = https://raw.githubusercontent.com/kubevela/kubevela/$(KUBEVELA_VERSION)/charts/vela-core/crds
+
 COMMON_CRD_FILES = \
   core.oam.dev_workflows.yaml
