@@ -35,12 +35,12 @@ import (
 const (
 	// SaveInputPropertiesKey define the key name for saving the input properties in the secret.
 	SaveInputPropertiesKey = "input-properties"
-	// ConfigTemplateLabel is the label key for config template
-	ConfigTemplateLabel = "config.oam.dev/template"
-	// ConfigTypeLabel is the label key for config type
+	// ConfigCatalogLabel is the label key for config catalog (used by vela config list)
+	ConfigCatalogLabel = "config.oam.dev/catalog"
+	// ConfigCatalogValue is the label value for KubeVela config catalog
+	ConfigCatalogValue = "velacore-config"
+	// ConfigTypeLabel is the label key for config type/template
 	ConfigTypeLabel = "config.oam.dev/type"
-	// ConfigTypeConfig is the label value for config type
-	ConfigTypeConfig = "config"
 )
 
 // ErrRequestInvalid means the request is invalid
@@ -79,7 +79,7 @@ func CreateConfig(ctx context.Context, params *CreateConfigParams) (*any, error)
 			Name:      vars.Name,
 			Namespace: vars.Namespace,
 			Labels: map[string]string{
-				ConfigTypeLabel: ConfigTypeConfig,
+				ConfigCatalogLabel: ConfigCatalogValue,
 			},
 		},
 		Data: map[string][]byte{
@@ -87,9 +87,9 @@ func CreateConfig(ctx context.Context, params *CreateConfigParams) (*any, error)
 		},
 	}
 
-	// Add template label if provided
+	// Add template/type label if provided
 	if vars.Template != "" {
-		secret.Labels[ConfigTemplateLabel] = vars.Template
+		secret.Labels[ConfigTypeLabel] = vars.Template
 	}
 
 	cli := params.KubeClient
@@ -197,8 +197,8 @@ func ListConfig(ctx context.Context, params *ListConfigParams) (*ListConfigRetur
 	listOpts := []client.ListOption{
 		client.InNamespace(vars.Namespace),
 		client.MatchingLabels{
-			ConfigTypeLabel:     ConfigTypeConfig,
-			ConfigTemplateLabel: vars.Template,
+			ConfigCatalogLabel: ConfigCatalogValue,
+			ConfigTypeLabel:    vars.Template,
 		},
 	}
 
