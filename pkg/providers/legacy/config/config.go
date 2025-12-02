@@ -116,19 +116,19 @@ func CreateConfig(ctx context.Context, params *CreateConfigParams) (*any, error)
 	return nil, nil
 }
 
-// NamespacedName is the namespaced name
-type NamespacedName struct {
+// ReadConfigVars is the input vars for reading a config
+type ReadConfigVars struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 }
 
-// ReadConfigParams is the read params
-type ReadConfigParams = providertypes.LegacyParams[NamespacedName]
-
-// ReadConfigResult is the read result
+// ReadConfigResult is the output result for reading a config
 type ReadConfigResult struct {
 	Config map[string]interface{} `json:"config"`
 }
+
+// ReadConfigParams is the read params
+type ReadConfigParams = providertypes.LegacyParams[ReadConfigVars]
 
 // ReadConfig reads the config from a secret
 func ReadConfig(ctx context.Context, params *ReadConfigParams) (*ReadConfigResult, error) {
@@ -138,6 +138,10 @@ func ReadConfig(ctx context.Context, params *ReadConfigParams) (*ReadConfigResul
 	}
 
 	cli := params.KubeClient
+	if cli == nil {
+		return nil, errors.New("kube client is nil")
+	}
+
 	secret := &corev1.Secret{}
 	err := cli.Get(ctx, client.ObjectKey{Name: vars.Name, Namespace: vars.Namespace}, secret)
 	if err != nil {
@@ -158,25 +162,26 @@ func ReadConfig(ctx context.Context, params *ReadConfigParams) (*ReadConfigResul
 		return nil, err
 	}
 
+	// Ensure config is never nil
+	if config == nil {
+		config = map[string]interface{}{}
+	}
+
 	return &ReadConfigResult{Config: config}, nil
 }
 
-// ListConfigVars is the input vars for listing configs
+// ListConfigVars is the input/output vars for listing configs
 type ListConfigVars struct {
-	Namespace string `json:"namespace"`
-	Template  string `json:"template"`
+	Namespace string                   `json:"namespace"`
+	Template  string                   `json:"template"`
+	Configs   []map[string]interface{} `json:"configs,omitempty"`
 }
 
 // ListConfigParams is the list params
 type ListConfigParams = providertypes.LegacyParams[ListConfigVars]
 
-// ListConfigResult is the list result
-type ListConfigResult struct {
-	Configs []map[string]interface{} `json:"configs"`
-}
-
 // ListConfig lists the configs from secrets
-func ListConfig(ctx context.Context, params *ListConfigParams) (*ListConfigResult, error) {
+func ListConfig(ctx context.Context, params *ListConfigParams) (*ListConfigVars, error) {
 	vars := params.Params
 	if vars.Namespace == "" || vars.Template == "" {
 		return nil, ErrRequestInvalid
@@ -218,7 +223,17 @@ func ListConfig(ctx context.Context, params *ListConfigParams) (*ListConfigResul
 		configs = []map[string]interface{}{}
 	}
 
-	return &ListConfigResult{Configs: configs}, nil
+	return &ListConfigVars{
+		Namespace: vars.Namespace,
+		Template:  vars.Template,
+		Configs:   configs,
+	}, nil
+}
+
+// NamespacedName is the namespaced name for delete operations
+type NamespacedName struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // DeleteConfigParams is the delete params
@@ -260,9 +275,9 @@ func GetTemplate() string {
 // GetProviders returns the cue providers.
 func GetProviders() map[string]cuexruntime.ProviderFn {
 	return map[string]cuexruntime.ProviderFn{
-		"create": providertypes.LegacyGenericProviderFn[CreateConfigVars, any](CreateConfig),
-		"read":   providertypes.LegacyGenericProviderFn[NamespacedName, ReadConfigResult](ReadConfig),
-		"list":   providertypes.LegacyGenericProviderFn[ListConfigVars, ListConfigResult](ListConfig),
-		"delete": providertypes.LegacyGenericProviderFn[NamespacedName, any](DeleteConfig),
+		"create-config": providertypes.LegacyGenericProviderFn[CreateConfigVars, any](CreateConfig),
+		"read-config":   providertypes.LegacyGenericProviderFn[ReadConfigVars, ReadConfigResult](ReadConfig),
+		"list-config":   providertypes.LegacyGenericProviderFn[ListConfigVars, ListConfigVars](ListConfig),
+		"delete-config": providertypes.LegacyGenericProviderFn[NamespacedName, any](DeleteConfig),
 	}
 }
