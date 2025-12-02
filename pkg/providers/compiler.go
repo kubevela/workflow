@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/kubevela/workflow/pkg/providers/builtin"
+	"github.com/kubevela/workflow/pkg/providers/config"
 	"github.com/kubevela/workflow/pkg/providers/email"
 	"github.com/kubevela/workflow/pkg/providers/http"
 	"github.com/kubevela/workflow/pkg/providers/kube"
@@ -54,6 +55,7 @@ var compiler = singleton.NewSingletonE[*cuex.Compiler](func() (*cuex.Compiler, e
 		runtime.Must(cuexruntime.NewInternalPackage(LegacyProviderName, legacy.GetLegacyTemplate(), legacy.GetLegacyProviders())),
 
 		// internal packages
+		runtime.Must(cuexruntime.NewInternalPackage("config", config.GetTemplate(), config.GetProviders())),
 		runtime.Must(cuexruntime.NewInternalPackage("email", email.GetTemplate(), email.GetProviders())),
 		runtime.Must(cuexruntime.NewInternalPackage("http", http.GetTemplate(), http.GetProviders())),
 		runtime.Must(cuexruntime.NewInternalPackage("kube", kube.GetTemplate(), kube.GetProviders())),
