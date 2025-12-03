@@ -10,15 +10,28 @@ spec:
       type: create-config
       properties:
         name: sample-config
-        namespace: test
+        namespace: wr-e2e-test
         config:
           key1: value1
           key2: 2
           key3: true
           nested:
             inner: value
+    - name: read-config
+      type: read-config
+      properties:
+          name: sample-config
+          namespace: wr-e2e-test
+      outputs:
+          - name: step-outputs
+            valueFrom: "output.config.key1"
+    - name: message
+      type: print-message-in-status
+      inputs:
+          - from: step-outputs
+            parameterKey: message
     - name: delete-config
       type: delete-config
       properties:
         name: sample-config
-        namespace: test
+        namespace: wr-e2e-test
