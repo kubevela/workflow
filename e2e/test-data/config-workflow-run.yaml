@@ -17,6 +17,25 @@ spec:
           key3: true
           nested:
             inner: value
+    - name: list-config
+      type: list-config
+      properties:
+          template: ""
+          name: sample-config
+          namespace: wr-e2e-test
+      outputs:
+          - name: list-config-json
+            valueFrom: |
+              import "encoding/json"
+              json.Marshal(output.configs)
+    - name: save-list-to-configmap
+      type: export2config
+      inputs:
+          - from: list-config-json
+            parameterKey: data.configs
+      properties:
+          configName: list-config-result
+          namespace: wr-e2e-test
     - name: read-config
       type: read-config
       properties:

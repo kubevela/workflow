@@ -183,18 +183,22 @@ type ListConfigParams = providertypes.LegacyParams[ListConfigVars]
 // ListConfig lists the configs from secrets
 func ListConfig(ctx context.Context, params *ListConfigParams) (*ListConfigVars, error) {
 	vars := params.Params
-	if vars.Namespace == "" || vars.Template == "" {
+	if vars.Namespace == "" {
 		return nil, ErrRequestInvalid
 	}
 
 	cli := params.KubeClient
 	secretList := &corev1.SecretList{}
+	labels := map[string]string{
+		ConfigCatalogLabel: ConfigCatalogValue,
+	}
+	if vars.Template != "" {
+		labels[ConfigTypeLabel] = vars.Template
+	}
+
 	listOpts := []client.ListOption{
 		client.InNamespace(vars.Namespace),
-		client.MatchingLabels{
-			ConfigCatalogLabel: ConfigCatalogValue,
-			ConfigTypeLabel:    vars.Template,
-		},
+		client.MatchingLabels(labels),
 	}
 
 	if err := cli.List(ctx, secretList, listOpts...); err != nil {
