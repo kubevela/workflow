@@ -9,21 +9,48 @@ spec:
     - name: write-config
       type: create-config
       properties:
-        name: test
-        config: 
+        name: sample-config
+        namespace: wr-e2e-test
+        config:
           key1: value1
           key2: 2
           key3: true
-          key4: 
-            key5: value5
+          nested:
+            inner: value
+    - name: list-config
+      type: list-config
+      properties:
+          template: ""
+          name: sample-config
+          namespace: wr-e2e-test
+      outputs:
+          - name: list-config-json
+            valueFrom: |
+              import "encoding/json"
+              json.Marshal(output.configs)
+    - name: save-list-to-configmap
+      type: export2config
+      inputs:
+          - from: list-config-json
+            parameterKey: data.configs
+      properties:
+          configName: list-config-result
+          namespace: wr-e2e-test
     - name: read-config
       type: read-config
       properties:
-        name: test
+          name: sample-config
+          namespace: wr-e2e-test
       outputs:
-      - fromKey: config
-        name: read-config
+          - name: step-outputs
+            valueFrom: "output.config.key1"
+    - name: message
+      type: print-message-in-status
+      inputs:
+          - from: step-outputs
+            parameterKey: message
     - name: delete-config
       type: delete-config
       properties:
-        name: test
+        name: sample-config
+        namespace: wr-e2e-test

@@ -84,7 +84,7 @@ docker-build: ## Build docker image with the manager.
 # load docker image to the k3d cluster
 image-load: 
 	docker build -t ${IMG}:${IMG_TAG} -f Dockerfile.e2e .
-	k3d image import ${IMG}:${IMG_TAG} || { echo >&2 "kind not installed or error loading image: ${IMG}:${IMG_TAG}"; exit 1; }
+	k3d image import ${IMG}:${IMG_TAG} || { echo >&2 "k3d not installed or error loading image: ${IMG}:${IMG_TAG}"; exit 1; }
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.

@@ -5,6 +5,7 @@ import (
 
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
+	"github.com/kubevela/workflow/pkg/providers/legacy/config"
 	"github.com/kubevela/workflow/pkg/providers/legacy/email"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http"
 	"github.com/kubevela/workflow/pkg/providers/legacy/kube"
@@ -24,6 +25,7 @@ func registerProviders(providers map[string]cuexruntime.ProviderFn, providerFunc
 // GetLegacyProviders get legacy providers
 func GetLegacyProviders() map[string]cuexruntime.ProviderFn {
 	providers := make(map[string]cuexruntime.ProviderFn, 0)
+	registerProviders(providers, config.GetProviders())
 	registerProviders(providers, email.GetProviders())
 	registerProviders(providers, http.GetProviders())
 	registerProviders(providers, kube.GetProviders())
@@ -37,6 +39,7 @@ func GetLegacyProviders() map[string]cuexruntime.ProviderFn {
 // GetLegacyTemplate get legacy template
 func GetLegacyTemplate() string {
 	return strings.Join([]string{
+		config.GetTemplate(),
 		email.GetTemplate(),
 		http.GetTemplate(),
 		kube.GetTemplate(),
