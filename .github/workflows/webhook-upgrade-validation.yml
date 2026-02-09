@@ -1,0 +1,133 @@
+name: Webhook Upgrade Validation
+
+# TODO: Before merging, revert branches to: main, release-*, and restore tags: v*
+on:
+  push:
+    branches:
+      - fix/admission-webhook-certs-on-helm-upgrades
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - fix/admission-webhook-certs-on-helm-upgrades
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.23.8'
+
+jobs:
+  webhook-upgrade-check:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup K3d
+        uses: nolar/setup-k3d-k3s@v1.0.8
+        with:
+          version: v1.31
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and load image
+        run: make image-load
+
+      - name: Install vela-workflow baseline
+        run: |
+          helm upgrade --install \
+            --create-namespace \
+            --namespace vela-system \
+            --set image.repository=oamdev/vela-workflow \
+            --set image.tag=latest \
+            --set image.pullPolicy=IfNotPresent \
+            --wait \
+            --timeout 3m \
+            vela-workflow \
+            ./charts/vela-workflow
+
+      - name: Verify baseline webhook state
+        run: |
+          echo "=== Baseline ValidatingWebhookConfiguration ==="
+          VWH_CA=$(kubectl get validatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+          echo "caBundle length: ${#VWH_CA}"
+          if [ "$VWH_CA" = "Cg==" ] || [ -z "$VWH_CA" ]; then
+            echo "ERROR: Baseline caBundle is placeholder or empty"
+            exit 1
+          fi
+          echo "caBundle is valid (not placeholder)"
+
+          echo "=== Baseline MutatingWebhookConfiguration ==="
+          MWH_CA=$(kubectl get mutatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+          echo "caBundle length: ${#MWH_CA}"
+          if [ "$MWH_CA" = "Cg==" ] || [ -z "$MWH_CA" ]; then
+            echo "ERROR: Baseline caBundle is placeholder or empty"
+            exit 1
+          fi
+          echo "caBundle is valid (not placeholder)"
+
+      - name: Prepare failing chart (break patch job secret name)
+        run: |
+          sed -i 's/--secret-name={{ template "kubevela.fullname" . }}-admission$/--secret-name={{ template "kubevela.fullname" . }}-admission-DOES-NOT-EXIST/' \
+            charts/vela-workflow/templates/admission-webhooks/job-patch/job-patchWebhook.yaml
+
+      - name: Run Helm upgrade (expected to fail)
+        run: |
+          set +e
+          helm upgrade --install \
+            --namespace vela-system \
+            --set image.repository=oamdev/vela-workflow \
+            --set image.tag=latest \
+            --set image.pullPolicy=IfNotPresent \
+            --timeout 90s \
+            vela-workflow \
+            ./charts/vela-workflow \
+            --debug
+          status=$?
+          echo "Helm upgrade exit code: ${status}"
+          if [ $status -eq 0 ]; then
+            echo "ERROR: Expected helm upgrade to fail" >&2
+            exit 1
+          fi
+          echo "Helm upgrade failed as expected"
+
+      - name: Dump webhook configurations
+        if: ${{ always() }}
+        run: |
+          echo "=== ValidatingWebhookConfiguration ==="
+          kubectl get validatingwebhookconfiguration vela-workflow-admission -o yaml
+          echo "=== MutatingWebhookConfiguration ==="
+          kubectl get mutatingwebhookconfiguration vela-workflow-admission -o yaml
+
+      - name: Verify caBundle preserved after failed upgrade
+        run: |
+          echo "=== ValidatingWebhookConfiguration ==="
+          VWH_CA=$(kubectl get validatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+          echo "caBundle length: ${#VWH_CA}"
+          if [ "$VWH_CA" = "Cg==" ] || [ -z "$VWH_CA" ]; then
+            echo "FAIL: caBundle is placeholder or empty after failed upgrade"
+            exit 1
+          fi
+          echo "PASS: ValidatingWebhook caBundle preserved"
+
+          echo "=== MutatingWebhookConfiguration ==="
+          MWH_CA=$(kubectl get mutatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+          echo "caBundle length: ${#MWH_CA}"
+          if [ "$MWH_CA" = "Cg==" ] || [ -z "$MWH_CA" ]; then
+            echo "FAIL: caBundle is placeholder or empty after failed upgrade"
+            exit 1
+          fi
+          echo "PASS: MutatingWebhook caBundle preserved"
+
+      - name: Cleanup k3d cluster
+        if: ${{ always() }}
+        run: k3d cluster delete || true
