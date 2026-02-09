@@ -1,14 +1,17 @@
 name: Webhook Upgrade Validation
 
-# TODO: Before merging, revert branches to: main, release-*, and restore tags: v*
 on:
   push:
     branches:
-      - fix/admission-webhook-certs-on-helm-upgrades
+      - main
+      - release-*
+    tags:
+      - v*
   workflow_dispatch: {}
   pull_request:
     branches:
-      - fix/admission-webhook-certs-on-helm-upgrades
+      - main
+      - release-*
 
 permissions:
   contents: read
