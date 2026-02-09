@@ -42,6 +42,7 @@ import (
 
 	"github.com/kubevela/workflow/api/condition"
 	"github.com/kubevela/workflow/api/v1alpha1"
+	wfconfig "github.com/kubevela/workflow/pkg/config"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/executor"
 	"github.com/kubevela/workflow/pkg/features"
@@ -87,6 +88,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	defer cancel()
 
 	ctx = types.SetNamespaceInCtx(ctx, req.Namespace)
+	ctx = context.WithValue(ctx, providertypes.ConfigFactoryKey, wfconfig.NewK8sFactory(r.Client))
 	ctx = providertypes.WithLabelParams(ctx, map[string]string{
 		types.LabelWorkflowRunName:      req.Name,
 		types.LabelWorkflowRunNamespace: req.Namespace,
