@@ -163,9 +163,9 @@ func GetTemplate() string {
 // GetProviders returns the cue providers.
 func GetProviders() map[string]cuexruntime.ProviderFn {
 	return map[string]cuexruntime.ProviderFn{
-		"create": providertypes.LegacyGenericProviderFn[CreateConfigProperties, any](CreateConfig),
-		"read":   providertypes.LegacyGenericProviderFn[wfconfig.NamespacedName, ReadResult](ReadConfig),
-		"list":   providertypes.LegacyGenericProviderFn[ListVars, ListResult](ListConfig),
-		"delete": providertypes.LegacyGenericProviderFn[wfconfig.NamespacedName, any](DeleteConfig),
+		"create-config": providertypes.LegacyGenericProviderFn[CreateConfigProperties, any](CreateConfig),
+		"read-config":   providertypes.LegacyGenericProviderFn[wfconfig.NamespacedName, ReadResult](ReadConfig),
+		"list-config":   providertypes.LegacyGenericProviderFn[ListVars, ListResult](ListConfig),
+		"delete-config": providertypes.LegacyGenericProviderFn[wfconfig.NamespacedName, any](DeleteConfig),
 	}
 }

@@ -27,7 +27,9 @@ type NamespacedName struct {
 // Metadata is the user-provided metadata for a config item.
 type Metadata struct {
 	NamespacedName
-	Properties map[string]interface{} `json:"properties"`
+	Alias       string                 `json:"alias,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Properties  map[string]interface{} `json:"properties"`
 }
 
 // ConfigItem is the minimal view of a config returned by ListConfigs.
