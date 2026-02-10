@@ -1,0 +1,31 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: new-config-crud
+  namespace: vela-system
+spec:
+  workflowSpec:
+    steps:
+    - name: create-config
+      type: create-config
+      properties:
+        name: app-settings
+        config:
+          host: "postgres.default.svc"
+          port: 5432
+          log_level: "info"
+    - name: read-config
+      type: read-config
+      properties:
+        name: app-settings
+    - name: list-configs
+      type: list-config
+      properties:
+        # Lists all configs with the "velacore-config" catalog label.
+        # Returns empty when no configs match; use the template label
+        # value from create-config to narrow results.
+        template: "any"
+    - name: delete-config
+      type: delete-config
+      properties:
+        name: app-settings
