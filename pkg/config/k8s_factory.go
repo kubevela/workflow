@@ -407,7 +407,7 @@ func (f *K8sFactory) ReadConfig(ctx context.Context, namespace, name string) (ma
 }
 
 // ListConfigs lists config Secrets filtered by template name.
-func (f *K8sFactory) ListConfigs(ctx context.Context, namespace, template, _ string, _ bool) ([]*ConfigItem, error) {
+func (f *K8sFactory) ListConfigs(ctx context.Context, namespace, template, _ string, _ bool) ([]*Item, error) {
 	selector := labels.SelectorFromSet(labels.Set{
 		LabelConfigCatalog: CatalogValue,
 	})
@@ -426,7 +426,7 @@ func (f *K8sFactory) ListConfigs(ctx context.Context, namespace, template, _ str
 		return nil, err
 	}
 
-	var items []*ConfigItem
+	var items []*Item
 	for i := range secretList.Items {
 		s := &secretList.Items[i]
 		raw, ok := s.Data[DataKeyProperties]
@@ -437,7 +437,7 @@ func (f *K8sFactory) ListConfigs(ctx context.Context, namespace, template, _ str
 		if err := json.Unmarshal(raw, &props); err != nil {
 			continue
 		}
-		item := &ConfigItem{
+		item := &Item{
 			Name:       s.Name,
 			Properties: props,
 		}

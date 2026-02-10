@@ -32,8 +32,8 @@ type Metadata struct {
 	Properties  map[string]interface{} `json:"properties"`
 }
 
-// ConfigItem is the minimal view of a config returned by ListConfigs.
-type ConfigItem struct {
+// Item is the minimal view of a config returned by ListConfigs.
+type Item struct {
 	Name        string                 `json:"name"`
 	Alias       string                 `json:"alias,omitempty"`
 	Description string                 `json:"description,omitempty"`
@@ -47,6 +47,6 @@ type Factory interface {
 	ParseConfig(ctx context.Context, template NamespacedName, meta Metadata) (any, error)
 	CreateOrUpdateConfig(ctx context.Context, configItem any, ns string) error
 	ReadConfig(ctx context.Context, namespace, name string) (map[string]interface{}, error)
-	ListConfigs(ctx context.Context, namespace, template, scope string, withStatus bool) ([]*ConfigItem, error)
+	ListConfigs(ctx context.Context, namespace, template, scope string, withStatus bool) ([]*Item, error)
 	DeleteConfig(ctx context.Context, namespace, name string) error
 }

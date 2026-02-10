@@ -53,11 +53,11 @@ func (m *mockFactory) ReadConfig(_ context.Context, namespace, name string) (map
 	return nil, ErrRequestInvalid
 }
 
-func (m *mockFactory) ListConfigs(_ context.Context, _ string, _ string, _ string, _ bool) ([]*wfconfig.ConfigItem, error) {
-	var items []*wfconfig.ConfigItem
+func (m *mockFactory) ListConfigs(_ context.Context, _ string, _ string, _ string, _ bool) ([]*wfconfig.Item, error) {
+	var items []*wfconfig.Item
 	for key, props := range m.configs {
 		parts := strings.SplitN(key, "/", 2)
-		items = append(items, &wfconfig.ConfigItem{
+		items = append(items, &wfconfig.Item{
 			Name:       parts[1],
 			Properties: props,
 		})
