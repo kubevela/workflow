@@ -321,6 +321,8 @@ github.com/kubevela/kube-trigger v0.1.1-0.20250711201929-51c837aa9bd2 h1:3FvzYw6
 github.com/kubevela/kube-trigger v0.1.1-0.20250711201929-51c837aa9bd2/go.mod h1:lGeLpXHVxYPulYtVgGatFHFolkmzSmrdyhIQ7BHHJHs=
 github.com/kubevela/pkg v1.9.3-0.20251015050342-14cd204ff6fc h1:nuXTUQRQDJORMopbRD1fV4iwKT43MWgvMERM9YnrSPk=
 github.com/kubevela/pkg v1.9.3-0.20251015050342-14cd204ff6fc/go.mod h1:EmM4VIyU7KxDmPBq9hG4GpSZbGwiM76/W/8paLBk8wY=
+github.com/kubevela/pkg v1.10.0 h1:opwBitEK+Un1StWhz+iq+bWjZDge+Va65fh6BVtmjUc=
+github.com/kubevela/pkg v1.10.0/go.mod h1:EmM4VIyU7KxDmPBq9hG4GpSZbGwiM76/W/8paLBk8wY=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/lib/pq v1.10.7 h1:p7ZhMD+KsSRozJr34udlUrhboJwWAgCg34+/ZZNvZZw=
