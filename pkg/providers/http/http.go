@@ -54,11 +54,12 @@ func init() {
 
 // Request .
 type Request struct {
-	Timeout     string            `json:"timeout,omitempty"`
-	Body        string            `json:"body,omitempty"`
-	Header      map[string]string `json:"header,omitempty"`
-	Trailer     map[string]string `json:"trailer,omitempty"`
-	RateLimiter *RateLimiter      `json:"rateLimiter,omitempty"`
+	Timeout           string            `json:"timeout,omitempty"`
+	Body              string            `json:"body,omitempty"`
+	Header            map[string]string `json:"header,omitempty"`
+	Trailer           map[string]string `json:"trailer,omitempty"`
+	RateLimiter       *RateLimiter      `json:"rateLimiter,omitempty"`
+	HeadersFromSecret []HeaderSecret    `json:"headersFromSecret,omitempty"`
 }
 
 // RateLimiter .
@@ -71,6 +72,13 @@ type RateLimiter struct {
 type TLSConfig struct {
 	Secret    string `json:"secret"`
 	Namespace string `json:"namespace"`
+}
+
+// HeaderSecret resolves a single HTTP header value from a Kubernetes Secret.
+type HeaderSecret struct {
+	Name   string `json:"name"`
+	Secret string `json:"secret"`
+	Key    string `json:"key"`
 }
 
 // RequestVars is the vars for http request
@@ -132,9 +140,21 @@ func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
 		reader = strings.NewReader(request.Body)
 		header = parseHeaders(request.Header)
 		trailer = parseHeaders(request.Trailer)
+		if len(header) == 0 {
+			header.Set("Content-Type", "application/json")
+		}
+		if len(request.HeadersFromSecret) > 0 {
+			if params.KubeClient == nil {
+				return nil, errors.New("kubeClient is required for headersFromSecret")
+			}
+			ns := fmt.Sprint(params.ProcessContext.GetData(model.ContextNamespace))
+			if err = resolveHeaderSecrets(ctx, params.KubeClient, request.HeadersFromSecret, ns, header); err != nil {
+				return nil, err
+			}
+		}
 	}
-	if len(header) == 0 {
-		header = map[string][]string{}
+	if header == nil {
+		header = http.Header{}
 		header.Set("Content-Type", "application/json")
 	}
 
@@ -220,6 +240,21 @@ func getTransport(ctx context.Context, cli client.Client, secretName, ns string)
 	}
 	tr.TLSClientConfig.Certificates = []tls.Certificate{cliCrt}
 	return tr, nil
+}
+
+func resolveHeaderSecrets(ctx context.Context, cli client.Client, secrets []HeaderSecret, ns string, h http.Header) error {
+	for _, hs := range secrets {
+		secret := new(v1.Secret)
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: hs.Secret}, secret); err != nil {
+			return fmt.Errorf("secret %q not found for header %q: %w", hs.Secret, hs.Name, err)
+		}
+		val, ok := secret.Data[hs.Key]
+		if !ok {
+			return fmt.Errorf("key %q not found in secret %q", hs.Key, hs.Secret)
+		}
+		h.Set(hs.Name, string(val))
+	}
+	return nil
 }
 
 func parseHeaders(obj map[string]string) http.Header {
