@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -76,11 +77,37 @@ var _ = Describe("Test the workflow run with the built-in definitions", func() {
 			time.Second*30, time.Second*2).Should(Equal(v1alpha1.WorkflowStateSucceeded))
 	})
 
+	It("Test the workflow run that references a Workflow template via workflowRef", func() {
+		applyWorkflowFromYAML(ctx, "./test-data/ref-workflow-template.yaml", namespace)
+		wr := applyWorkflowRunFromYAML(ctx, "./test-data/ref-workflow-run.yaml", namespace)
+		Eventually(
+			func() v1alpha1.WorkflowRunPhase {
+				var getWorkflow v1alpha1.WorkflowRun
+				if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: wr.Name}, &getWorkflow); err != nil {
+					klog.Errorf("fail to query the app %s", err.Error())
+				}
+				klog.Infof("the workflow run status is %s (%+v)", getWorkflow.Status.Phase, getWorkflow.Status.Steps)
+				return getWorkflow.Status.Phase
+			},
+			time.Second*30, time.Second*2).Should(Equal(v1alpha1.WorkflowStateSucceeded))
+	})
+
 	AfterEach(func() {
 		By("Clean up resources after a test")
 		k8sClient.DeleteAllOf(ctx, &v1alpha1.WorkflowRun{}, client.InNamespace(namespace))
+		k8sClient.DeleteAllOf(ctx, &oamv1alpha1.Workflow{}, client.InNamespace(namespace))
 	})
 })
+
+func applyWorkflowFromYAML(ctx context.Context, path, ns string) oamv1alpha1.Workflow {
+	content, err := os.ReadFile(path)
+	Expect(err).Should(BeNil())
+	var workflow oamv1alpha1.Workflow
+	Expect(yaml.Unmarshal(content, &workflow)).Should(BeNil())
+	workflow.Namespace = ns
+	Expect(k8sClient.Create(ctx, &workflow)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
+	return workflow
+}
 
 func applyWorkflowRunFromYAML(ctx context.Context, path, ns string) v1alpha1.WorkflowRun {
 	content, err := os.ReadFile(path)
