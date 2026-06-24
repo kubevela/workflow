@@ -1,0 +1,7 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: message-ref
+  namespace: default
+spec:
+  workflowRef: message-template

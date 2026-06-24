@@ -48,6 +48,7 @@ import (
 	crtlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	triggerv1alpha1 "github.com/kubevela/kube-trigger/api/v1alpha1"
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	velaclient "github.com/kubevela/pkg/controller/client"
 	"github.com/kubevela/pkg/multicluster"
 
@@ -75,6 +76,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(oamv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
