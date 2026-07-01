@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
@@ -75,6 +76,40 @@ parameter: {
 }`)
 }
 
+// TestLoadUpgradesLegacyCUESyntax verifies that LoadTemplate applies CUE version
+// compatibility upgrades to templates fetched from the cluster, so legacy syntax
+// (e.g. list1 + list2) is rewritten to canonical form (list.Concat) before the
+// template reaches the workflow engine.
+func TestLoadUpgradesLegacyCUESyntax(t *testing.T) {
+	cli := &test.MockClient{
+		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+			o, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				return nil
+			}
+			var d map[string]interface{}
+			js, err := yaml.YAMLToJSON([]byte(legacyStepDefYaml))
+			if err != nil {
+				return err
+			}
+			if err := json.Unmarshal(js, &d); err != nil {
+				return err
+			}
+			o.Object = d
+			return nil
+		},
+	}
+	singleton.KubeClient.Set(cli)
+	loader := NewWorkflowStepTemplateLoader()
+
+	r := require.New(t)
+	tmpl, err := loader.LoadTemplate(context.Background(), "legacy-step")
+	r.NoError(err)
+	// Legacy list1 + list2 must be rewritten to list.Concat([list1, list2]).
+	r.True(strings.Contains(tmpl, "list.Concat"), "expected upgraded template to contain list.Concat, got: %s", tmpl)
+	r.False(strings.Contains(tmpl, "list1 + list2"), "expected legacy list arithmetic to be rewritten, got: %s", tmpl)
+}
+
 var (
 	stepDefYaml = `apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
@@ -99,4 +134,19 @@ spec:
         	// +usage=Declare the name of the component
         	component: string
         }`
+
+	// legacyStepDefYaml simulates a WorkflowStepDefinition stored in the cluster
+	// that was authored against old CUE syntax (list concatenation via +).
+	legacyStepDefYaml = `apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: legacy-step
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: |
+        list1: [1, 2, 3]
+        list2: [4, 5, 6]
+        combined: list1 + list2`
 )

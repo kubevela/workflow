@@ -56,6 +56,7 @@ import (
 	"github.com/kubevela/workflow/controllers"
 	"github.com/kubevela/workflow/pkg/backup"
 	"github.com/kubevela/workflow/pkg/common"
+	wfupgrade "github.com/kubevela/workflow/pkg/cue/upgrade"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/providers"
@@ -129,6 +130,8 @@ func main() {
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
 	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")
 	flag.BoolVar(&providers.EnableExternalPackageWatchForDefaultCompiler, "enable-external-package-watch-for-default-compiler", false, "Enable external package watch for default compiler")
+	flag.BoolVar(wfupgrade.EnableCUEVersionCompatibility, "enable-cue-version-compatibility", *wfupgrade.EnableCUEVersionCompatibility, "Automatically rewrite legacy CUE syntax in stored definitions at render time.")
+	flag.IntVar(&wfupgrade.CompatibilityCacheSize, "cue-compatibility-cache-size", wfupgrade.CompatibilityCacheSize, "Maximum number of CUE templates to cache after version compatibility rewriting. Set to 0 to disable caching.")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
 	feature.DefaultMutableFeatureGate.AddFlag(flag.CommandLine)
 	sharding.AddControllerFlags(flag.CommandLine)
@@ -137,6 +140,7 @@ func main() {
 	klog.InitFlags(nil)
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+	wfupgrade.InitCompatibilityCache(context.Background(), wfupgrade.CompatibilityCacheSize)
 	if logDebug {
 		_ = flag.Set("v", strconv.Itoa(int(common.LogDebug)))
 	}
