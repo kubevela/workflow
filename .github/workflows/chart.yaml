@@ -4,7 +4,12 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      overwrite_version:
+        description: 'Version to overwrite (e.g. v0.6.3). Leave empty to fail if version already exists.'
+        required: false
+        default: ''
 
 jobs:
   publish-images:
@@ -31,6 +36,18 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Check image does not already exist
+        run: |
+          TAG=${{ steps.vars.outputs.TAG }}
+          if [[ "$TAG" != "latest" ]]; then
+            if docker manifest inspect docker.io/oamdev/vela-workflow:${TAG} > /dev/null 2>&1; then
+              if [[ "${{ inputs.overwrite_version }}" != "$TAG" ]]; then
+                echo "Image oamdev/vela-workflow:${TAG} already exists. Set overwrite_version=${TAG} to republish."
+                exit 1
+              fi
+              echo "Image already exists but overwrite_version matches, continuing."
+            fi
+          fi
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
         with:
@@ -86,7 +103,7 @@ jobs:
           patch="0"
           current_repo_tag="$major.$minor.$patch"
           image_tag=${GITHUB_REF#refs/tags/}
-          chart_version=$latest_repo_tag
+          chart_version=$image_tag
           if [[ ${GITHUB_REF} == "refs/heads/main" ]]; then
             image_tag=latest
             chart_version=${current_repo_tag}-nightly-build
@@ -106,6 +123,15 @@ jobs:
           git config --global user.email "135009839+kubevela[bot]@users.noreply.github.com"
           git config --global user.name "kubevela[bot]"
           git clone https://x-access-token:${{ steps.get_app_token.outputs.token }}@github.com/kubevela/charts.git kubevela-charts
+          chart_version=${GITHUB_REF#refs/tags/}
+          chart_semver=${chart_version#"v"}
+          if ls kubevela-charts/docs/vela-workflow-${chart_semver}.tgz > /dev/null 2>&1; then
+            if [[ "${{ inputs.overwrite_version }}" != "${chart_version}" ]]; then
+              echo "Helm chart vela-workflow-${chart_semver} already exists. Set overwrite_version=${chart_version} to republish."
+              exit 1
+            fi
+            echo "Chart already exists but overwrite_version matches, continuing."
+          fi
           helm package $HELM_CHART --destination ./kubevela-charts/docs/
           helm repo index --url https://kubevela.github.io/charts ./kubevela-charts/docs/
           cd kubevela-charts/
