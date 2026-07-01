@@ -1,0 +1,25 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  annotations:
+    definition.oam.dev/description: Fail the workflow if two strings are not equal (e2e test helper)
+  name: assert-equal
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+        	"vela/op"
+        )
+        assert: op.#Steps & {
+        	if parameter.actual != parameter.expected {
+        		mismatch: op.#Fail & {
+        			message: "expected \(parameter.expected) but got \(parameter.actual)"
+        		}
+        	}
+        }
+        parameter: {
+        	expected: string
+        	actual:   string
+        }
