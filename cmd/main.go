@@ -111,6 +111,7 @@ func main() {
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "admission webhook listen address")
 	flag.IntVar(&controllerArgs.ConcurrentReconciles, "concurrent-reconciles", 4, "concurrent-reconciles is the concurrent reconcile number of the controller. The default value is 4")
 	flag.BoolVar(&controllerArgs.IgnoreWorkflowWithoutControllerRequirement, "ignore-workflow-without-controller-requirement", false, "If true, workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation")
+	flag.DurationVar(&controllerArgs.ReconcileTimeout, "reconcile-timeout", controllers.DefaultReconcileTimeout, "The timeout for workflowrun reconcile loop. Increase this value if your workflowrun has a large number of steps. Default is 3m.")
 	flag.Float64Var(&qps, "kube-api-qps", 50, "the qps for reconcile clients. Low qps may lead to low throughput. High qps may give stress to api-server. Raise this value if concurrent-reconciles is set to be high.")
 	flag.IntVar(&burst, "kube-api-burst", 100, "the burst for reconcile clients. Recommend setting it qps*2.")
 	flag.StringVar(&userAgent, "user-agent", "vela-workflow", "the user agent of the client.")
