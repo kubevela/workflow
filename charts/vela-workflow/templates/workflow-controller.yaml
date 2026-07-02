@@ -144,6 +144,8 @@ spec:
             - "--group-by-label={{ .Values.workflow.groupByLabel }}"
             - "--enable-external-package-for-default-compiler={{- .Values.workflow.enableExternalPackageForDefaultCompiler | toString -}}"
             - "--enable-external-package-watch-for-default-compiler={{- .Values.workflow.enableExternalPackageWatchForDefaultCompiler | toString -}}"
+            - "--enable-cue-version-compatibility={{- .Values.workflow.enableCUEVersionCompatibility | toString -}}"
+            - "--cue-compatibility-cache-size={{ .Values.workflow.cueCompatibilityCacheSize }}"
             {{ if .Values.backup.enable }}
             - "--backup-strategy={{ .Values.backup.strategy }}"
             - "--backup-ignore-strategy={{ .Values.backup.ignoreStrategy }}"

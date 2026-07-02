@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	wfupgrade "github.com/kubevela/workflow/pkg/cue/upgrade"
 )
 
 var (
@@ -73,7 +75,12 @@ func (loader *WorkflowStepLoader) LoadTemplate(ctx context.Context, name string)
 		}
 	}
 
-	return loader.loadDefinition(ctx, name)
+	tmpl, err := loader.loadDefinition(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	upgraded, _ := wfupgrade.EnsureCueVersionCompatibility(tmpl, name, wfupgrade.WorkflowStepKind, wfupgrade.TemplateAreaMain)
+	return upgraded, nil
 }
 
 // NewWorkflowStepTemplateLoader create a task template loader.
