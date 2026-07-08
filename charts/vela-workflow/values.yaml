@@ -19,6 +19,8 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.enableWatchEventListener Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature
 ## @param workflow.enableExternalPackageForDefaultCompiler Enable external package for default compiler
 ## @param workflow.enableExternalPackageWatchForDefaultCompiler Enable external package watch for default compiler
+## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
+## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
@@ -30,6 +32,8 @@ workflow:
   enableWatchEventListener: false 
   enableExternalPackageForDefaultCompiler: true
   enableExternalPackageWatchForDefaultCompiler: false
+  disableWorkflowHTTP: false
+  blockPrivateHTTPAddresses: false
   backoff:
     maxTime:
       waitState: 60
