@@ -57,7 +57,7 @@ func SecureTransport(base *http.Transport, policy Policy) *http.Transport {
 }
 
 func controlFunc(policy Policy) func(network, address string, _ syscall.RawConn) error {
-	return func(network, address string, _ syscall.RawConn) error {
+	return func(_ string, address string, _ syscall.RawConn) error {
 		return policy.BlockedAddress(address)
 	}
 }

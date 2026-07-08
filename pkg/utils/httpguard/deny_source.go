@@ -107,22 +107,7 @@ func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager,
 		return fmt.Errorf("get ConfigMap informer for HTTP deny watch: %w", err)
 	}
 	reload := func() {
-		cm := &corev1.ConfigMap{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, cm); err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.ErrorS(err, "workflow HTTP deny ConfigMap deleted; keeping last good policy", "name", name, "namespace", namespace)
-				return
-			}
-			klog.ErrorS(err, "failed to reload workflow HTTP deny ConfigMap", "name", name, "namespace", namespace)
-			return
-		}
-		fragment, err := ParseConfigMap(cm)
-		if err != nil {
-			klog.ErrorS(err, "invalid workflow HTTP deny ConfigMap update; keeping last good policy", "name", name, "namespace", namespace)
-			return
-		}
-		SetDenyFragment(fragment)
-		klog.InfoS("reloaded workflow HTTP deny ConfigMap", "name", name, "namespace", namespace)
+		tryReloadDenyConfigMap(ctx, cli, name, namespace)
 	}
 
 	handler := &denyEventHandler{reload: reload, name: name, namespace: namespace}
@@ -132,6 +117,25 @@ func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager,
 	}
 	<-ctx.Done()
 	return nil
+}
+
+func tryReloadDenyConfigMap(ctx context.Context, cli client.Client, name, namespace string) {
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.ErrorS(err, "workflow HTTP deny ConfigMap deleted; keeping last good policy", "name", name, "namespace", namespace)
+			return
+		}
+		klog.ErrorS(err, "failed to reload workflow HTTP deny ConfigMap", "name", name, "namespace", namespace)
+		return
+	}
+	fragment, err := ParseConfigMap(cm)
+	if err != nil {
+		klog.ErrorS(err, "invalid workflow HTTP deny ConfigMap update; keeping last good policy", "name", name, "namespace", namespace)
+		return
+	}
+	SetDenyFragment(fragment)
+	klog.InfoS("reloaded workflow HTTP deny ConfigMap", "name", name, "namespace", namespace)
 }
 
 type denyEventHandler struct {

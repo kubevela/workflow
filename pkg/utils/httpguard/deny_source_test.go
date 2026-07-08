@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -45,6 +46,141 @@ func TestLoadConfigMap(t *testing.T) {
 	p := Current()
 	require.True(t, p.Blocked(net.ParseIP("10.1.1.1")))
 	require.Error(t, p.BlockedHost("metadata.google.internal"))
+}
+
+func TestLoadConfigMap_emptyNameClearsFragment(t *testing.T) {
+	fragment, err := ParseDenyList("", "blocked.example")
+	require.NoError(t, err)
+	SetDenyFragment(fragment)
+	t.Cleanup(func() {
+		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
+	})
+	require.NoError(t, LoadConfigMap(context.Background(), nil, "", "vela-system"))
+	require.NoError(t, Current().BlockedHost("blocked.example"))
+}
+
+func TestLoadConfigMap_notFound(t *testing.T) {
+	scheme := testScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	err := LoadConfigMap(context.Background(), cli, "missing", "vela-system")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "get workflow HTTP deny ConfigMap")
+}
+
+func TestSetEnhancer_nilUsesIdentity(t *testing.T) {
+	t.Cleanup(func() {
+		SetEnhancer(nil)
+	})
+	SetEnhancer(nil)
+	cur := Current()
+	require.True(t, cur.BlockLinkLocal)
+	require.False(t, cur.BlockPrivate)
+}
+
+func TestSetDenyFragment_nilExactHosts(t *testing.T) {
+	t.Cleanup(func() {
+		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
+	})
+	SetDenyFragment(Policy{})
+	cur := Current()
+	require.NotNil(t, cur.ExactHosts)
+}
+
+func TestSetupWatcher_emptyName(t *testing.T) {
+	require.NoError(t, SetupWatcher(nil, "", "vela-system"))
+}
+
+func TestDenyEventHandler_triggersReload(t *testing.T) {
+	var reloads int
+	h := &denyEventHandler{
+		reload:    func() { reloads++ },
+		name:      "workflow-http-deny",
+		namespace: "vela-system",
+	}
+	h.OnAdd(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},
+	}, false)
+	require.Equal(t, 1, reloads)
+
+	h.OnUpdate(nil, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},
+	})
+	require.Equal(t, 2, reloads)
+
+	h.OnDelete(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},
+	})
+	require.Equal(t, 3, reloads)
+}
+
+func TestDenyEventHandler_ignoresOtherConfigMaps(t *testing.T) {
+	var reloads int
+	h := &denyEventHandler{
+		reload:    func() { reloads++ },
+		name:      "workflow-http-deny",
+		namespace: "vela-system",
+	}
+	h.OnAdd(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: "vela-system"},
+	}, false)
+	require.Equal(t, 0, reloads)
+}
+
+func TestDenyEventHandler_deletedFinalStateUnknown(t *testing.T) {
+	var reloads int
+	h := &denyEventHandler{
+		reload:    func() { reloads++ },
+		name:      "workflow-http-deny",
+		namespace: "vela-system",
+	}
+	h.OnDelete(cache.DeletedFinalStateUnknown{
+		Obj: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},
+		},
+	})
+	require.Equal(t, 1, reloads)
+}
+
+func TestDenyEventHandler_ignoresInvalidObjects(t *testing.T) {
+	var reloads int
+	h := &denyEventHandler{
+		reload:    func() { reloads++ },
+		name:      "workflow-http-deny",
+		namespace: "vela-system",
+	}
+	h.OnAdd("not-a-configmap", false)
+	h.OnDelete(cache.DeletedFinalStateUnknown{Obj: "still-not-a-configmap"})
+	require.Equal(t, 0, reloads)
+}
+
+func TestTryReloadDenyConfigMap_success(t *testing.T) {
+	t.Cleanup(func() {
+		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
+	})
+	scheme := testScheme(t)
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},
+		Data:       map[string]string{ConfigMapKeyDenyHosts: "reloaded.example"},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+	tryReloadDenyConfigMap(context.Background(), cli, "workflow-http-deny", "vela-system")
+	require.Error(t, Current().BlockedHost("reloaded.example"))
+}
+
+func TestTryReloadDenyConfigMap_notFound(t *testing.T) {
+	scheme := testScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	tryReloadDenyConfigMap(context.Background(), cli, "missing", "vela-system")
+}
+
+func TestTryReloadDenyConfigMap_invalid(t *testing.T) {
+	scheme := testScheme(t)
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "bad", Namespace: "vela-system"},
+		Data:       map[string]string{ConfigMapKeyDenyCIDRs: "not-a-cidr"},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+	tryReloadDenyConfigMap(context.Background(), cli, "bad", "vela-system")
 }
 
 func TestLoadConfigMap_invalid(t *testing.T) {
