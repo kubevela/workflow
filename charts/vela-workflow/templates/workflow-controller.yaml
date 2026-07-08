@@ -143,6 +143,9 @@ spec:
             - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
             - "--feature-gates=DisableWorkflowHTTP={{- .Values.workflow.disableWorkflowHTTP | toString -}}"
             - "--feature-gates=BlockPrivateHTTPAddresses={{- .Values.workflow.blockPrivateHTTPAddresses | toString -}}"
+            {{ if .Values.workflow.httpDeny.configMapName }}
+            - "--workflow-http-deny-configmap-name={{ .Values.workflow.httpDeny.configMapName }}"
+            {{ end }}
             - "--group-by-label={{ .Values.workflow.groupByLabel }}"
             - "--enable-external-package-for-default-compiler={{- .Values.workflow.enableExternalPackageForDefaultCompiler | toString -}}"
             - "--enable-external-package-watch-for-default-compiler={{- .Values.workflow.enableExternalPackageWatchForDefaultCompiler | toString -}}"
@@ -164,15 +167,18 @@ spec:
             {{ end }}
           image: {{ .Values.imageRegistry }}{{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ quote .Values.image.pullPolicy }}
-          {{- if or .Values.envVar .Values.featureGates.enableCueExpVariable }}
           env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
           {{- with .Values.envVar }}
           {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- if .Values.featureGates.enableCueExpVariable }}
             - name: CUE_EXPERIMENT
               value: "evalv3=0,keepvalidators=0"
-          {{- end }}
           {{- end }}
           resources:
           {{- toYaml .Values.resources | nindent 12 }}

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -112,7 +113,7 @@ func Do(ctx context.Context, params *DoParams) (*DoReturns, error) {
 }
 
 func requestPolicy() httpguard.Policy {
-	policy := httpguard.DefaultPolicy()
+	policy := httpguard.Current()
 	if utilfeature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses) {
 		policy.BlockPrivate = true
 	}
@@ -129,9 +130,17 @@ func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
 		reader          io.Reader
 	)
 	policy := requestPolicy()
+	if parsed, err := neturl.Parse(params.Params.URL); err == nil {
+		if err := policy.BlockedHost(parsed.Host); err != nil {
+			return nil, err
+		}
+	}
 	defaultClient := &http.Client{
 		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
 		Timeout:   time.Second * 3,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return policy.BlockedHost(req.URL.Host)
+		},
 	}
 	method := params.Params.Method
 	url := params.Params.URL

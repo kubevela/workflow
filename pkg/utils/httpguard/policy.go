@@ -19,10 +19,12 @@ package httpguard
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
-// Policy controls which destination IPs outbound HTTP clients may connect to.
-// Validation runs at dial time on the resolved address, not on the URL string.
+// Policy controls which destination hosts and IPs outbound HTTP clients may
+// connect to. Host checks run on the URL before dial; IP checks run at dial
+// time on the resolved address.
 type Policy struct {
 	// BlockLinkLocal denies link-local unicast (169.254.0.0/16, fe80::/10).
 	BlockLinkLocal bool
@@ -34,6 +36,14 @@ type Policy struct {
 	BlockPrivate bool
 	// BlockLoopback denies 127.0.0.0/8 and ::1. Off by default.
 	BlockLoopback bool
+	// DenyCIDRs blocks any destination IP contained in these networks.
+	DenyCIDRs []*net.IPNet
+	ExactIPs  []net.IP
+	// ExactHosts are lower-case hostnames that must be rejected.
+	ExactHosts map[string]struct{}
+	// WildcardSuffixes are lower-case DNS suffixes without the leading "*."
+	// (for example "corp.internal" from "*.corp.internal").
+	WildcardSuffixes []string
 }
 
 // DefaultPolicy is the secure-by-default posture for controller outbound HTTP:
@@ -42,6 +52,7 @@ func DefaultPolicy() Policy {
 	return Policy{
 		BlockLinkLocal: true,
 		BlockMetadata:  true,
+		ExactHosts:     map[string]struct{}{},
 	}
 }
 
@@ -58,6 +69,26 @@ var metadataIPs = func() []net.IP {
 	}
 	return out
 }()
+
+// MergeDeny overlays denylist CIDRs/hosts from other onto p.
+func (p Policy) MergeDeny(other Policy) Policy {
+	if len(other.DenyCIDRs) > 0 {
+		p.DenyCIDRs = append(append([]*net.IPNet{}, p.DenyCIDRs...), other.DenyCIDRs...)
+	}
+	if len(other.ExactIPs) > 0 {
+		p.ExactIPs = append(append([]net.IP{}, p.ExactIPs...), other.ExactIPs...)
+	}
+	if p.ExactHosts == nil {
+		p.ExactHosts = map[string]struct{}{}
+	}
+	for host := range other.ExactHosts {
+		p.ExactHosts[host] = struct{}{}
+	}
+	if len(other.WildcardSuffixes) > 0 {
+		p.WildcardSuffixes = append(append([]string{}, p.WildcardSuffixes...), other.WildcardSuffixes...)
+	}
+	return p
+}
 
 // Blocked reports whether ip must be rejected under policy.
 func (p Policy) Blocked(ip net.IP) bool {
@@ -84,11 +115,49 @@ func (p Policy) Blocked(ip net.IP) bool {
 			}
 		}
 	}
+	for _, exact := range p.ExactIPs {
+		if ip.Equal(exact) {
+			return true
+		}
+	}
+	for _, cidr := range p.DenyCIDRs {
+		if cidr != nil && cidr.Contains(ip) {
+			return true
+		}
+	}
 	return false
 }
 
+// BlockedHost reports whether hostname must be rejected under the denylist.
+// Host may include a port; IP literals are checked against ExactIPs/DenyCIDRs.
+func (p Policy) BlockedHost(host string) error {
+	host = normalizeHost(host)
+	if host == "" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if p.Blocked(ip) {
+			return fmt.Errorf("blocked SSRF target: %s", ip)
+		}
+		return nil
+	}
+	if _, ok := p.ExactHosts[host]; ok {
+		return fmt.Errorf("blocked SSRF host: %s", host)
+	}
+	for _, suffix := range p.WildcardSuffixes {
+		if host == suffix {
+			continue
+		}
+		if strings.HasSuffix(host, "."+suffix) {
+			return fmt.Errorf("blocked SSRF host: %s", host)
+		}
+	}
+	return nil
+}
+
 // BlockedAddress parses host:port from a dial address and reports whether it
-// is blocked. Non-IP hosts are allowed through; resolution happens before dial.
+// is blocked. Non-IP hosts are allowed through; host denylist must be checked
+// separately via BlockedHost before dial.
 func (p Policy) BlockedAddress(address string) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
@@ -102,4 +171,19 @@ func (p Policy) BlockedAddress(address string) error {
 		return fmt.Errorf("blocked SSRF target: %s", ip)
 	}
 	return nil
+}
+
+func normalizeHost(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	// Strip brackets from IPv6 literals like [::1]:443 after SplitHostPort, or
+	// raw hostname:port when callers pass URL.Host.
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return strings.ToLower(host)
 }
