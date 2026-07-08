@@ -27,6 +27,8 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.cueUpgradeGenericDefaultGuardEnabled Enable generic default-guard hazard compatibility rewrite pass
 ## @param workflow.cueUpgradeKeepValidatorsSingletonEnabled Enable keepvalidators singleton concretization compatibility pass
 ## @param workflow.cueUpgradeEvalv3SelfRefGuardEnabled Enable evalv3 self-reference default-guard compatibility rewrite pass
+## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
+## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
@@ -46,6 +48,8 @@ workflow:
   cueUpgradeGenericDefaultGuardEnabled: false
   cueUpgradeKeepValidatorsSingletonEnabled: false
   cueUpgradeEvalv3SelfRefGuardEnabled: false
+  disableWorkflowHTTP: false
+  blockPrivateHTTPAddresses: false
   backoff:
     maxTime:
       waitState: 60
