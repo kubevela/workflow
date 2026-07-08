@@ -72,7 +72,8 @@ func Current() Policy {
 
 // LoadConfigMap reads name from namespace and installs the denylist fragment.
 // Fail-closed: missing or invalid ConfigMaps return an error.
-func LoadConfigMap(ctx context.Context, c client.Client, name, namespace string) error {
+// c may be a cache Client or an API Reader (needed before mgr.Start).
+func LoadConfigMap(ctx context.Context, c client.Reader, name, namespace string) error {
 	if name == "" {
 		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
 		return nil
