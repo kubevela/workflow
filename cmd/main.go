@@ -245,7 +245,8 @@ func main() {
 		}
 		return p
 	})
-	if err := httpguard.LoadConfigMap(context.Background(), kubeClient, workflowHTTPDenyConfigMapName, controllerNamespace); err != nil {
+	// Use APIReader: mgr.GetClient() is cache-backed and is not ready before mgr.Start.
+	if err := httpguard.LoadConfigMap(context.Background(), mgr.GetAPIReader(), workflowHTTPDenyConfigMapName, controllerNamespace); err != nil {
 		klog.ErrorS(err, "unable to initialize workflow HTTP deny ConfigMap", "name", workflowHTTPDenyConfigMapName, "namespace", controllerNamespace)
 		os.Exit(1)
 	}
