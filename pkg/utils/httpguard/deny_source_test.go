@@ -29,6 +29,9 @@ import (
 )
 
 func TestLoadConfigMap(t *testing.T) {
+	t.Cleanup(func() {
+		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
+	})
 	scheme := testScheme(t)
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "workflow-http-deny", Namespace: "vela-system"},

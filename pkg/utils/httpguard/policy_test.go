@@ -17,6 +17,7 @@ limitations under the License.
 package httpguard
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -83,6 +84,48 @@ func TestParseDenyList_invalid(t *testing.T) {
 	require.Error(t, err)
 	_, err = ParseDenyList("", "foo.*.bar")
 	require.Error(t, err)
+	_, err = ParseDenyList("", "evil.example:443")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "port qualifiers are not supported")
+}
+
+func TestBlockedHost_trailingDot(t *testing.T) {
+	fragment, err := ParseDenyList("", "blocked.example.com")
+	require.NoError(t, err)
+	policy := DefaultPolicy().MergeDeny(fragment)
+	require.Error(t, policy.BlockedHost("blocked.example.com."))
+}
+
+func TestBlockedHost_ipv6Zone(t *testing.T) {
+	policy := DefaultPolicy()
+	require.Error(t, policy.BlockedHost("fe80::1%eth0"))
+	require.Error(t, policy.BlockedAddress("[fe80::1%eth0]:80"))
+}
+
+func TestSecureTransport_ignoresPresetDialContext(t *testing.T) {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return net.Dial(network, address)
+	}
+	client := &http.Client{
+		Transport: SecureTransport(base, DefaultPolicy()),
+	}
+	_, err := client.Get("http://169.254.169.254/latest/meta-data/")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "blocked SSRF target")
+}
+
+func TestSecureTransport_wrapsDialTLSContext(t *testing.T) {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return net.Dial(network, addr)
+	}
+	client := &http.Client{
+		Transport: SecureTransport(base, DefaultPolicy()),
+	}
+	_, err := client.Get("https://169.254.169.254/latest/meta-data/")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "blocked SSRF target")
 }
 
 func TestParseConfigMap(t *testing.T) {
