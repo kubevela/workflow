@@ -331,6 +331,27 @@ func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
 	r.Contains(err.Error(), "DisableWorkflowHTTP")
 }
 
+func TestHttpDo_blockPrivateHTTPAddresses(t *testing.T) {
+	r := require.New(t)
+	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.BlockPrivateHTTPAddresses): true,
+	}))
+	t.Cleanup(func() {
+		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.BlockPrivateHTTPAddresses): false,
+		})
+	})
+
+	_, err := Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://10.0.0.1/path",
+		},
+	})
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF target")
+}
+
 func TestHttpDo_blocksDeniedHost(t *testing.T) {
 	fragment, err := httpguard.ParseDenyList("", "blocked.example")
 	require.NoError(t, err)

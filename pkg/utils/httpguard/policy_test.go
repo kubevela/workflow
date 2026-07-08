@@ -128,6 +128,69 @@ func TestSecureTransport_wrapsDialTLSContext(t *testing.T) {
 	assert.Contains(t, err.Error(), "blocked SSRF target")
 }
 
+func TestParseConfigMap_nil(t *testing.T) {
+	policy, err := ParseConfigMap(nil)
+	require.NoError(t, err)
+	require.NotNil(t, policy.ExactHosts)
+}
+
+func TestParseDenyList_emptyWildcard(t *testing.T) {
+	_, err := ParseDenyList("", "*.")
+	require.Error(t, err)
+}
+
+func TestParseDenyList_commentOnlyLine(t *testing.T) {
+	policy, err := ParseDenyList("10.0.0.0/8 # private", "")
+	require.NoError(t, err)
+	assert.True(t, policy.Blocked(net.ParseIP("10.0.0.1")))
+}
+
+func TestPolicy_blockLoopbackAndPrivate(t *testing.T) {
+	policy := Policy{
+		BlockLoopback: true,
+		BlockPrivate:  true,
+		ExactHosts:    map[string]struct{}{},
+	}
+	assert.True(t, policy.Blocked(net.ParseIP("127.0.0.1")))
+	assert.True(t, policy.Blocked(net.ParseIP("10.0.0.1")))
+	assert.True(t, policy.Blocked(net.ParseIP("fd00::1")))
+}
+
+func TestMergeDeny_copiesAllFields(t *testing.T) {
+	_, cidr, err := net.ParseCIDR("192.168.0.0/16")
+	require.NoError(t, err)
+	other := Policy{
+		DenyCIDRs:        []*net.IPNet{cidr},
+		ExactIPs:         []net.IP{net.ParseIP("8.8.4.4")},
+		ExactHosts:       map[string]struct{}{"evil.example": {}},
+		WildcardSuffixes: []string{"corp.internal"},
+	}
+	merged := DefaultPolicy().MergeDeny(other)
+	assert.True(t, merged.Blocked(net.ParseIP("192.168.1.1")))
+	assert.True(t, merged.Blocked(net.ParseIP("8.8.4.4")))
+	require.Error(t, merged.BlockedHost("evil.example"))
+	require.Error(t, merged.BlockedHost("a.corp.internal"))
+}
+
+func TestBlockedAddress_invalidAddress(t *testing.T) {
+	err := DefaultPolicy().BlockedAddress("not-an-address")
+	require.Error(t, err)
+}
+
+func TestBlockedHost_ipLiteral(t *testing.T) {
+	policy := DefaultPolicy()
+	require.Error(t, policy.BlockedHost("169.254.169.254"))
+	require.NoError(t, policy.BlockedHost("8.8.8.8"))
+}
+
+func TestSecureTransport_nilBase(t *testing.T) {
+	client := &http.Client{
+		Transport: SecureTransport(nil, DefaultPolicy()),
+	}
+	_, err := client.Get("http://169.254.169.254/latest/meta-data/")
+	require.Error(t, err)
+}
+
 func TestParseConfigMap(t *testing.T) {
 	cm := &corev1.ConfigMap{Data: map[string]string{
 		ConfigMapKeyDenyCIDRs: "192.168.0.0/16",
