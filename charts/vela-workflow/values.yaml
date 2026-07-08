@@ -21,6 +21,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.enableExternalPackageWatchForDefaultCompiler Enable external package watch for default compiler
 ## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
 ## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
+## @param workflow.httpDeny.configMapName ConfigMap name in controller namespace containing extra HTTP denylist entries
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
@@ -34,6 +35,8 @@ workflow:
   enableExternalPackageWatchForDefaultCompiler: false
   disableWorkflowHTTP: false
   blockPrivateHTTPAddresses: false
+  httpDeny:
+    configMapName: ""
   backoff:
     maxTime:
       waitState: 60
