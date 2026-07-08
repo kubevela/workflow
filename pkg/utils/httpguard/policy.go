@@ -135,7 +135,7 @@ func (p Policy) BlockedHost(host string) error {
 	if host == "" {
 		return nil
 	}
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := parseIPLiteral(host); ip != nil {
 		if p.Blocked(ip) {
 			return fmt.Errorf("blocked SSRF target: %s", ip)
 		}
@@ -163,7 +163,7 @@ func (p Policy) BlockedAddress(address string) error {
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(host)
+	ip := parseIPLiteral(host)
 	if ip == nil {
 		return nil
 	}
@@ -185,5 +185,15 @@ func normalizeHost(host string) string {
 	}
 	host = strings.TrimPrefix(host, "[")
 	host = strings.TrimSuffix(host, "]")
-	return strings.ToLower(host)
+	return strings.TrimSuffix(strings.ToLower(host), ".")
+}
+
+func parseIPLiteral(host string) net.IP {
+	if host == "" {
+		return nil
+	}
+	if i := strings.Index(host, "%"); i >= 0 {
+		host = host[:i]
+	}
+	return net.ParseIP(host)
 }

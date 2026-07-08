@@ -87,6 +87,9 @@ func parseHostLines(text string, out *Policy) error {
 		if strings.Contains(line, "*") {
 			return fmt.Errorf("invalid deny host %q: only *.suffix wildcards are supported", line)
 		}
+		if _, _, err := net.SplitHostPort(line); err == nil {
+			return fmt.Errorf("invalid deny host %q: port qualifiers are not supported", line)
+		}
 		host := strings.TrimSuffix(line, ".")
 		if host == "" {
 			return fmt.Errorf("invalid empty deny host")

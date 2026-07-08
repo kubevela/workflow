@@ -29,21 +29,29 @@ func SecureTransport(base *http.Transport, policy Policy) *http.Transport {
 	if base == nil {
 		base = http.DefaultTransport.(*http.Transport).Clone()
 	} else {
-		cloned := *base
-		base = &cloned
+		base = base.Clone()
 	}
-	existingDial := base.DialContext
-	base.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+
+	securedDial := func(ctx context.Context, network, address string) (net.Conn, error) {
 		if err := policy.BlockedAddress(address); err != nil {
 			return nil, err
-		}
-		if existingDial != nil {
-			return existingDial(ctx, network, address)
 		}
 		dialer := &net.Dialer{
 			Control: controlFunc(policy),
 		}
 		return dialer.DialContext(ctx, network, address)
+	}
+
+	existingDialTLS := base.DialTLSContext
+	base.DialContext = securedDial
+	base.DialTLS = nil
+	if existingDialTLS != nil {
+		base.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if err := policy.BlockedAddress(addr); err != nil {
+				return nil, err
+			}
+			return existingDialTLS(ctx, network, addr)
+		}
 	}
 	return base
 }
