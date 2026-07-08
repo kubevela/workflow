@@ -140,7 +140,7 @@ type denyEventHandler struct {
 
 var _ cache.ResourceEventHandler = &denyEventHandler{}
 
-func (h *denyEventHandler) OnAdd(obj interface{}, _ bool)  { h.maybe(obj) }
+func (h *denyEventHandler) OnAdd(obj interface{})           { h.maybe(obj) }
 func (h *denyEventHandler) OnUpdate(_, newObj interface{}) { h.maybe(newObj) }
 func (h *denyEventHandler) OnDelete(obj interface{})       { h.maybe(obj) }
 
