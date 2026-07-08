@@ -41,6 +41,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/http/testdata"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -312,6 +313,31 @@ url: "https://127.0.0.1:8443/api/v1/token?val=test-token"
 	prd := &provider{cli, "default"}
 	err = prd.Do(ctx, nil, v, nil)
 	r.NoError(err)
+}
+
+func TestHttpDoBlocksDeniedHost(t *testing.T) {
+	ctx := monitorContext.NewTraceContext(context.Background(), "")
+	httpguard.SetDenyFragment(httpguard.Policy{
+		ExactHosts: map[string]struct{}{"blocked.example.com": {}},
+	})
+	defer httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+
+	v, err := value.NewValue(`
+method: "GET"
+url: "http://blocked.example.com/path"
+response: close({
+	body: string
+	header?:  [string]: [...string]
+	trailer?: [string]: [...string]
+	statusCode: int
+})
+`, nil, "")
+	require.NoError(t, err)
+
+	prd := &provider{}
+	err = prd.Do(ctx, nil, v, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "blocked SSRF host")
 }
 
 func newMockHttpsServer() *httptest.Server {

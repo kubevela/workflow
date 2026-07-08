@@ -38,16 +38,18 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 
 ### KubeVela workflow parameters
 
-| Name                                   | Description                                                                                                                                                                            | Value                   |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `workflow.enableSuspendOnFailure`      | Enable the capability of suspend an failed workflow automatically                                                                                                                      | `false`                 |
-| `workflow.enablePatchStatusAtOnce`     | Enable the capability of patch status at once                                                                                                                                          | `false`                 |
-| `workflow.enableWatchEventListener`    | Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature | `false`                 |
-| `workflow.backoff.maxTime.waitState`   | The max backoff time of workflow in a wait condition                                                                                                                                   | `60`                    |
-| `workflow.backoff.maxTime.failedState` | The max backoff time of workflow in a failed condition                                                                                                                                 | `300`                   |
-| `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step                                                                                                                                          | `10`                    |
-| `workflow.groupByLabel`                | The label used to group workflow record                                                                                                                                                | `pipeline.oam.dev/name` |
-
+| Name                                                    | Description                                                                                                                                                                            | Value                   |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `workflow.enableSuspendOnFailure`                       | Enable the capability of suspend an failed workflow automatically                                                                                                                      | `false`                 |
+| `workflow.enablePatchStatusAtOnce`                      | Enable the capability of patch status at once                                                                                                                                          | `false`                 |
+| `workflow.enableWatchEventListener`                     | Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature | `false`                 |
+| `workflow.disableWorkflowHTTP`                          | Disable outbound HTTP from workflow request/webhook steps                                                                                                                               | `false`                 |
+| `workflow.blockPrivateHTTPAddresses`                    | Block outbound HTTP to RFC-1918 and ULA destinations                                                                                                                                   | `false`                 |
+| `workflow.httpDeny.configMapName`                       | ConfigMap name in the controller namespace containing extra HTTP denylist entries (`denyCIDRs`, `denyHosts`)                                                                           | `""`                    |
+| `workflow.backoff.maxTime.waitState`                    | The max backoff time of workflow in a wait condition                                                                                                                                   | `60`                    |
+| `workflow.backoff.maxTime.failedState`                  | The max backoff time of workflow in a failed condition                                                                                                                                 | `300`                   |
+| `workflow.step.errorRetryTimes`                         | The max retry times of a failed workflow step                                                                                                                                          | `10`                    |
+| `workflow.groupByLabel`                                 | The label used to group workflow record                                                                                                                                                | `pipeline.oam.dev/name` |
 
 ### KubeVela workflow backup parameters
 

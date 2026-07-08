@@ -17,6 +17,9 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.enableSuspendOnFailure Enable the capability of suspend an failed workflow automatically
 ## @param workflow.enablePatchStatusAtOnce Enable the capability of patch status at once
 ## @param workflow.enableWatchEventListener Enable the capability of watch event listener for a faster reconcile, note that you need to install [kube-trigger](https://github.com/kubevela/kube-trigger) first to use this feature
+## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
+## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
+## @param workflow.httpDeny.configMapName ConfigMap name in controller namespace containing extra HTTP denylist entries
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
@@ -25,6 +28,10 @@ workflow:
   enableSuspendOnFailure: false
   enablePatchStatusAtOnce: false
   enableWatchEventListener: false 
+  disableWorkflowHTTP: false
+  blockPrivateHTTPAddresses: false
+  httpDeny:
+    configMapName: ""
   backoff:
     maxTime:
       waitState: 60

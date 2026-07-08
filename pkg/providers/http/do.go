@@ -24,20 +24,24 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
 	"cuelang.org/go/cue"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 const (
@@ -51,6 +55,14 @@ var (
 
 func init() {
 	rateLimiter = ratelimiter.NewRateLimiter(128)
+}
+
+func requestPolicy() httpguard.Policy {
+	policy := httpguard.Current()
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses) {
+		policy.BlockPrivate = true
+	}
+	return policy
 }
 
 type provider struct {
@@ -68,15 +80,22 @@ func (h *provider) Do(ctx monitorContext.Context, wfCtx wfContext.Context, v *va
 }
 
 func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interface{}, error) {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.DisableWorkflowHTTP) {
+		return nil, errors.New("workflow outbound HTTP is disabled by DisableWorkflowHTTP feature gate")
+	}
 	var (
 		err             error
 		method, u       string
 		header, trailer http.Header
 		r               io.Reader
 	)
+	policy := requestPolicy()
 	defaultClient := &http.Client{
-		Transport: http.DefaultTransport,
+		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
 		Timeout:   time.Second * 3,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return policy.BlockedHost(req.URL.Host)
+		},
 	}
 	if timeout, err := v.GetString("request", "timeout"); err == nil && timeout != "" {
 		duration, err := time.ParseDuration(timeout)
@@ -90,6 +109,11 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	}
 	if u, err = v.GetString("url"); err != nil {
 		return nil, err
+	}
+	if parsed, err := neturl.Parse(u); err == nil {
+		if err := policy.BlockedHost(parsed.Host); err != nil {
+			return nil, err
+		}
 	}
 	if rl, err := v.LookupValue("request", "ratelimiter"); err == nil {
 		limit, err := rl.GetInt64("limit")
@@ -133,7 +157,11 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	req.Trailer = trailer
 
 	if tr, err := h.getTransport(ctx, v); err == nil && tr != nil {
-		defaultClient.Transport = tr
+		if transport, ok := tr.(*http.Transport); ok {
+			defaultClient.Transport = httpguard.SecureTransport(transport, policy)
+		} else {
+			defaultClient.Transport = tr
+		}
 	}
 
 	resp, err := defaultClient.Do(req)
