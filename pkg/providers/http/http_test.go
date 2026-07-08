@@ -40,6 +40,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -328,6 +329,25 @@ func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
 	})
 	r.Error(err)
 	r.Contains(err.Error(), "DisableWorkflowHTTP")
+}
+
+func TestHttpDo_blocksDeniedHost(t *testing.T) {
+	fragment, err := httpguard.ParseDenyList("", "blocked.example")
+	require.NoError(t, err)
+	httpguard.SetDenyFragment(fragment)
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+	_, err = Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://blocked.example/path",
+		},
+	})
+	r := require.New(t)
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF host")
 }
 
 func newMockHttpsServer() *httptest.Server {
