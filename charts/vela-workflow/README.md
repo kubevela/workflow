@@ -74,6 +74,8 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `resources.limits.memory`   | Workflow controller's memory limit   | `1Gi`                  |
 | `resources.requests.cpu`    | Workflow controller's cpu request    | `50m`                  |
 | `resources.requests.memory` | Workflow controller's memory request | `20Mi`                 |
+| `envVar`                    | Extra environment variables injected into the workflow controller container (always applied) | `[]`             |
+| `featureGates.enableCueExpVariable` | inject the CUE_EXPERIMENT env var (evalv3=0,keepvalidators=0) into the controller to disable experimental CUE features during the v0.14.x migration window | `true`      |
 | `webhookService.type`       | KubeVela webhook service type        | `ClusterIP`            |
 | `webhookService.port`       | KubeVela webhook service port        | `9443`                 |
 | `healthCheck.port`          | KubeVela health check port           | `9440`                 |

@@ -87,6 +87,13 @@ resources:
     cpu: 50m
     memory: 20Mi
 
+## @param envVar Extra environment variables injected into the workflow controller container (always applied)
+envVar: []
+
+## @param featureGates.enableCueExpVariable inject the CUE_EXPERIMENT env var (evalv3=0,keepvalidators=0) into the controller to disable experimental CUE features during the v0.14.x migration window
+featureGates:
+  enableCueExpVariable: true
+
 ## @param webhookService.type KubeVela webhook service type
 ## @param webhookService.port KubeVela webhook service port
 webhookService:
