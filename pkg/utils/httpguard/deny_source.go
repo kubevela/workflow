@@ -106,12 +106,20 @@ func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager,
 	if err != nil {
 		return fmt.Errorf("get ConfigMap informer for HTTP deny watch: %w", err)
 	}
+	return watchAndReloadInformer(ctx, cli, informer, name, namespace)
+}
+
+type configMapInformer interface {
+	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
+}
+
+func watchAndReloadInformer(ctx context.Context, cli client.Client, informer configMapInformer, name, namespace string) error {
 	reload := func() {
 		tryReloadDenyConfigMap(ctx, cli, name, namespace)
 	}
 
 	handler := &denyEventHandler{reload: reload, name: name, namespace: namespace}
-	_, err = informer.AddEventHandler(handler)
+	_, err := informer.AddEventHandler(handler)
 	if err != nil {
 		return err
 	}
