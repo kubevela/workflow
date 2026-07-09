@@ -18,8 +18,10 @@ package httpguard
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -201,4 +203,56 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	s := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(s))
 	return s
+}
+
+type stubInformer struct {
+	addErr error
+}
+
+type stubRegistration struct{}
+
+func (stubRegistration) HasSynced() bool { return true }
+func (stubRegistration) Remove() error { return nil }
+
+func (s *stubInformer) AddEventHandler(_ cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	return stubRegistration{}, s.addErr
+}
+
+func TestWatchAndReloadInformer_stopsOnCancel(t *testing.T) {
+	scheme := testScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watchAndReloadInformer(ctx, cli, &stubInformer{}, "workflow-http-deny", "vela-system")
+	}()
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-errCh:
+			return false
+		default:
+			return true
+		}
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("watch did not stop after context cancellation")
+	}
+}
+
+func TestWatchAndReloadInformer_addHandlerError(t *testing.T) {
+	scheme := testScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	ctx := context.Background()
+
+	err := watchAndReloadInformer(ctx, cli, &stubInformer{addErr: fmt.Errorf("add failed")}, "workflow-http-deny", "vela-system")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "add failed")
 }

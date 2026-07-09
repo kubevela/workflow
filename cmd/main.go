@@ -62,7 +62,6 @@ import (
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
-	"github.com/kubevela/workflow/pkg/utils/httpguard"
 	"github.com/kubevela/workflow/pkg/webhook"
 	"github.com/kubevela/workflow/version"
 	//+kubebuilder:scaffold:imports
@@ -239,19 +238,9 @@ func main() {
 
 	kubeClient := mgr.GetClient()
 	controllerNamespace := resolveControllerNamespace()
-	httpguard.SetEnhancer(func(p httpguard.Policy) httpguard.Policy {
-		if feature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses) {
-			p.BlockPrivate = true
-		}
-		return p
-	})
-	// Use APIReader: mgr.GetClient() is cache-backed and is not ready before mgr.Start.
-	if err := httpguard.LoadConfigMap(context.Background(), mgr.GetAPIReader(), workflowHTTPDenyConfigMapName, controllerNamespace); err != nil {
-		klog.ErrorS(err, "unable to initialize workflow HTTP deny ConfigMap", "name", workflowHTTPDenyConfigMapName, "namespace", controllerNamespace)
-		os.Exit(1)
-	}
-	if err := httpguard.SetupWatcher(mgr, workflowHTTPDenyConfigMapName, controllerNamespace); err != nil {
-		klog.ErrorS(err, "unable to watch workflow HTTP deny ConfigMap", "name", workflowHTTPDenyConfigMapName, "namespace", controllerNamespace)
+	blockPrivate := feature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses)
+	if err := configureWorkflowHTTPDeny(context.Background(), mgr.GetAPIReader(), mgr, workflowHTTPDenyConfigMapName, controllerNamespace, blockPrivate); err != nil {
+		klog.ErrorS(err, "unable to configure workflow HTTP deny policy", "name", workflowHTTPDenyConfigMapName, "namespace", controllerNamespace)
 		os.Exit(1)
 	}
 	if groupByLabel != "" {
