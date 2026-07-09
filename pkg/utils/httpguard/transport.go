@@ -31,6 +31,10 @@ func SecureTransport(base *http.Transport, policy Policy) *http.Transport {
 	} else {
 		base = base.Clone()
 	}
+	// Do not inherit environment proxy settings: proxied dials only validate the
+	// proxy address, which would bypass destination SSRF checks on hostnames.
+	base.Proxy = nil
+	base.ProxyConnectHeader = nil
 
 	securedDial := func(ctx context.Context, network, address string) (net.Conn, error) {
 		if err := policy.BlockedAddress(address); err != nil {
