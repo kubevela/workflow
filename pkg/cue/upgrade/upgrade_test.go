@@ -97,6 +97,51 @@ combined: list1 + list2
 	}
 }
 
+func TestPerUpgradeFlagsAffectRewrite(t *testing.T) {
+	origList := upgrade.EnableListConcatUpgrade
+	origBool := upgrade.EnableBoolDefaultGuardUpgrade
+	t.Cleanup(func() {
+		upgrade.EnableListConcatUpgrade = origList
+		upgrade.EnableBoolDefaultGuardUpgrade = origBool
+	})
+
+	listInput := `
+list1: [1, 2]
+list2: [3, 4]
+combined: list1 + list2
+`
+	upgrade.EnableListConcatUpgrade = false
+	got, _ := upgrade.EnsureCueVersionCompatibility(listInput, "test-step", upgrade.WorkflowStepKind, upgrade.TemplateAreaMain)
+	if strings.Contains(got, "list.Concat") {
+		t.Fatalf("expected list arithmetic unchanged when disabled, got: %s", got)
+	}
+	upgrade.EnableListConcatUpgrade = true
+	got, _ = upgrade.EnsureCueVersionCompatibility(listInput+"\n", "test-step", upgrade.WorkflowStepKind, upgrade.TemplateAreaMain)
+	if !strings.Contains(got, "list.Concat") {
+		t.Fatalf("expected list.Concat rewrite when enabled, got: %s", got)
+	}
+
+	boolInput := `
+_flag: bool | *false
+if cond {
+	_flag: true
+}
+if !_flag {
+	_error: 0 & "required"
+}
+`
+	upgrade.EnableBoolDefaultGuardUpgrade = false
+	got, _ = upgrade.EnsureCueVersionCompatibility(boolInput, "test-step", upgrade.WorkflowStepKind, upgrade.TemplateAreaMain)
+	if !strings.Contains(got, "bool | *false") {
+		t.Fatalf("expected bool default guard unchanged when disabled, got: %s", got)
+	}
+	upgrade.EnableBoolDefaultGuardUpgrade = true
+	got, _ = upgrade.EnsureCueVersionCompatibility(boolInput+"\n", "test-step", upgrade.WorkflowStepKind, upgrade.TemplateAreaMain)
+	if strings.Contains(got, "bool | *false") {
+		t.Fatalf("expected bool default guard rewritten when enabled, got: %s", got)
+	}
+}
+
 // TestUpgradeWithUnknownWorkflowVersion verifies that UNKNOWN version falls back to latest
 // and still applies all upgrades.
 func TestUpgradeWithUnknownWorkflowVersion(t *testing.T) {
