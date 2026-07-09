@@ -11,6 +11,7 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/main.go main.go
+COPY cmd/http_deny.go http_deny.go
 COPY cmd/main_e2e_test.go main_e2e_test.go
 COPY api/ api/
 COPY controllers/ controllers/
