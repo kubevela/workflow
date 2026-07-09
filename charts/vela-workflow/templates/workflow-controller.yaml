@@ -146,6 +146,12 @@ spec:
             - "--enable-external-package-watch-for-default-compiler={{- .Values.workflow.enableExternalPackageWatchForDefaultCompiler | toString -}}"
             - "--enable-cue-version-compatibility={{- .Values.workflow.enableCUEVersionCompatibility | toString -}}"
             - "--cue-compatibility-cache-size={{ .Values.workflow.cueCompatibilityCacheSize }}"
+            - "--cue-upgrade-list-concat-enabled={{ .Values.workflow.cueUpgradeListConcatEnabled }}"
+            - "--cue-upgrade-error-field-label-enabled={{ .Values.workflow.cueUpgradeErrorFieldLabelEnabled }}"
+            - "--cue-upgrade-bool-default-guard-enabled={{ .Values.workflow.cueUpgradeBoolDefaultGuardEnabled }}"
+            - "--cue-upgrade-generic-default-guard-enabled={{ .Values.workflow.cueUpgradeGenericDefaultGuardEnabled }}"
+            - "--cue-upgrade-keepvalidators-singleton-enabled={{ .Values.workflow.cueUpgradeKeepValidatorsSingletonEnabled }}"
+            - "--cue-upgrade-evalv3-selfref-guard-enabled={{ .Values.workflow.cueUpgradeEvalv3SelfRefGuardEnabled }}"
             {{ if .Values.backup.enable }}
             - "--backup-strategy={{ .Values.backup.strategy }}"
             - "--backup-ignore-strategy={{ .Values.backup.ignoreStrategy }}"

@@ -33,6 +33,7 @@ package upgrade
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	pkgupgrade "github.com/kubevela/pkg/cue/upgrade"
@@ -73,6 +74,23 @@ var EnableCUEVersionCompatibility = &pkgupgrade.EnableCUEVersionCompatibility
 // CompatibilityCacheSize mirrors pkgupgrade.CompatibilityCacheSize.
 var CompatibilityCacheSize = pkgupgrade.CompatibilityCacheSize
 
+var (
+	// EnableListConcatUpgrade controls the list-arithmetic compatibility rewrite pass.
+	EnableListConcatUpgrade = true
+	// EnableErrorFieldLabelUpgrade controls quoting of legacy unquoted error labels.
+	EnableErrorFieldLabelUpgrade = true
+	// EnableBoolDefaultGuardUpgrade controls the bool default-guard hazard rewrite pass.
+	EnableBoolDefaultGuardUpgrade = false
+	// EnableGenericDefaultGuardUpgrade controls generic (non-bool) default-guard hazard rewrites.
+	EnableGenericDefaultGuardUpgrade = false
+	// EnableKeepValidatorsSingletonUpgrade controls singleton keepvalidators concretization rewrites.
+	EnableKeepValidatorsSingletonUpgrade = false
+	// EnableEvalv3SelfRefGuardUpgrade controls evalv3 self-reference default-guard rewrites.
+	EnableEvalv3SelfRefGuardUpgrade = false
+)
+
+var syncLocalFlagsMu sync.Mutex
+
 // Re-export functions.
 var (
 	ParseVersion         = pkgupgrade.ParseVersion
@@ -88,16 +106,25 @@ func SetCacheEntryTTL(d time.Duration) {
 
 // Upgrade applies all registered upgrades to cueStr.
 func Upgrade(cueStr string, targetVersion ...Version) (string, error) {
+	syncLocalFlagsMu.Lock()
+	defer syncLocalFlagsMu.Unlock()
+	syncLocalFlagsLocked()
 	return pkgupgrade.Upgrade(cueStr, targetVersion...)
 }
 
 // RequiresUpgrade checks whether cueStr needs upgrading.
 func RequiresUpgrade(cueStr string, targetVersion ...Version) (bool, []string, error) {
+	syncLocalFlagsMu.Lock()
+	defer syncLocalFlagsMu.Unlock()
+	syncLocalFlagsLocked()
 	return pkgupgrade.RequiresUpgrade(cueStr, targetVersion...)
 }
 
 // EnsureCueVersionCompatibility applies all upgrades for the running workflow version.
 func EnsureCueVersionCompatibility(cueStr, defName string, defKind DefinitionKind, area TemplateArea) (string, bool) {
+	syncLocalFlagsMu.Lock()
+	defer syncLocalFlagsMu.Unlock()
+	syncLocalFlagsLocked()
 	return pkgupgrade.EnsureCueVersionCompatibility(cueStr, defName, defKind, area)
 }
 
@@ -107,6 +134,7 @@ func InitCompatibilityCache(ctx context.Context, size int) {
 }
 
 func init() {
+	syncLocalFlags()
 	// Wire the workflow version provider (standalone mode).
 	// When KubeVela consumes workflow, kubevela's init() will overwrite this
 	// with velaversion.VelaVersion, which is the correct behaviour — upgrade
@@ -125,4 +153,19 @@ func init() {
 	pkgupgrade.OnCacheEviction = func(reason string) {
 		CUECompatCacheEvictionsTotal.WithLabelValues(reason).Inc()
 	}
+}
+
+func syncLocalFlags() {
+	syncLocalFlagsMu.Lock()
+	defer syncLocalFlagsMu.Unlock()
+	syncLocalFlagsLocked()
+}
+
+func syncLocalFlagsLocked() {
+	pkgupgrade.EnableListArithmeticUpgrade = EnableListConcatUpgrade
+	pkgupgrade.EnableErrorFieldLabelUpgrade = EnableErrorFieldLabelUpgrade
+	pkgupgrade.EnableBoolDefaultNegationUpgrade = EnableBoolDefaultGuardUpgrade
+	pkgupgrade.EnableGenericDefaultGuardUpgrade = EnableGenericDefaultGuardUpgrade
+	pkgupgrade.EnableKeepValidatorsSingletonUpgrade = EnableKeepValidatorsSingletonUpgrade
+	pkgupgrade.EnableEvalv3SelfRefGuardUpgrade = EnableEvalv3SelfRefGuardUpgrade
 }
