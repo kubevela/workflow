@@ -87,6 +87,30 @@ func TestParseDenyList_invalid(t *testing.T) {
 	_, err = ParseDenyList("", "evil.example:443")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "port qualifiers are not supported")
+	_, err = ParseDenyList("", "evil.example/path")
+	require.Error(t, err)
+	_, err = ParseDenyList("", "*.corp.internal/evil")
+	require.Error(t, err)
+	_, err = ParseDenyList("", "http://evil.example")
+	require.Error(t, err)
+}
+
+func TestMergeDeny_doesNotMutateSourceMaps(t *testing.T) {
+	base := Policy{ExactHosts: map[string]struct{}{"keep.example": {}}}
+	other := Policy{ExactHosts: map[string]struct{}{"deny.example": {}}}
+	merged := base.MergeDeny(other)
+	require.Error(t, merged.BlockedHost("deny.example"))
+	require.NoError(t, base.BlockedHost("deny.example"))
+	require.NoError(t, other.BlockedHost("keep.example"))
+	require.Len(t, base.ExactHosts, 1)
+	require.Len(t, other.ExactHosts, 1)
+}
+
+func TestSecureTransport_disablesInheritedProxy(t *testing.T) {
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	require.NotNil(t, base.Proxy)
+	transport := SecureTransport(base, DefaultPolicy())
+	require.Nil(t, transport.Proxy)
 }
 
 func TestBlockedHost_trailingDot(t *testing.T) {

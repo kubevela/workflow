@@ -81,6 +81,9 @@ func parseHostLines(text string, out *Policy) error {
 			if suffix == "" || strings.Contains(suffix, "*") {
 				return fmt.Errorf("invalid deny host wildcard %q", line)
 			}
+			if err := validateDenyHostname(suffix); err != nil {
+				return err
+			}
 			out.WildcardSuffixes = append(out.WildcardSuffixes, suffix)
 			return nil
 		}
@@ -93,6 +96,9 @@ func parseHostLines(text string, out *Policy) error {
 		host := strings.TrimSuffix(line, ".")
 		if host == "" {
 			return fmt.Errorf("invalid empty deny host")
+		}
+		if err := validateDenyHostname(host); err != nil {
+			return err
 		}
 		out.ExactHosts[host] = struct{}{}
 		return nil
@@ -119,4 +125,14 @@ func forEachEntry(text string, fn func(line string) error) error {
 		}
 	}
 	return scanner.Err()
+}
+
+func validateDenyHostname(host string) error {
+	if strings.ContainsAny(host, "/\\ \t") {
+		return fmt.Errorf("invalid deny host %q: path or whitespace characters are not supported", host)
+	}
+	if strings.Contains(host, ":") {
+		return fmt.Errorf("invalid deny host %q: port or scheme qualifiers are not supported", host)
+	}
+	return nil
 }

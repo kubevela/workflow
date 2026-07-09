@@ -78,11 +78,17 @@ func (p Policy) MergeDeny(other Policy) Policy {
 	if len(other.ExactIPs) > 0 {
 		p.ExactIPs = append(append([]net.IP{}, p.ExactIPs...), other.ExactIPs...)
 	}
-	if p.ExactHosts == nil {
+	if len(other.ExactHosts) > 0 {
+		copied := make(map[string]struct{}, len(p.ExactHosts)+len(other.ExactHosts))
+		for host := range p.ExactHosts {
+			copied[host] = struct{}{}
+		}
+		for host := range other.ExactHosts {
+			copied[host] = struct{}{}
+		}
+		p.ExactHosts = copied
+	} else if p.ExactHosts == nil {
 		p.ExactHosts = map[string]struct{}{}
-	}
-	for host := range other.ExactHosts {
-		p.ExactHosts[host] = struct{}{}
 	}
 	if len(other.WildcardSuffixes) > 0 {
 		p.WildcardSuffixes = append(append([]string{}, p.WildcardSuffixes...), other.WildcardSuffixes...)
