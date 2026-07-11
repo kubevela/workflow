@@ -58,6 +58,8 @@ type Args struct {
 	ConcurrentReconciles int
 	// IgnoreWorkflowWithoutControllerRequirement indicates that workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation.
 	IgnoreWorkflowWithoutControllerRequirement bool
+	// ReconcileTimeout is the timeout for the reconcile loop. Default is 3 minutes.
+	ReconcileTimeout time.Duration
 }
 
 // WorkflowRunReconciler reconciles a WorkflowRun object
@@ -74,9 +76,9 @@ type workflowRunPatcher struct {
 	run *v1alpha1.WorkflowRun
 }
 
-var (
-	// ReconcileTimeout timeout for controller to reconcile
-	ReconcileTimeout = time.Minute * 3
+const (
+	// DefaultReconcileTimeout is the default timeout for controller to reconcile
+	DefaultReconcileTimeout = time.Minute * 3
 )
 
 // Reconcile reconciles the WorkflowRun object
@@ -84,7 +86,11 @@ var (
 // +kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core.oam.dev,resources=workflowruns/finalizers,verbs=update
 func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	ctx, cancel := context.WithTimeout(ctx, ReconcileTimeout)
+	reconcileTimeout := r.Args.ReconcileTimeout
+	if reconcileTimeout <= 0 {
+		reconcileTimeout = DefaultReconcileTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, reconcileTimeout)
 	defer cancel()
 
 	ctx = types.SetNamespaceInCtx(ctx, req.Namespace)
