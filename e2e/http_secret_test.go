@@ -50,7 +50,7 @@ var _ = Describe("Test the request step resolving headers from a Kubernetes Secr
 		}
 		Expect(k8sClient.Create(ctx, &secret)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 
-		deployHTTPBin(ctx)
+		deployMockServer(ctx)
 	})
 
 	It("should resolve the Authorization header from the Secret and reach the target", func() {
@@ -73,20 +73,49 @@ var _ = Describe("Test the request step resolving headers from a Kubernetes Secr
 	})
 })
 
-func deployHTTPBin(ctx context.Context) {
+func deployMockServer(ctx context.Context) {
+	nginxConfig := `
+server {
+    listen 80;
+    location /validate {
+        if ($http_authorization != "Bearer sk-supersecret-12345") {
+            return 401;
+        }
+        return 200 "OK";
+    }
+}
+`
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "mock-server-config", Namespace: httpSecretTestNamespace},
+		Data:       map[string]string{"default.conf": nginxConfig},
+	}
+	Expect(k8sClient.Create(ctx, &cm)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
+
 	replicas := int32(1)
 	deploy := appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "httpbin", Namespace: httpSecretTestNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "mock-server", Namespace: httpSecretTestNamespace},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "httpbin"}},
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "mock-server"}},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "httpbin"}},
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "mock-server"}},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Name:  "httpbin",
-						Image: "kennethreitz/httpbin",
+						Name:  "nginx",
+						Image: "nginx:alpine",
 						Ports: []corev1.ContainerPort{{ContainerPort: 80}},
+						VolumeMounts: []corev1.VolumeMount{{
+							Name:      "config",
+							MountPath: "/etc/nginx/conf.d",
+						}},
+					}},
+					Volumes: []corev1.Volume{{
+						Name: "config",
+						VolumeSource: corev1.VolumeSource{
+							ConfigMap: &corev1.ConfigMapVolumeSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "mock-server-config"},
+							},
+						},
 					}},
 				},
 			},
@@ -95,9 +124,9 @@ func deployHTTPBin(ctx context.Context) {
 	Expect(k8sClient.Create(ctx, &deploy)).Should(SatisfyAny(BeNil(), &utils.AlreadyExistMatcher{}))
 
 	svc := corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "httpbin", Namespace: httpSecretTestNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: "mock-server", Namespace: httpSecretTestNamespace},
 		Spec: corev1.ServiceSpec{
-			Selector: map[string]string{"app": "httpbin"},
+			Selector: map[string]string{"app": "mock-server"},
 			Ports:    []corev1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(80)}},
 		},
 	}
@@ -105,7 +134,7 @@ func deployHTTPBin(ctx context.Context) {
 
 	Eventually(func() int32 {
 		var d appsv1.Deployment
-		if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: httpSecretTestNamespace, Name: "httpbin"}, &d); err != nil {
+		if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: httpSecretTestNamespace, Name: "mock-server"}, &d); err != nil {
 			return 0
 		}
 		return d.Status.ReadyReplicas
