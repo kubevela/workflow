@@ -25,18 +25,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
 	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 const (
@@ -100,15 +104,35 @@ func Do(ctx context.Context, params *DoParams) (*DoReturns, error) {
 	return runHTTP(ctx, params)
 }
 
+func requestPolicy() httpguard.Policy {
+	policy := httpguard.Current()
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses) {
+		policy.BlockPrivate = true
+	}
+	return policy
+}
+
 func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
+	if utilfeature.DefaultMutableFeatureGate.Enabled(features.DisableWorkflowHTTP) {
+		return nil, errors.New("workflow outbound HTTP is disabled by DisableWorkflowHTTP feature gate")
+	}
 	var (
 		err             error
 		header, trailer http.Header
 		reader          io.Reader
 	)
+	policy := requestPolicy()
+	if parsed, err := neturl.Parse(params.Params.URL); err == nil {
+		if err := policy.BlockedHost(parsed.Host); err != nil {
+			return nil, err
+		}
+	}
 	defaultClient := &http.Client{
-		Transport: http.DefaultTransport,
+		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
 		Timeout:   time.Second * 3,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return policy.BlockedHost(req.URL.Host)
+		},
 	}
 	method := params.Params.Method
 	url := params.Params.URL
@@ -150,7 +174,11 @@ func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
 			params.Params.TLSConfig.Namespace = fmt.Sprint(params.ProcessContext.GetData(model.ContextNamespace))
 		}
 		if tr, err := getTransport(ctx, params.KubeClient, params.Params.TLSConfig.Secret, params.Params.TLSConfig.Namespace); err == nil && tr != nil {
-			defaultClient.Transport = tr
+			if transport, ok := tr.(*http.Transport); ok {
+				defaultClient.Transport = httpguard.SecureTransport(transport, policy)
+			} else {
+				defaultClient.Transport = tr
+			}
 		}
 	}
 

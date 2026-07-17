@@ -33,11 +33,14 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -292,6 +295,80 @@ func TestHTTPSDo(t *testing.T) {
 		},
 	})
 	r.NoError(err)
+}
+
+func TestHttpDo_blocksMetadata(t *testing.T) {
+	ctx := context.Background()
+	_, err := Do(ctx, &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://169.254.169.254/latest/meta-data/",
+		},
+	})
+	r := require.New(t)
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF target")
+}
+
+func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
+	r := require.New(t)
+	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.DisableWorkflowHTTP): true,
+	}))
+	t.Cleanup(func() {
+		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.DisableWorkflowHTTP): false,
+		})
+	})
+
+	_, err := Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://127.0.0.1:1229/hello",
+		},
+	})
+	r.Error(err)
+	r.Contains(err.Error(), "DisableWorkflowHTTP")
+}
+
+func TestHttpDo_blockPrivateHTTPAddresses(t *testing.T) {
+	r := require.New(t)
+	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.BlockPrivateHTTPAddresses): true,
+	}))
+	t.Cleanup(func() {
+		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.BlockPrivateHTTPAddresses): false,
+		})
+	})
+
+	_, err := Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://10.0.0.1/path",
+		},
+	})
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF target")
+}
+
+func TestHttpDo_blocksDeniedHost(t *testing.T) {
+	fragment, err := httpguard.ParseDenyList("", "blocked.example")
+	require.NoError(t, err)
+	httpguard.SetDenyFragment(fragment)
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+	_, err = Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    "http://blocked.example/path",
+		},
+	})
+	r := require.New(t)
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF host")
 }
 
 func newMockHttpsServer() *httptest.Server {
