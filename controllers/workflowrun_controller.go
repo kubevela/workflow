@@ -202,6 +202,7 @@ func (r *WorkflowRunReconciler) matchControllerRequirement(wr *v1alpha1.Workflow
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	executor.InitStepStatusCache(context.Background())
 	builder := ctrl.NewControllerManagedBy(mgr)
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnableWatchEventListener) {
 		builder = builder.Watches(&triggerv1alpha1.EventListener{}, ctrlHandler.EnqueueRequestsFromMapFunc(findObjectForEventListener))
@@ -255,7 +256,7 @@ func (r *WorkflowRunReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *WorkflowRunReconciler) endWithNegativeCondition(ctx context.Context, wr *v1alpha1.WorkflowRun, condition condition.Condition) (ctrl.Result, error) {
 	wr.SetConditions(condition)
 	if err := r.Status().Patch(ctx, wr, client.Merge); err != nil {
-		executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
+		executor.StepStatusCache.Put(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1, ReconcileTimeout)
 		return ctrl.Result{}, errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return ctrl.Result{}, fmt.Errorf("reconcile WorkflowRun error, msg: %s", condition.Message)
@@ -266,13 +267,13 @@ func (r *workflowRunPatcher) patchStatus(ctx context.Context, status *v1alpha1.W
 	wr := r.run
 	if isUpdate {
 		if err := r.Status().Update(ctx, wr); err != nil {
-			executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
+			executor.StepStatusCache.Put(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1, ReconcileTimeout)
 			return errors.WithMessage(err, "failed to update workflowrun status")
 		}
 		return nil
 	}
 	if err := r.Status().Patch(ctx, wr, client.Merge); err != nil {
-		executor.StepStatusCache.Store(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1)
+		executor.StepStatusCache.Put(fmt.Sprintf("%s-%s", wr.Name, wr.Namespace), -1, ReconcileTimeout)
 		return errors.WithMessage(err, "failed to patch workflowrun status")
 	}
 	return nil
