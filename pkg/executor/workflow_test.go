@@ -2058,6 +2058,49 @@ var _ = Describe("Test Workflow", func() {
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
+	It("skip workflow when cached step count exceeds status", func() {
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+					Name: "s1",
+					Type: "success",
+				},
+			},
+			{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+					Name: "s2",
+					Type: "success",
+				},
+			},
+		})
+		instance.Name = "app-skip-cache"
+		instance.Status = v1alpha1.WorkflowRunStatus{
+			Mode:      defaultMode,
+			StartTime: metav1.Now(),
+			Steps: []v1alpha1.WorkflowStepStatus{{
+				StepStatus: v1alpha1.StepStatus{
+					Name:  "s1",
+					Type:  "success",
+					Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+				},
+			}},
+		}
+
+		cacheKey := instance.Name + "-" + instance.Namespace
+		InitStepStatusCache(context.Background())
+		StepStatusCache.Delete(cacheKey)
+		DeferCleanup(func() {
+			StepStatusCache.Delete(cacheKey)
+		})
+		StepStatusCache.Put(cacheKey, 2, stepStatusCacheTTL)
+
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+		wf := New(instance)
+		state, err := wf.ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSkipped))
+	})
+
 	It("test for DAG", func() {
 		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
 			{
