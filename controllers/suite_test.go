@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -38,6 +39,7 @@ import (
 
 	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/pkg/executor"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -86,6 +88,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	singleton.KubeClient.Set(k8sClient)
 	fakeDynamicClient := fake.NewSimpleDynamicClient(testScheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
+	executor.InitStepStatusCache(context.Background())
 
 	reconciler = &WorkflowRunReconciler{
 		Client:   k8sClient,
