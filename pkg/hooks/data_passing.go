@@ -34,14 +34,19 @@ import (
 )
 
 // Input set data to parameter.
+// It first tries to get the value from the sensitive store, then falls back to the regular store.
 func Input(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.WorkflowStep) (cue.Value, error) {
 	filledVal := paramValue
 	for _, input := range step.Inputs {
-		inputValue, err := ctx.GetVar(strings.Split(input.From, ".")...)
+		// Try to get from sensitive store first, then fall back to regular store
+		inputValue, err := ctx.GetSensitiveVar(strings.Split(input.From, ".")...)
 		if err != nil {
-			inputValue, err = value.LookupValueByScript(paramValue, input.From)
+			inputValue, err = ctx.GetVar(strings.Split(input.From, ".")...)
 			if err != nil {
-				return filledVal, errors.WithMessagef(err, "get input from [%s]", input.From)
+				inputValue, err = value.LookupValueByScript(paramValue, input.From)
+				if err != nil {
+					return filledVal, errors.WithMessagef(err, "get input from [%s]", input.From)
+				}
 			}
 		}
 		if input.ParameterKey != "" {
@@ -60,6 +65,8 @@ func Input(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.Workflo
 }
 
 // Output get data from task value.
+// When output.Sensitive is true (requires kubevela/pkg update), the value is stored in the Secret store.
+// Otherwise, it is stored in the ConfigMap store (default behavior for backward compatibility).
 func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
 	errMsg := ""
 	if wfTypes.IsStepFinish(status.Phase, status.Reason) {
@@ -87,8 +94,15 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.Workflo
 			if err != nil || v.Err() != nil {
 				v = taskValue.Context().CompileString("null")
 			}
-			if err := ctx.SetVar(v, output.Name); err != nil {
-				errMsg += fmt.Sprintf("failed to set output %s: %s\n", output.Name, err.Error())
+			// Route sensitive outputs to Secret store, non-sensitive to ConfigMap
+			if output.Sensitive {
+				if err := ctx.SetSensitiveVar(v, output.Name); err != nil {
+					errMsg += fmt.Sprintf("failed to set sensitive output %s: %s\n", output.Name, err.Error())
+				}
+			} else {
+				if err := ctx.SetVar(v, output.Name); err != nil {
+					errMsg += fmt.Sprintf("failed to set output %s: %s\n", output.Name, err.Error())
+				}
 			}
 		}
 	}
