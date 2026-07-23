@@ -58,7 +58,7 @@ spec:
         	// +usage=Headers whose values are sourced from Kubernetes Secrets
         	headersFromSecret?: [...{
         		// +usage=The HTTP header name to set
-        		name: string
+        		header: string
         		// +usage=The name of the Kubernetes Secret
         		secret: string
         		// +usage=The key within Secret.Data whose value becomes the header value

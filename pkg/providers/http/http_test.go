@@ -280,7 +280,7 @@ func TestHTTPDoWithHeaderSecret(t *testing.T) {
 	}{
 		"secret-found-key-present": {
 			headersFromSecret: []HeaderSecret{
-				{Name: "Authorization", Secret: "api-creds", Key: "token"},
+				{Header: "Authorization", Secret: "api-creds", Key: "token"},
 			},
 			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
 				secret := obj.(*v1.Secret)
@@ -291,7 +291,7 @@ func TestHTTPDoWithHeaderSecret(t *testing.T) {
 		},
 		"secret-not-found": {
 			headersFromSecret: []HeaderSecret{
-				{Name: "Authorization", Secret: "missing-secret", Key: "token"},
+				{Header: "Authorization", Secret: "missing-secret", Key: "token"},
 			},
 			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
 				return errors.New("not found")
@@ -300,7 +300,7 @@ func TestHTTPDoWithHeaderSecret(t *testing.T) {
 		},
 		"key-missing-in-secret": {
 			headersFromSecret: []HeaderSecret{
-				{Name: "Authorization", Secret: "api-creds", Key: "missing-key"},
+				{Header: "Authorization", Secret: "api-creds", Key: "missing-key"},
 			},
 			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
 				secret := obj.(*v1.Secret)
@@ -311,7 +311,7 @@ func TestHTTPDoWithHeaderSecret(t *testing.T) {
 		},
 		"namespace-from-context": {
 			headersFromSecret: []HeaderSecret{
-				{Name: "Authorization", Secret: "api-creds", Key: "token"},
+				{Header: "Authorization", Secret: "api-creds", Key: "token"},
 			},
 			mockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
 				if key.Namespace != "my-ns" {

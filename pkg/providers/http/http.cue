@@ -26,7 +26,7 @@
 			}
 			// +usage=Headers whose values are resolved from Kubernetes Secrets
 			headersFromSecret?: [...{
-				name:   string
+				header: string
 				secret: string
 				key:    string
 			}]

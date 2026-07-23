@@ -76,7 +76,7 @@ type TLSConfig struct {
 
 // HeaderSecret resolves a single HTTP header value from a Kubernetes Secret.
 type HeaderSecret struct {
-	Name   string `json:"name"`
+	Header string `json:"header"`
 	Secret string `json:"secret"`
 	Key    string `json:"key"`
 }
@@ -246,13 +246,13 @@ func resolveHeaderSecrets(ctx context.Context, cli client.Client, secrets []Head
 	for _, hs := range secrets {
 		secret := new(v1.Secret)
 		if err := cli.Get(ctx, client.ObjectKey{Namespace: ns, Name: hs.Secret}, secret); err != nil {
-			return fmt.Errorf("secret %q not found for header %q: %w", hs.Secret, hs.Name, err)
+			return fmt.Errorf("secret %q not found for header %q: %w", hs.Secret, hs.Header, err)
 		}
 		val, ok := secret.Data[hs.Key]
 		if !ok {
 			return fmt.Errorf("key %q not found in secret %q", hs.Key, hs.Secret)
 		}
-		h.Set(hs.Name, string(val))
+		h.Set(hs.Header, string(val))
 	}
 	return nil
 }
