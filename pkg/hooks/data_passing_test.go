@@ -22,12 +22,14 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/workflow/pkg/mock"
+
 	"github.com/kubevela/pkg/util/singleton"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 
@@ -165,7 +167,7 @@ func TestOutput(t *testing.T) {
 }
 
 func mockContext(t *testing.T) wfContext.Context {
-	cli := &test.MockClient{
+	cli := &mock.Client{
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
 		},

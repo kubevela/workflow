@@ -23,16 +23,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/kubevela/pkg/util/singleton"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+
+	"github.com/kubevela/workflow/pkg/mock"
 )
 
 func TestLoad(t *testing.T) {
-	cli := &test.MockClient{
+	cli := &mock.Client{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*unstructured.Unstructured)
 			if !ok {
@@ -81,7 +82,7 @@ parameter: {
 // (e.g. list1 + list2) is rewritten to canonical form (list.Concat) before the
 // template reaches the workflow engine.
 func TestLoadUpgradesLegacyCUESyntax(t *testing.T) {
-	cli := &test.MockClient{
+	cli := &mock.Client{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*unstructured.Unstructured)
 			if !ok {
