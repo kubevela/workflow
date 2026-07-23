@@ -94,7 +94,7 @@ func TestSendEmail(t *testing.T) {
 			if tc.errMsg != "" {
 				patch.Reset()
 				patch = ApplyMethod(reflect.TypeOf(dial), "DialAndSend", func(_ *gomail.Dialer, _ ...*gomail.Message) error {
-					return fmt.Errorf(tc.errMsg)
+					return fmt.Errorf("%s", tc.errMsg)
 				})
 				defer patch.Reset()
 			}

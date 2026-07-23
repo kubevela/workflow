@@ -85,9 +85,6 @@ linters:
       # defaults / merged gosimple checks into staticcheck), not introduced
       # by this change.
       - linters:
-          - govet
-        text: 'non-constant format string'
-      - linters:
           - goconst
         text: 'occurrences, make it a constant'
       - linters:
@@ -99,6 +96,12 @@ linters:
       - linters:
           - revive
         text: 'unused-parameter'
+      # staticcheck.conf already ignores SA1019 repo-wide for CUE-upgrade
+      # reasons, but golangci-lint's staticcheck doesn't read that file.
+      # Mirror the same exclusion here so both tools agree.
+      - linters:
+          - staticcheck
+        text: 'SA1019:'
     paths:
       - zz_generated\..+\.go$
       - .*_test.go$
