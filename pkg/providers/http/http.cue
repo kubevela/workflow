@@ -24,6 +24,12 @@
 				limit:  int
 				period: string
 			}
+			// +usage=Headers whose values are resolved from Kubernetes Secrets
+			headersFromSecret?: [...{
+				header: string
+				secret: string
+				key:    string
+			}]
 			...
 		}
 		// +usgae=The tls config of the request

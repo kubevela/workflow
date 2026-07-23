@@ -31,10 +31,12 @@ import (
 	"time"
 
 	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
@@ -257,6 +259,98 @@ func runMockServer(shutdown chan struct{}) {
 		if err == nil {
 			break
 		}
+	}
+}
+
+func TestHTTPDoWithHeaderSecret(t *testing.T) {
+	ctx := context.Background()
+
+	// Echo server that writes back the Authorization header value as the body.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.Header.Get("Authorization")))
+	}))
+	defer srv.Close()
+
+	testCases := map[string]struct {
+		headersFromSecret []HeaderSecret
+		mockGet           func(context.Context, client.ObjectKey, client.Object) error
+		processNS         string
+		expectedBody      string
+		expectedErr       string
+	}{
+		"secret-found-key-present": {
+			headersFromSecret: []HeaderSecret{
+				{Header: "Authorization", Secret: "api-creds", Key: "token"},
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+				secret := obj.(*v1.Secret)
+				*secret = v1.Secret{Data: map[string][]byte{"token": []byte("Bearer abc123")}}
+				return nil
+			},
+			expectedBody: "Bearer abc123",
+		},
+		"secret-not-found": {
+			headersFromSecret: []HeaderSecret{
+				{Header: "Authorization", Secret: "missing-secret", Key: "token"},
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+				return errors.New("not found")
+			},
+			expectedErr: `secret "missing-secret" not found for header "Authorization"`,
+		},
+		"key-missing-in-secret": {
+			headersFromSecret: []HeaderSecret{
+				{Header: "Authorization", Secret: "api-creds", Key: "missing-key"},
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object) error {
+				secret := obj.(*v1.Secret)
+				*secret = v1.Secret{Data: map[string][]byte{"token": []byte("Bearer abc123")}}
+				return nil
+			},
+			expectedErr: `key "missing-key" not found in secret "api-creds"`,
+		},
+		"namespace-from-context": {
+			headersFromSecret: []HeaderSecret{
+				{Header: "Authorization", Secret: "api-creds", Key: "token"},
+			},
+			mockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
+				if key.Namespace != "my-ns" {
+					return fmt.Errorf("unexpected namespace %q", key.Namespace)
+				}
+				secret := obj.(*v1.Secret)
+				*secret = v1.Secret{Data: map[string][]byte{"token": []byte("Bearer fromns")}}
+				return nil
+			},
+			processNS:    "my-ns",
+			expectedBody: "Bearer fromns",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			r := require.New(t)
+			pCtx := process.NewContext(process.ContextData{Namespace: tc.processNS})
+			res, err := Do(ctx, &DoParams{
+				Params: RequestVars{
+					Method: "GET",
+					URL:    srv.URL,
+					Request: &Request{
+						HeadersFromSecret: tc.headersFromSecret,
+					},
+				},
+				RuntimeParams: types.RuntimeParams{
+					KubeClient:     &test.MockClient{MockGet: tc.mockGet},
+					ProcessContext: pCtx,
+				},
+			})
+			if tc.expectedErr != "" {
+				r.Error(err)
+				r.Contains(err.Error(), tc.expectedErr)
+				return
+			}
+			r.NoError(err)
+			r.Equal(tc.expectedBody, res.Returns.Body)
+		})
 	}
 }
 
