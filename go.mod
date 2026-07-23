@@ -153,6 +153,7 @@ require (
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.100.2
 	github.com/go-kit/kit => github.com/go-kit/kit v0.12.0
+	github.com/kubevela/kube-trigger => github.com/anishbista60/kube-trigger v0.0.0-20260722123926-5b6151e1f28b
 	github.com/kubevela/pkg => github.com/anishbista60/pkg v0.0.0-20260722123526-34480bf014a5
 	github.com/nats-io/jwt/v2 => github.com/nats-io/jwt/v2 v2.0.1
 	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.9.3
@@ -160,5 +161,3 @@ replace (
 	github.com/wercker/stern => github.com/anishbista60/stern v0.0.0-20260716201616-e009e4ac1325
 	sigs.k8s.io/apiserver-runtime => github.com/anishbista60/apiserver-runtime v1.1.2-0.20260722123624-38ed2f9bdeb6
 )
-
-replace github.com/kubevela/kube-trigger => github.com/anishbista60/kube-trigger v0.0.0-20260722123926-5b6151e1f28b
