@@ -62,7 +62,7 @@ else
 GOIMPORTS=$(shell which goimports)
 endif
 
-GOLANGCILINT_VERSION ?= v1.60.0
+GOLANGCILINT_VERSION ?= v2.12.2
 
 .PHONY: golangci
 golangci:
