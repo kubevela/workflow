@@ -65,7 +65,7 @@ jobs:
         with:
           version: 3.15.1
           kubebuilderOnly: false
-          kubernetesVersion: v1.31.10
+          kubernetesVersion: v1.35.0
 
       - name: Run Make test
         run: make test
