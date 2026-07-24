@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"cuelang.org/go/cue"
@@ -47,7 +48,8 @@ var (
 	// DisableRecorder optimize workflow by disable recorder
 	DisableRecorder = false
 	// StepStatusCache cache the step status
-	StepStatusCache cache.Cache[string]
+	StepStatusCache     cache.Cache[string]
+	stepStatusCacheOnce sync.Once
 )
 
 const (
@@ -61,9 +63,9 @@ const (
 
 // InitStepStatusCache initializes the StepStatusCache. Must be called once at startup.
 func InitStepStatusCache(ctx context.Context) {
-	if StepStatusCache == nil {
+	stepStatusCacheOnce.Do(func() {
 		StepStatusCache = cache.NewMemoryCacheStore[string](ctx)
-	}
+	})
 }
 
 type workflowExecutor struct {
@@ -83,6 +85,7 @@ func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
 
 // InitializeWorkflowInstance init workflow instance
 func InitializeWorkflowInstance(instance *types.WorkflowInstance) {
+	InitStepStatusCache(context.Background())
 	if instance.Status.StartTime.IsZero() && len(instance.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
 		mode := oamv1alpha1.WorkflowExecuteMode{
