@@ -24,7 +24,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +41,7 @@ import (
 	"github.com/kubevela/pkg/util/singleton"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"

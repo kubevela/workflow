@@ -13,8 +13,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.23.8'
-  GOLANGCI_VERSION: 'v1.60.1'
+  GO_VERSION: '1.25.12'
+  GOLANGCI_VERSION: 'v2.12.2'
 
 jobs:
 
@@ -65,7 +65,7 @@ jobs:
         with:
           version: 3.15.1
           kubebuilderOnly: false
-          kubernetesVersion: v1.31.10
+          kubernetesVersion: v1.35.0
 
       - name: Run Make test
         run: make test
