@@ -21,13 +21,12 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/kubevela/workflow/pkg/mock"
 
 	"github.com/kubevela/pkg/util/singleton"
 
@@ -66,7 +65,7 @@ func TestSetContext(t *testing.T) {
 }
 
 func newCliForTest(wfCm *corev1.ConfigMap) {
-	cli := &mock.Client{
+	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {

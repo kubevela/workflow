@@ -24,6 +24,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -31,8 +32,6 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
-
-	"github.com/kubevela/workflow/pkg/mock"
 
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
 	"github.com/kubevela/pkg/cue/cuex"
@@ -644,7 +643,7 @@ func newWorkflowContextForTest(t *testing.T) wfContext.Context {
 	err = json.Unmarshal(testCaseJson, &cm)
 	r.NoError(err)
 
-	cli := &mock.Client{
+	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			o, ok := obj.(*corev1.ConfigMap)
 			if ok {

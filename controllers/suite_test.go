@@ -17,11 +17,12 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -141,7 +142,7 @@ func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message s
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Event(object, eventtype, reason, messageFmt)
+	f.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
