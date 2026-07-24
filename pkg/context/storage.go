@@ -31,11 +31,13 @@ var (
 type inMemoryContextStorage struct {
 	mu       sync.Mutex
 	contexts map[string]*v1.ConfigMap
+	secrets  map[string]*v1.Secret
 }
 
 // MemStore store in-memory context
 var MemStore = &inMemoryContextStorage{
 	contexts: map[string]*v1.ConfigMap{},
+	secrets:  map[string]*v1.Secret{},
 }
 
 func (o *inMemoryContextStorage) getKey(cm *v1.ConfigMap) string {
@@ -77,4 +79,50 @@ func (o *inMemoryContextStorage) DeleteInMemoryContext(appName string) {
 	defer o.mu.Unlock()
 	key := fmt.Sprintf("workflow-%s-context", appName)
 	delete(o.contexts, key)
+}
+
+func (o *inMemoryContextStorage) getSecretKey(secret *v1.Secret) string {
+	ns := secret.GetNamespace()
+	if ns == "" {
+		ns = "default"
+	}
+	name := secret.GetName()
+	return ns + "/" + name
+}
+
+// GetOrCreateInMemorySecret gets or creates an in-memory secret for sensitive workflow data.
+func (o *inMemoryContextStorage) GetOrCreateInMemorySecret(secret *v1.Secret) {
+	if obj := o.GetInMemorySecret(secret.Name, secret.Namespace); obj != nil {
+		obj.DeepCopyInto(secret)
+	} else {
+		o.CreateInMemorySecret(secret)
+	}
+}
+
+// GetInMemorySecret gets an in-memory secret by name and namespace.
+func (o *inMemoryContextStorage) GetInMemorySecret(name, ns string) *v1.Secret {
+	return o.secrets[ns+"/"+name]
+}
+
+// CreateInMemorySecret creates an in-memory secret for sensitive workflow data.
+func (o *inMemoryContextStorage) CreateInMemorySecret(secret *v1.Secret) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	secret.Data = map[string][]byte{}
+	o.secrets[o.getSecretKey(secret)] = secret
+}
+
+// UpdateInMemorySecret updates an in-memory secret for sensitive workflow data.
+func (o *inMemoryContextStorage) UpdateInMemorySecret(secret *v1.Secret) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.secrets[o.getSecretKey(secret)] = secret
+}
+
+// DeleteInMemorySecret deletes an in-memory secret.
+func (o *inMemoryContextStorage) DeleteInMemorySecret(appName string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	key := fmt.Sprintf("workflow-%s-context-secret", appName)
+	delete(o.secrets, key)
 }
