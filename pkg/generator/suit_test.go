@@ -17,6 +17,7 @@ limitations under the License.
 package generator
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -33,6 +34,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"github.com/kubevela/workflow/pkg/executor"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -71,6 +74,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	singleton.KubeClient.Set(k8sClient)
 	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
+	executor.InitStepStatusCache(context.Background())
 }, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {

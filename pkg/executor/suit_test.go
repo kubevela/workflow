@@ -17,6 +17,7 @@ limitations under the License.
 package executor
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -71,6 +72,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	singleton.KubeClient.Set(k8sClient)
 	fakeDynamicClient := fake.NewSimpleDynamicClient(scheme)
 	singleton.DynamicClient.Set(fakeDynamicClient)
+	InitStepStatusCache(context.Background())
 }, NodeTimeout(1*time.Minute))
 
 var _ = AfterSuite(func() {
