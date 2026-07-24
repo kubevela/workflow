@@ -22,10 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/kubevela/workflow/pkg/mock"
 
 	"github.com/kubevela/pkg/util/singleton"
 
@@ -39,7 +38,7 @@ func TestMetricCheck(t *testing.T) {
 	srv := runMockPrometheusServer() // no lint
 	r := require.New(t)
 	ctx := context.Background()
-	cli := &mock.Client{
+	cli := &test.MockClient{
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 			return nil
 		},

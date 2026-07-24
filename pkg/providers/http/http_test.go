@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +39,6 @@ import (
 
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
-	"github.com/kubevela/workflow/pkg/mock"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
@@ -364,7 +363,7 @@ func TestHTTPSDo(t *testing.T) {
 	ctx := context.Background()
 	s := newMockHttpsServer()
 	defer s.Close()
-	cli := &mock.Client{
+	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 			secret := obj.(*v1.Secret)
 			*secret = v1.Secret{
