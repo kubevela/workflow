@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/feature"
 
+	"github.com/kubevela/pkg/cache"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
@@ -47,7 +48,8 @@ var (
 	// DisableRecorder optimize workflow by disable recorder
 	DisableRecorder = false
 	// StepStatusCache cache the step status
-	StepStatusCache sync.Map
+	StepStatusCache     cache.Cache[string]
+	stepStatusCacheOnce sync.Once
 )
 
 const (
@@ -55,7 +57,16 @@ const (
 	minWorkflowBackoffWaitTime = 1
 	// backoffTimeCoefficient is the coefficient of time to wait before reconcile workflow again
 	backoffTimeCoefficient = 0.05
+	// stepStatusCacheTTL is the TTL for step status cache entries
+	stepStatusCacheTTL = time.Minute * 3
 )
+
+// InitStepStatusCache initializes the StepStatusCache. Must be called once at startup.
+func InitStepStatusCache(ctx context.Context) {
+	stepStatusCacheOnce.Do(func() {
+		StepStatusCache = cache.NewMemoryCacheStore[string](ctx)
+	})
+}
 
 type workflowExecutor struct {
 	instance *types.WorkflowInstance
@@ -74,6 +85,7 @@ func New(instance *types.WorkflowInstance, options ...Option) WorkflowExecutor {
 
 // InitializeWorkflowInstance init workflow instance
 func InitializeWorkflowInstance(instance *types.WorkflowInstance) {
+	InitStepStatusCache(context.Background())
 	if instance.Status.StartTime.IsZero() && len(instance.Status.Steps) == 0 {
 		metrics.WorkflowRunInitializedCounter.WithLabelValues().Inc()
 		mode := oamv1alpha1.WorkflowExecuteMode{
@@ -129,9 +141,9 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 		return v1alpha1.WorkflowStateSucceeded, nil
 	}
 
-	if cacheValue, ok := StepStatusCache.Load(cacheKey); ok {
+	if cacheValue, ok := StepStatusCache.Get(cacheKey); ok {
 		// handle cache resource
-		if len(status.Steps) < cacheValue.(int) {
+		if stepCount, valid := cacheValue.(int); valid && len(status.Steps) < stepCount {
 			return v1alpha1.WorkflowStateSkipped, nil
 		}
 	}
@@ -141,11 +153,11 @@ func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunner
 	err = e.Run(ctx, taskRunners, dagMode)
 	if err != nil {
 		ctx.Error(err, "run steps")
-		StepStatusCache.Store(cacheKey, len(status.Steps))
+		StepStatusCache.Put(cacheKey, len(status.Steps), stepStatusCacheTTL)
 		return v1alpha1.WorkflowStateExecuting, err
 	}
 
-	StepStatusCache.Store(cacheKey, len(status.Steps))
+	StepStatusCache.Put(cacheKey, len(status.Steps), stepStatusCacheTTL)
 	if feature.DefaultMutableFeatureGate.Enabled(features.EnablePatchStatusAtOnce) {
 		return e.status.Phase, nil
 	}
