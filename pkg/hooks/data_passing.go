@@ -28,6 +28,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/cue/sensitive"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
@@ -59,8 +60,59 @@ func Input(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.Workflo
 	return filledVal, nil
 }
 
-// Output get data from task value.
+// OutputWithSensitive builds the post-stop hook for a step whose template has
+// already been read for `// +sensitive` markers.
+//
+// sensitivePaths are the template paths the definition author marked, absolute
+// from the template root so they compare directly against an output's
+// valueFrom. extractErr is whatever reading those markers failed with; a step
+// whose markers could not be read routes every output to the Secret, because
+// "I could not tell" must not be mistaken for "nothing is secret".
+//
+// The marker is read from the template text, which the hook never sees -- its
+// taskValue is the evaluated result, and comments do not survive evaluation --
+// so the paths are derived where the template is loaded and closed over here.
+// That is also what keeps the parse off the per-run path.
+func OutputWithSensitive(sensitivePaths []string, extractErr error) wfTypes.TaskPostStopHook {
+	return func(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
+		return output(ctx, taskValue, step, status, stepStatus, sensitivePaths, extractErr)
+	}
+}
+
+// isSensitiveOutput reports whether an output has to be kept out of the
+// plaintext context ConfigMap.
+//
+// Three ways to be sensitive, in order of how much we know:
+//
+//   - the markers could not be read at all (extractErr): everything is, since
+//     the alternative is leaking a credential we were told about but failed to
+//     parse.
+//   - valueFrom overlaps a marked path, in either direction. See
+//     sensitive.Covers.
+//   - the template marked something and valueFrom is an expression rather than
+//     a plain path: there is no proving an expression does not embed a marked
+//     value, so it fails closed.
+func isSensitiveOutput(valueFrom string, sensitivePaths []string, extractErr error) bool {
+	if extractErr != nil {
+		return true
+	}
+	if len(sensitivePaths) == 0 {
+		return false
+	}
+	if !sensitive.IsPlainFieldPath(valueFrom) {
+		return true
+	}
+	return sensitive.Covers(valueFrom, sensitivePaths)
+}
+
+// Output get data from task value. It is the no-markers case of
+// OutputWithSensitive, kept for callers that install the hook without a
+// template to read -- a step group, for one, has no template of its own.
 func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
+	return output(ctx, taskValue, step, status, stepStatus, nil, nil)
+}
+
+func output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus, sensitivePaths []string, extractErr error) error {
 	errMsg := ""
 	if wfTypes.IsStepFinish(status.Phase, status.Reason) {
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)
@@ -87,7 +139,11 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.Workflo
 			if err != nil || v.Err() != nil {
 				v = taskValue.Context().CompileString("null")
 			}
-			if err := ctx.SetVar(v, output.Name); err != nil {
+			setVar := ctx.SetVar
+			if isSensitiveOutput(output.ValueFrom, sensitivePaths, extractErr) {
+				setVar = ctx.SetSensitiveVar
+			}
+			if err := setVar(v, output.Name); err != nil {
 				errMsg += fmt.Sprintf("failed to set output %s: %s\n", output.Name, err.Error())
 			}
 		}

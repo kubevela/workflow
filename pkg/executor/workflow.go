@@ -715,7 +715,13 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 			},
 		},
 		PreStartHooks: []types.TaskPreStartHook{hooks.Input},
-		PostStopHooks: []types.TaskPostStopHook{hooks.Output},
+		// PostStopHooks is deliberately left unset. The output hook carries the
+		// step template's `// +sensitive` paths, which decide whether an output
+		// goes to the context ConfigMap or to the companion Secret, so it can
+		// only be built where the template is known. Each task runner defaults
+		// it for its own step; setting one here would hand every step the same
+		// hook and route marked outputs to the ConfigMap. A caller that does
+		// set it keeps full control, as before.
 	}
 	if e.debug {
 		options.Debug = func(id string, v cue.Value) error {
