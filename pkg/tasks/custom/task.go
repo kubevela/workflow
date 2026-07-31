@@ -243,7 +243,16 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				}
 			}
 
-			if exec.stepStatus.Phase == v1alpha1.WorkflowStepPhaseSucceeded && taskv.Err() != nil {
+			// Check wfStatus (this reconcile), not stepStatus (the previous one).
+			// wfStatus starts at the neutral Succeeded default and is set to
+			// Running/Suspending/Failed by Wait()/Suspend()/err() if an action claimed a
+			// specific outcome while CompileString ran. Still holding the default means
+			// nothing claimed one, so a template error is ours to report.
+			//
+			// Reading stepStatus instead meant that once a reconcile persisted Failed, every
+			// later reconcile skipped this check and returned the untouched Succeeded
+			// default -- reporting success for a step whose actions never ran.
+			if exec.wfStatus.Phase == v1alpha1.WorkflowStepPhaseSucceeded && taskv.Err() != nil {
 				tracer.Error(taskv.Err(), "do steps")
 				exec.err(wfCtx, true, taskv.Err(), types.StatusReasonExecute)
 				return exec.status(), exec.operation(), nil

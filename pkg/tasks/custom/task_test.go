@@ -689,6 +689,158 @@ name: context.name
 	}
 }
 
+// TestTemplateErrorPersistsAcrossReconciles guards against a step whose CUE template
+// fails to compile reporting Succeeded on the second and later reconciles.
+//
+// The bug: the guard in makeTaskGenerator read exec.stepStatus (the PREVIOUS
+// reconcile's phase) instead of exec.wfStatus (this reconcile's). Once pass 1
+// persisted Failed, pass 2 saw Failed, skipped the taskv.Err() check entirely, and
+// returned the untouched optimistic Succeeded default.
+//
+// Two things are essential to reaching the bug, and omitting either hides it:
+//
+//  1. Feed the returned status back in as options.StepStatus before the second run.
+//     That is what pkg/executor/workflow.go:730 does. Without it, stepStatus stays at
+//     its default and the guard is always true (see the "failed-after-retries" case in
+//     TestTaskLoader, which loops but never feeds status back).
+//  2. Call the generator again for the second pass. The executor struct -- and the
+//     optimistic Succeeded seed on wfStatus -- is created per generator call, not per
+//     Run call. A reconcile regenerates runners
+//     (controllers/workflowrun_controller.go:134), so reusing one runner would carry
+//     pass 1's Failed wfStatus into pass 2 and mask the defect.
+func TestTemplateErrorPersistsAcrossReconciles(t *testing.T) {
+	r := require.New(t)
+
+	// Reset the in-memory failure counter. checkErrorTimes (action.go:145-152) keys it on
+	// exec.wfStatus.ID, which is empty when TaskGeneratorOptions carries no ID -- so it is
+	// shared with every other test using the app-v1/default context. At
+	// MaxWorkflowStepErrorRetryTimes (10) the reason flips to StatusReasonFailedAfterRetries
+	// and the assertions below would fail for an unrelated reason.
+	wfContext.CleanupMemoryStore("app-v1", "default")
+	wfCtx := newWorkflowContextForTest(t)
+
+	compiler := cuex.NewCompilerWithInternalPackages(
+		pkgruntime.Must(cuexruntime.NewInternalPackage("test", "", map[string]cuexruntime.ProviderFn{
+			// Returns a value carrying an unresolved reference, so taskv.Err() != nil.
+			"templateError": cuexruntime.NativeProviderFn(func(ctx context.Context, v cue.Value) (cue.Value, error) {
+				return v.Context().CompileString("output: xxx"), nil
+			}),
+		})),
+	)
+
+	pCtx := process.NewContext(process.ContextData{
+		Name:      "app",
+		Namespace: "default",
+	})
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
+
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Name: "template",
+			Type: "templateError",
+		},
+	}
+
+	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
+	r.NoError(err)
+	run, err := gen(step, &types.TaskGeneratorOptions{})
+	r.NoError(err)
+
+	// Pass 1: no persisted status yet.
+	firstStatus, _, err := run.Run(wfCtx, &types.TaskRunOptions{})
+	r.NoError(err)
+	r.Equal(v1alpha1.WorkflowStepPhaseFailed, firstStatus.Phase, "first reconcile must fail")
+	r.Equal(types.StatusReasonExecute, firstStatus.Reason)
+	r.NotEmpty(firstStatus.Message, "first reconcile must report the compile error")
+
+	// Pass 2: a fresh runner, as a reconcile produces, plus pass 1's status fed back.
+	secondRun, err := gen(step, &types.TaskGeneratorOptions{})
+	r.NoError(err)
+	secondStatus, _, err := secondRun.Run(wfCtx, &types.TaskRunOptions{
+		StepStatus: map[string]v1alpha1.StepStatus{
+			step.Name: firstStatus,
+		},
+	})
+	r.NoError(err)
+	r.Equal(v1alpha1.WorkflowStepPhaseFailed, secondStatus.Phase,
+		"template is still broken, so the second reconcile must still fail")
+	r.Equal(types.StatusReasonExecute, secondStatus.Reason)
+	r.NotEmpty(secondStatus.Message,
+		"second reconcile must still report the compile error, not an empty-message success")
+}
+
+// TestInFlightStatusSurvivesSecondReconcile asserts that a step which reports itself as
+// waiting or suspended keeps that phase on a later reconcile, with its previous status
+// fed back in. A step mid-flight has a legitimately incomplete CUE value, so the
+// template-error check at task.go must stay skipped for it.
+func TestInFlightStatusSurvivesSecondReconcile(t *testing.T) {
+	r := require.New(t)
+
+	compiler := cuex.NewCompilerWithInternalPackages(
+		pkgruntime.Must(cuexruntime.NewInternalPackage("test", "", map[string]cuexruntime.ProviderFn{
+			"wait": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
+				val.RuntimeParams.Action.Wait("I am waiting")
+				return nil, nil
+			}),
+			"suspend": providertypes.LegacyGenericProviderFn[any, any](func(ctx context.Context, val *providertypes.LegacyParams[any]) (*any, error) {
+				val.RuntimeParams.Action.Suspend("I am suspended")
+				return nil, nil
+			}),
+		})),
+	)
+
+	pCtx := process.NewContext(process.ContextData{
+		Name:      "app",
+		Namespace: "default",
+	})
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, compiler)
+
+	testCases := []struct {
+		stepType      string
+		expectedPhase v1alpha1.WorkflowStepPhase
+	}{
+		{stepType: "wait", expectedPhase: v1alpha1.WorkflowStepPhaseRunning},
+		{stepType: "suspend", expectedPhase: v1alpha1.WorkflowStepPhaseSuspending},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.stepType, func(t *testing.T) {
+			// Isolate each subtest from the shared in-memory failure counter. See the
+			// comment in TestTemplateErrorPersistsAcrossReconciles.
+			wfContext.CleanupMemoryStore("app-v1", "default")
+			wfCtx := newWorkflowContextForTest(t)
+
+			step := oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+					Name: tc.stepType,
+					Type: tc.stepType,
+				},
+			}
+
+			gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
+			r.NoError(err)
+
+			run, err := gen(step, &types.TaskGeneratorOptions{})
+			r.NoError(err)
+			firstStatus, _, err := run.Run(wfCtx, &types.TaskRunOptions{})
+			r.NoError(err)
+			r.Equal(tc.expectedPhase, firstStatus.Phase)
+
+			// Fresh runner for the second pass, as a reconcile produces.
+			secondRun, err := gen(step, &types.TaskGeneratorOptions{})
+			r.NoError(err)
+			secondStatus, _, err := secondRun.Run(wfCtx, &types.TaskRunOptions{
+				StepStatus: map[string]v1alpha1.StepStatus{
+					step.Name: firstStatus,
+				},
+			})
+			r.NoError(err)
+			r.Equal(tc.expectedPhase, secondStatus.Phase,
+				"an in-flight step must not be flipped to Failed by the template-error check")
+		})
+	}
+}
+
 var (
 	testCaseYaml = `apiVersion: v1
 data:
