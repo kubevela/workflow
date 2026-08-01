@@ -1268,3 +1268,54 @@ func TestRestartRunStep(t *testing.T) {
 		})
 	}
 }
+
+func TestRestartFromStepWorkflowRefInSystemNamespace(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+
+	workflow := &oamv1alpha1.Workflow{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "shared-workflow",
+			Namespace: SystemNamespace,
+		},
+		WorkflowSpec: oamv1alpha1.WorkflowSpec{
+			Steps: []oamv1alpha1.WorkflowStep{
+				{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "step1"}},
+			},
+		},
+	}
+	r.NoError(cli.Create(ctx, workflow))
+	defer func() { r.NoError(cli.Delete(ctx, workflow)) }()
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "wr-ref-fallback-context",
+			Namespace: "default",
+		},
+	}
+	r.NoError(cli.Create(ctx, cm))
+	defer func() { r.NoError(cli.Delete(ctx, cm)) }()
+
+	run := &v1alpha1.WorkflowRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "wr-ref-fallback",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.WorkflowRunSpec{
+			WorkflowRef: workflow.Name,
+		},
+		Status: v1alpha1.WorkflowRunStatus{
+			ContextBackend: &corev1.ObjectReference{
+				Name:      cm.Name,
+				Namespace: "default",
+			},
+			Steps: []v1alpha1.WorkflowStepStatus{
+				{StepStatus: v1alpha1.StepStatus{Name: "step1", Phase: v1alpha1.WorkflowStepPhaseFailed}},
+			},
+		},
+	}
+	r.NoError(cli.Create(ctx, run))
+	defer func() { r.NoError(cli.Delete(ctx, run)) }()
+
+	r.NoError(RestartFromStep(ctx, cli, run, "step1"))
+}

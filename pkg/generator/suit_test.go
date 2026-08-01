@@ -18,6 +18,7 @@ package generator
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	cuexv1alpha1 "github.com/kubevela/pkg/apis/cue/v1alpha1"
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	crdv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
@@ -58,6 +60,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 		ControlPlaneStartTimeout: time.Minute,
 		ControlPlaneStopTimeout:  time.Minute,
 		UseExistingCluster:       ptr.To(false),
+		CRDDirectoryPaths:        []string{filepath.Join("..", "..", "charts", "vela-workflow", "crds")},
 	}
 	var err error
 	cfg, err = testEnv.Start()
@@ -66,6 +69,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	Expect(clientgoscheme.AddToScheme(scheme)).Should(BeNil())
 	Expect(crdv1.AddToScheme(scheme)).Should(BeNil())
 	Expect(cuexv1alpha1.AddToScheme(scheme)).Should(BeNil())
+	Expect(oamv1alpha1.AddToScheme(scheme)).Should(BeNil())
 	// +kubebuilder:scaffold:scheme
 	By("Create the k8s client")
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})

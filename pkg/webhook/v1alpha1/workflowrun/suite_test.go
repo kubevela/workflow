@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -61,7 +62,7 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter)))
 	By("bootstrapping test environment")
 
-	yamlPath := filepath.Join("../../../../..", "charts", "vela-workflow", "crds")
+	yamlPath := filepath.Join("../../../..", "charts", "vela-workflow", "crds")
 	testEnv = &envtest.Environment{
 		ControlPlaneStartTimeout: time.Minute,
 		ControlPlaneStopTimeout:  time.Minute,
@@ -77,6 +78,9 @@ var _ = BeforeSuite(func(ctx SpecContext) {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = scheme.AddToScheme(testScheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = oamv1alpha1.AddToScheme(testScheme)
 	Expect(err).NotTo(HaveOccurred())
 	// +kubebuilder:scaffold:scheme
 

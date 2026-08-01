@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -134,5 +135,51 @@ var _ = Describe("Test workflow step runner generator", func() {
 		Expect(err).Should(BeNil())
 		Expect(len(runners)).Should(BeEquivalentTo(1))
 		Expect(runners[0].Name()).Should(BeEquivalentTo("step-1"))
+	})
+
+	It("Test generate workflow instance from a workflowRef in vela-system namespace", func() {
+		systemNS := corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "vela-system"}}
+		if err := k8sClient.Create(ctx, &systemNS); err != nil && !kerrors.IsAlreadyExists(err) {
+			Expect(err).Should(BeNil())
+		}
+
+		workflow := &oamv1alpha1.Workflow{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-workflow-" + namespaceName,
+				Namespace: "vela-system",
+			},
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
+					{
+						WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+							Name: "step-1",
+							Type: "suspend",
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, workflow)).Should(Succeed())
+		defer func() {
+			Expect(k8sClient.Delete(ctx, workflow)).Should(Succeed())
+		}()
+
+		wr := &v1alpha1.WorkflowRun{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "WorkflowRun",
+				APIVersion: "core.oam.dev/v1alpha1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "wr-ref-cross-ns",
+				Namespace: namespaceName,
+			},
+			Spec: v1alpha1.WorkflowRunSpec{
+				WorkflowRef: workflow.Name,
+			},
+		}
+		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
+		Expect(err).Should(BeNil())
+		Expect(len(instance.Steps)).Should(BeEquivalentTo(1))
+		Expect(instance.Steps[0].Name).Should(BeEquivalentTo("step-1"))
 	})
 })

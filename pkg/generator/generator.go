@@ -37,6 +37,7 @@ import (
 	"github.com/kubevela/workflow/pkg/tasks"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
+	"github.com/kubevela/workflow/pkg/utils"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
@@ -78,11 +79,8 @@ func GenerateWorkflowInstance(ctx context.Context, cli client.Client, run *v1alp
 	case run.Spec.WorkflowSpec != nil:
 		steps = run.Spec.WorkflowSpec.Steps
 	case run.Spec.WorkflowRef != "":
-		template := new(oamv1alpha1.Workflow)
-		if err := cli.Get(ctx, client.ObjectKey{
-			Name:      run.Spec.WorkflowRef,
-			Namespace: run.Namespace,
-		}, template); err != nil {
+		template, err := utils.GetWorkflow(ctx, cli, run.Namespace, run.Spec.WorkflowRef)
+		if err != nil {
 			return nil, err
 		}
 		steps = template.WorkflowSpec.Steps
