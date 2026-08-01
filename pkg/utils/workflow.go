@@ -25,7 +25,7 @@ import (
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
-// SystemNamespace is the namespace where cluster-scoped Workflows are looked up
+// SystemNamespace is the shared namespace where reusable Workflows are looked up
 // as a fallback, mirroring how X-Definitions resolve from vela-system.
 const SystemNamespace = "vela-system"
 

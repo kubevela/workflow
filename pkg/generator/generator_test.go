@@ -148,6 +148,9 @@ var _ = Describe("Test workflow step runner generator", func() {
 				Name:      "shared-workflow-" + namespaceName,
 				Namespace: "vela-system",
 			},
+			Mode: &oamv1alpha1.WorkflowExecuteMode{
+				Steps: v1alpha1.WorkflowModeDAG,
+			},
 			WorkflowSpec: oamv1alpha1.WorkflowSpec{
 				Steps: []oamv1alpha1.WorkflowStep{
 					{
@@ -181,5 +184,24 @@ var _ = Describe("Test workflow step runner generator", func() {
 		Expect(err).Should(BeNil())
 		Expect(len(instance.Steps)).Should(BeEquivalentTo(1))
 		Expect(instance.Steps[0].Name).Should(BeEquivalentTo("step-1"))
+		Expect(instance.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
+	})
+
+	It("Test generate workflow instance from a missing workflowRef", func() {
+		wr := &v1alpha1.WorkflowRun{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "WorkflowRun",
+				APIVersion: "core.oam.dev/v1alpha1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "wr-ref-missing",
+				Namespace: namespaceName,
+			},
+			Spec: v1alpha1.WorkflowRunSpec{
+				WorkflowRef: "does-not-exist",
+			},
+		}
+		_, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
+		Expect(err).ShouldNot(BeNil())
 	})
 })

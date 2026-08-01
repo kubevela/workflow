@@ -18,14 +18,30 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
+
+// erroringReader wraps a client.Reader and returns a fixed error for Get calls
+// whose ObjectKey matches one of failFor, delegating everything else.
+type erroringReader struct {
+	client.Reader
+	failFor map[client.ObjectKey]error
+}
+
+func (e *erroringReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if err, ok := e.failFor[key]; ok {
+		return err
+	}
+	return e.Reader.Get(ctx, key, obj, opts...)
+}
 
 func TestGetWorkflow(t *testing.T) {
 	ctx := context.Background()
@@ -100,5 +116,32 @@ func TestGetWorkflow(t *testing.T) {
 		_, err := GetWorkflow(ctx, cli, "default", "does-not-exist")
 		r.Error(err)
 		r.True(kerrors.IsNotFound(err))
+	})
+
+	t.Run("not found in vela-system does not attempt a further fallback", func(t *testing.T) {
+		r := require.New(t)
+		_, err := GetWorkflow(ctx, cli, SystemNamespace, "does-not-exist-in-system")
+		r.Error(err)
+		r.True(kerrors.IsNotFound(err))
+	})
+
+	t.Run("non-not-found error from the given namespace is returned as-is", func(t *testing.T) {
+		r := require.New(t)
+		key := client.ObjectKey{Namespace: "default", Name: "boom"}
+		wantErr := errors.New("boom: connection refused")
+		reader := &erroringReader{Reader: cli, failFor: map[client.ObjectKey]error{key: wantErr}}
+
+		_, err := GetWorkflow(ctx, reader, "default", "boom")
+		r.Equal(wantErr, err)
+	})
+
+	t.Run("non-not-found error from the vela-system fallback is returned as-is", func(t *testing.T) {
+		r := require.New(t)
+		key := client.ObjectKey{Namespace: SystemNamespace, Name: "boom"}
+		wantErr := errors.New("boom: connection refused")
+		reader := &erroringReader{Reader: cli, failFor: map[client.ObjectKey]error{key: wantErr}}
+
+		_, err := GetWorkflow(ctx, reader, "other-namespace", "boom")
+		r.Equal(wantErr, err)
 	})
 }

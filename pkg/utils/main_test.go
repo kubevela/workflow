@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/pkg/util/singleton"
 	"github.com/kubevela/workflow/api/v1alpha1"
 )
@@ -34,6 +35,7 @@ var (
 func TestMain(m *testing.M) {
 	sc := scheme.Scheme
 	_ = v1alpha1.AddToScheme(sc)
+	_ = oamv1alpha1.AddToScheme(sc)
 	cli = fake.NewClientBuilder().WithScheme(sc).WithStatusSubresource(&v1alpha1.WorkflowRun{}).Build()
 	singleton.KubeClient.Set(cli)
 	m.Run()

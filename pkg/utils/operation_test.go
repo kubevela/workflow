@@ -1305,6 +1305,10 @@ func TestRestartFromStepWorkflowRefInSystemNamespace(t *testing.T) {
 			WorkflowRef: workflow.Name,
 		},
 		Status: v1alpha1.WorkflowRunStatus{
+			Suspend:    true,
+			Terminated: true,
+			Finished:   true,
+			EndTime:    metav1.Now(),
 			ContextBackend: &corev1.ObjectReference{
 				Name:      cm.Name,
 				Namespace: "default",
@@ -1318,4 +1322,12 @@ func TestRestartFromStepWorkflowRefInSystemNamespace(t *testing.T) {
 	defer func() { r.NoError(cli.Delete(ctx, run)) }()
 
 	r.NoError(RestartFromStep(ctx, cli, run, "step1"))
+
+	got := &v1alpha1.WorkflowRun{}
+	r.NoError(cli.Get(ctx, client.ObjectKey{Name: run.Name, Namespace: run.Namespace}, got))
+	r.Empty(got.Status.Steps)
+	r.False(got.Status.Suspend)
+	r.False(got.Status.Terminated)
+	r.False(got.Status.Finished)
+	r.True(got.Status.EndTime.IsZero())
 }
