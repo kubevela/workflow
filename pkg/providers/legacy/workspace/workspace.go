@@ -45,9 +45,10 @@ const (
 
 // VarVars .
 type VarVars struct {
-	Method string `json:"method"`
-	Path   string `json:"path"`
-	Value  any    `json:"value"`
+	Method    string `json:"method"`
+	Path      string `json:"path"`
+	Value     any    `json:"value"`
+	Sensitive bool   `json:"sensitive,omitempty"`
 }
 
 // VarReturns .
@@ -65,9 +66,13 @@ func DoVar(_ context.Context, params *VarParams) (*VarReturns, error) {
 
 	switch params.Params.Method {
 	case "Get":
-		value, err := wfCtx.GetVar(strings.Split(path, ".")...)
+		// Try sensitive store first, then fall back to regular store
+		value, err := wfCtx.GetSensitiveVar(strings.Split(path, ".")...)
 		if err != nil {
-			return nil, err
+			value, err = wfCtx.GetVar(strings.Split(path, ".")...)
+			if err != nil {
+				return nil, err
+			}
 		}
 		b, err := value.MarshalJSON()
 		if err != nil {
@@ -85,8 +90,15 @@ func DoVar(_ context.Context, params *VarParams) (*VarReturns, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := wfCtx.SetVar(cuecontext.New().CompileBytes(b), strings.Split(path, ".")...); err != nil {
-			return nil, err
+		// Route to sensitive store if sensitive flag is set
+		if params.Params.Sensitive {
+			if err := wfCtx.SetSensitiveVar(cuecontext.New().CompileBytes(b), strings.Split(path, ".")...); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := wfCtx.SetVar(cuecontext.New().CompileBytes(b), strings.Split(path, ".")...); err != nil {
+				return nil, err
+			}
 		}
 		return nil, nil
 	}

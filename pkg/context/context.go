@@ -42,6 +42,8 @@ import (
 const (
 	// ConfigMapKeyVars is the key in ConfigMap Data field for containing data of variable
 	ConfigMapKeyVars = "vars"
+	// SecretKeyVars is the key in Secret Data field for containing sensitive data of variable
+	SecretKeyVars = "vars"
 	// AnnotationStartTimestamp is the annotation key of the workflow start  timestamp
 	AnnotationStartTimestamp = "vela.io/startTime"
 )
@@ -52,10 +54,13 @@ var (
 
 // WorkflowContext is workflow context.
 type WorkflowContext struct {
-	store       *corev1.ConfigMap
-	memoryStore *sync.Map
-	vars        cue.Value
-	modified    bool
+	workflowName  string
+	store         *corev1.ConfigMap
+	secretStore   *corev1.Secret
+	memoryStore   *sync.Map
+	vars          cue.Value
+	sensitiveVars cue.Value
+	modified      bool
 }
 
 // GetVar get variable from workflow context.
@@ -86,9 +91,57 @@ func (wf *WorkflowContext) SetVar(v cue.Value, paths ...string) error {
 	return nil
 }
 
+// GetSensitiveVar get sensitive variable from workflow context secret store.
+func (wf *WorkflowContext) GetSensitiveVar(paths ...string) (cue.Value, error) {
+	v := wf.sensitiveVars.LookupPath(value.FieldPath(paths...))
+	if !v.Exists() {
+		return v, fmt.Errorf("sensitive var %s not found", strings.Join(paths, "."))
+	}
+	return v, nil
+}
+
+// SetSensitiveVar set sensitive variable to workflow context secret store.
+func (wf *WorkflowContext) SetSensitiveVar(v cue.Value, paths ...string) error {
+	// convert value to string to set
+	str, err := sets.ToString(v)
+	if err != nil {
+		return err
+	}
+
+	// Lazily create secret store when first sensitive data is stored
+	if wf.secretStore == nil {
+		wf.secretStore = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            generateSecretStoreName(wf.workflowName),
+				Namespace:       wf.store.Namespace,
+				OwnerReferences: wf.store.OwnerReferences,
+				Annotations: map[string]string{
+					AnnotationStartTimestamp: time.Now().String(),
+				},
+			},
+			Data: map[string][]byte{},
+		}
+	}
+
+	wf.sensitiveVars, err = value.FillRaw(wf.sensitiveVars, str, paths...)
+	if err != nil {
+		return err
+	}
+	if err := wf.sensitiveVars.Err(); err != nil {
+		return err
+	}
+	wf.modified = true
+	return nil
+}
+
 // GetStore get store of workflow context.
 func (wf *WorkflowContext) GetStore() *corev1.ConfigMap {
 	return wf.store
+}
+
+// GetSecretStore get secret store of workflow context for sensitive data.
+func (wf *WorkflowContext) GetSecretStore() *corev1.Secret {
+	return wf.secretStore
 }
 
 // GetMutableValue get mutable data from workflow context.
@@ -169,6 +222,19 @@ func (wf *WorkflowContext) writeToStore() error {
 	}
 
 	wf.store.Data[ConfigMapKeyVars] = varStr
+
+	// Write sensitive vars to secret store if it exists
+	if wf.secretStore != nil {
+		sensitiveVarStr, err := sets.ToString(wf.sensitiveVars)
+		if err != nil {
+			return err
+		}
+		if wf.secretStore.Data == nil {
+			wf.secretStore.Data = make(map[string][]byte)
+		}
+		wf.secretStore.Data[SecretKeyVars] = []byte(sensitiveVarStr)
+	}
+
 	return nil
 }
 
@@ -182,11 +248,45 @@ func (wf *WorkflowContext) sync(ctx context.Context) error {
 		Namespace: wf.store.Namespace,
 	}, store); err != nil {
 		if kerrors.IsNotFound(err) {
-			return cli.Create(ctx, wf.store)
+			if err := cli.Create(ctx, wf.store); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		if err := cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy())); err != nil {
+			return err
+		}
+	}
+
+	// Sync secret store if it exists and has data
+	if wf.secretStore != nil && len(wf.secretStore.Data) > 0 {
+		if err := wf.syncSecret(ctx); err != nil {
+			return errors.WithMessagef(err, "save sensitive context to secret(%s/%s)", wf.secretStore.Namespace, wf.secretStore.Name)
+		}
+	}
+
+	return nil
+}
+
+func (wf *WorkflowContext) syncSecret(ctx context.Context) error {
+	cli := singleton.KubeClient.Get()
+	secretStore := &corev1.Secret{}
+	if EnableInMemoryContext {
+		MemStore.UpdateInMemorySecret(wf.secretStore)
+		return nil
+	}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Name:      wf.secretStore.Name,
+		Namespace: wf.secretStore.Namespace,
+	}, secretStore); err != nil {
+		if kerrors.IsNotFound(err) {
+			return cli.Create(ctx, wf.secretStore)
 		}
 		return err
 	}
-	return cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy()))
+	return cli.Patch(ctx, wf.secretStore, client.MergeFrom(secretStore.DeepCopy()))
 }
 
 // LoadFromConfigMap recover workflow context from configMap.
@@ -197,6 +297,25 @@ func (wf *WorkflowContext) LoadFromConfigMap(_ context.Context, cm corev1.Config
 	data := cm.Data
 
 	wf.vars = cuecontext.New().CompileString(data[ConfigMapKeyVars])
+	// Initialize sensitiveVars to empty if not already set
+	if wf.sensitiveVars.Kind() == cue.BottomKind {
+		wf.sensitiveVars = cuecontext.New().CompileString("")
+	}
+	return nil
+}
+
+// LoadFromSecret recover sensitive workflow context from secret.
+func (wf *WorkflowContext) LoadFromSecret(_ context.Context, secret corev1.Secret) error {
+	if wf.secretStore == nil {
+		wf.secretStore = &secret
+	}
+	data := secret.Data
+
+	if varsData, ok := data[SecretKeyVars]; ok {
+		wf.sensitiveVars = cuecontext.New().CompileString(string(varsData))
+	} else {
+		wf.sensitiveVars = cuecontext.New().CompileString("")
+	}
 	return nil
 }
 
@@ -270,14 +389,18 @@ func newContext(ctx context.Context, ns, name string, owner []metav1.OwnerRefere
 	store.Annotations = map[string]string{
 		AnnotationStartTimestamp: time.Now().String(),
 	}
+
 	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
-		store:       store,
-		memoryStore: memCache,
-		modified:    true,
+		workflowName: name,
+		store:        store,
+		secretStore:  nil, // Created lazily when sensitive data is stored
+		memoryStore:  memCache,
+		modified:     true,
 	}
 	var err error
 	wfCtx.vars = cuecontext.New().CompileString("")
+	wfCtx.sensitiveVars = cuecontext.New().CompileString("")
 
 	return wfCtx, err
 }
@@ -304,7 +427,7 @@ func LoadContext(ctx context.Context, ns, name, ctxName string) (Context, error)
 	cli := singleton.KubeClient.Get()
 	if EnableInMemoryContext {
 		MemStore.GetOrCreateInMemoryContext(&store)
-	} else if err := cli.Get(context.Background(), client.ObjectKey{
+	} else if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: ns,
 		Name:      ctxName,
 	}, &store); err != nil {
@@ -312,16 +435,48 @@ func LoadContext(ctx context.Context, ns, name, ctxName string) (Context, error)
 	}
 	memCache := getMemoryStore(fmt.Sprintf("%s-%s", name, ns))
 	wfCtx := &WorkflowContext{
-		store:       &store,
-		memoryStore: memCache,
+		workflowName: name,
+		store:        &store,
+		memoryStore:  memCache,
 	}
 	if err := wfCtx.LoadFromConfigMap(ctx, store); err != nil {
 		return nil, err
 	}
+
+	// Try to load sensitive data from secret (may not exist for older workflows)
+	secretName := generateSecretStoreName(name)
+	var secretStore corev1.Secret
+	secretStore.Name = secretName
+	secretStore.Namespace = ns
+	if EnableInMemoryContext {
+		if secret := MemStore.GetInMemorySecret(secretName, ns); secret != nil {
+			if err := wfCtx.LoadFromSecret(ctx, *secret); err != nil {
+				return nil, err
+			}
+		}
+	} else if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: ns,
+		Name:      secretName,
+	}, &secretStore); err != nil {
+		if !kerrors.IsNotFound(err) {
+			return nil, errors.WithMessagef(err, "load sensitive context from secret(%s/%s)", ns, secretName)
+		}
+		// NotFound is OK - secret is optional for backward compatibility
+	} else {
+		if err := wfCtx.LoadFromSecret(ctx, secretStore); err != nil {
+			return nil, err
+		}
+	}
+
 	return wfCtx, nil
 }
 
 // generateStoreName generates the config map name of workflow context.
 func generateStoreName(name string) string {
 	return fmt.Sprintf("workflow-%s-context", name)
+}
+
+// generateSecretStoreName generates the secret name for sensitive workflow context data.
+func generateSecretStoreName(name string) string {
+	return fmt.Sprintf("workflow-%s-context-secret", name)
 }
