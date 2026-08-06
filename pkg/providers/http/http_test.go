@@ -392,19 +392,15 @@ func TestHTTPSDo(t *testing.T) {
 }
 
 func TestHttpDo_blocksMetadata(t *testing.T) {
-	fragment, err := httpguard.ParseDenyList(
-		"169.254.0.0/16\nfe80::/10\nfd00:ec2::254\n100.100.100.200",
-		"metadata.google.internal",
-	)
-	require.NoError(t, err)
-	httpguard.SetDenyFragment(fragment)
+	// Rely on BuiltinDeny()/Current() so a regression in the embedded floor fails this test.
+	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 	t.Cleanup(func() {
 		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 		httpguard.SetEnhancer(nil)
 	})
 
 	ctx := context.Background()
-	_, err = Do(ctx, &DoParams{
+	_, err := Do(ctx, &DoParams{
 		Params: RequestVars{
 			Method: "GET",
 			URL:    "http://169.254.169.254/latest/meta-data/",

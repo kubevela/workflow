@@ -19,6 +19,7 @@ package httpguard
 import (
 	_ "embed"
 	"fmt"
+	"net"
 	"sync"
 )
 
@@ -37,8 +38,9 @@ var (
 	builtinDenyErr  error
 )
 
-// BuiltinDeny returns the immutable denylist floor shipped with the binary.
-// Cluster ConfigMaps can only add denies; they cannot remove these entries.
+// BuiltinDeny returns a copy of the immutable denylist floor shipped with the
+// binary. Cluster ConfigMaps can only add denies; they cannot remove these
+// entries. Callers must not rely on mutating the returned Policy.
 func BuiltinDeny() Policy {
 	builtinDenyOnce.Do(func() {
 		policy, err := ParseDenyList(denyCIDRsDefaults, denyHostsDefaults)
@@ -49,7 +51,28 @@ func BuiltinDeny() Policy {
 		}
 		builtinDeny = policy
 	})
-	return builtinDeny
+	return clonePolicy(builtinDeny)
+}
+
+func clonePolicy(p Policy) Policy {
+	out := Policy{
+		BlockPrivate:  p.BlockPrivate,
+		BlockLoopback: p.BlockLoopback,
+		ExactHosts:    map[string]struct{}{},
+	}
+	for host := range p.ExactHosts {
+		out.ExactHosts[host] = struct{}{}
+	}
+	if len(p.ExactIPs) > 0 {
+		out.ExactIPs = append([]net.IP(nil), p.ExactIPs...)
+	}
+	if len(p.DenyCIDRs) > 0 {
+		out.DenyCIDRs = append([]*net.IPNet(nil), p.DenyCIDRs...)
+	}
+	if len(p.WildcardSuffixes) > 0 {
+		out.WildcardSuffixes = append([]string(nil), p.WildcardSuffixes...)
+	}
+	return out
 }
 
 func builtinDenyLoadError() error {

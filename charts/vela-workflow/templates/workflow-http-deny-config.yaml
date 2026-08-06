@@ -1,8 +1,9 @@
-{{- if .Values.workflow.httpDeny.installConfigTemplate }}
+{{- $tpl := .Values.workflow.httpDeny.configTemplateName }}
+{{- if and .Values.workflow.httpDeny.installConfigTemplate $tpl }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: config-template-{{ .Values.workflow.httpDeny.configTemplateName }}
+  name: config-template-{{ $tpl }}
   namespace: {{ .Release.Namespace }}
   labels:
     config.oam.dev/catalog: velacore-config
@@ -15,10 +16,10 @@ data:
   expanded-writer: |
     nacos: null
   template: |
-{{ .Files.Get "config-templates/workflow-http-deny.cue" | indent 4 }}
+{{ .Files.Get "config-templates/workflow-http-deny.cue" | replace "workflow-http-deny" $tpl | indent 4 }}
 ---
 {{- end }}
-{{- if .Values.workflow.httpDeny.defaultConfig.enabled }}
+{{- if and .Values.workflow.httpDeny.defaultConfig.enabled $tpl }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -26,7 +27,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     config.oam.dev/catalog: velacore-config
-    config.oam.dev/type: {{ .Values.workflow.httpDeny.configTemplateName }}
+    config.oam.dev/type: {{ $tpl }}
     config.oam.dev/scope: system
 data:
   denyHosts: |-

@@ -59,12 +59,20 @@ func TestShippedDefaultDeny_blocksMetadataAndLinkLocal(t *testing.T) {
 
 func shippedDefaultDeny(t *testing.T) Policy {
 	t.Helper()
-	policy, err := ParseDenyList(
-		"169.254.0.0/16\nfe80::/10\nfd00:ec2::254\n100.100.100.200",
-		"metadata.google.internal",
-	)
-	require.NoError(t, err)
+	policy := BuiltinDeny()
+	require.NoError(t, builtinDenyLoadError())
+	require.NotEmpty(t, policy.ExactHosts)
+	require.NotEmpty(t, policy.DenyCIDRs)
 	return policy
+}
+
+func TestBuiltinDeny_returnsIndependentCopy(t *testing.T) {
+	first := BuiltinDeny()
+	require.Error(t, first.BlockedHost("metadata.google.internal"))
+	delete(first.ExactHosts, "metadata.google.internal")
+	second := BuiltinDeny()
+	require.Error(t, second.BlockedHost("metadata.google.internal"))
+	require.NoError(t, first.BlockedHost("metadata.google.internal"))
 }
 
 func TestParseDenyList(t *testing.T) {

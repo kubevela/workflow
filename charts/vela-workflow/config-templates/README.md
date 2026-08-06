@@ -17,7 +17,9 @@ vela config create team-http-deny \
   'denyCIDRs={10.0.0.0/8}'
 ```
 
-Disable discovery or the shipped default ConfigMap if needed:
+Disable discovery or the shipped default ConfigMap if needed. An empty
+`configTemplateName` also skips installing the ConfigTemplate / default
+ConfigMap (avoids invalid `config-template-` names):
 
 ```bash
 --set workflow.httpDeny.configTemplateName=""

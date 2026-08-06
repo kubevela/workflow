@@ -43,8 +43,9 @@ func TestLoadConfigMaps_mergesTemplateConfigs(t *testing.T) {
 			Labels:    map[string]string{ConfigTemplateLabel: WorkflowHTTPDenyConfigTemplate},
 		},
 		Data: map[string]string{
-			ConfigMapKeyDenyCIDRs: "169.254.0.0/16",
-			ConfigMapKeyDenyHosts: "metadata.google.internal",
+			// Use non-builtin entries so assertions prove ConfigMap merge, not only BuiltinDeny().
+			ConfigMapKeyDenyCIDRs: "198.51.100.0/24",
+			ConfigMapKeyDenyHosts: "team-default.example",
 		},
 	}
 	extraCM := &corev1.ConfigMap{
@@ -60,9 +61,10 @@ func TestLoadConfigMaps_mergesTemplateConfigs(t *testing.T) {
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(defaultCM, extraCM).Build()
 	require.NoError(t, LoadConfigMaps(context.Background(), cli, WorkflowHTTPDenyConfigTemplate, "vela-system"))
 	p := Current()
-	require.True(t, p.Blocked(net.ParseIP("169.254.169.254")))
-	require.Error(t, p.BlockedHost("metadata.google.internal"))
+	require.True(t, p.Blocked(net.ParseIP("198.51.100.10")))
+	require.Error(t, p.BlockedHost("team-default.example"))
 	require.Error(t, p.BlockedHost("blocked.example"))
+	require.True(t, p.Blocked(net.ParseIP("169.254.169.254"))) // builtin floor still present
 }
 
 func TestLoadConfigMaps_deleteRemovesOnlyDeletedContribution(t *testing.T) {
@@ -76,7 +78,7 @@ func TestLoadConfigMaps_deleteRemovesOnlyDeletedContribution(t *testing.T) {
 			Namespace: "vela-system",
 			Labels:    map[string]string{ConfigTemplateLabel: WorkflowHTTPDenyConfigTemplate},
 		},
-		Data: map[string]string{ConfigMapKeyDenyHosts: "metadata.google.internal"},
+		Data: map[string]string{ConfigMapKeyDenyHosts: "team-default.example"},
 	}
 	extraCM := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,7 +95,7 @@ func TestLoadConfigMaps_deleteRemovesOnlyDeletedContribution(t *testing.T) {
 	tryReloadDenyConfigMaps(context.Background(), cli, WorkflowHTTPDenyConfigTemplate, "vela-system")
 
 	p := Current()
-	require.Error(t, p.BlockedHost("metadata.google.internal"))
+	require.Error(t, p.BlockedHost("team-default.example"))
 	require.NoError(t, p.BlockedHost("blocked.example"))
 }
 

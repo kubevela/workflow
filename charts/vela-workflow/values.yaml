@@ -29,7 +29,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.cueUpgradeEvalv3SelfRefGuardEnabled Enable evalv3 self-reference default-guard compatibility rewrite pass
 ## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
 ## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
-## @param workflow.httpDeny.configTemplateName Discover and merge ConfigMaps produced by this ConfigTemplate
+## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. Keep in sync with the controller flag; the chart rewrites the shipped CUE labels to match. Empty disables discovery and skips installing the template/default ConfigMap.
 ## @param workflow.httpDeny.installConfigTemplate Install the workflow HTTP deny ConfigTemplate
 ## @param workflow.httpDeny.defaultConfig.enabled Install the default metadata and link-local deny ConfigMap
 ## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap
