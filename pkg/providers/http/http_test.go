@@ -392,7 +392,7 @@ func TestHTTPSDo(t *testing.T) {
 }
 
 func TestHttpDo_blocksMetadata(t *testing.T) {
-	// Rely on BuiltinDeny()/Current() so a regression in the embedded floor fails this test.
+	// Rely on BuiltinDeny()/Current() so a regression in the builtin floor fails this test.
 	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 	t.Cleanup(func() {
 		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})

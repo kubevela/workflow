@@ -17,20 +17,18 @@ limitations under the License.
 package httpguard
 
 import (
-	_ "embed"
 	"fmt"
 	"net"
 	"sync"
 )
 
-// Keep these embeds in sync with charts/vela-workflow values
-// workflow.httpDeny.defaultConfig.
-//
-//go:embed defaults/deny_hosts.txt
-var denyHostsDefaults string
-
-//go:embed defaults/deny_cidrs.txt
-var denyCIDRsDefaults string
+// Builtin floor entries. Keep in sync with charts/vela-workflow values
+// workflow.httpDeny.defaultConfig. Helm ships the same list as a labeled
+// ConfigMap for Day 1; this binary floor remains if that ConfigMap is removed.
+const (
+	denyHostsDefaults = "metadata.google.internal"
+	denyCIDRsDefaults = "169.254.0.0/16\nfe80::/10\nfd00:ec2::254\n100.100.100.200"
+)
 
 var (
 	builtinDenyOnce sync.Once
@@ -45,7 +43,7 @@ func BuiltinDeny() Policy {
 	builtinDenyOnce.Do(func() {
 		policy, err := ParseDenyList(denyCIDRsDefaults, denyHostsDefaults)
 		if err != nil {
-			builtinDenyErr = fmt.Errorf("parse embedded workflow HTTP deny defaults: %w", err)
+			builtinDenyErr = fmt.Errorf("parse builtin workflow HTTP deny defaults: %w", err)
 			builtinDeny = Policy{ExactHosts: map[string]struct{}{}}
 			return
 		}
