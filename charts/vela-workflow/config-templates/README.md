@@ -1,20 +1,23 @@
 # Workflow HTTP denylist config
 
-Apply the system config template, then create a denylist ConfigMap in the
-workflow controller namespace:
+The controller discovers every ConfigMap labeled
+`config.oam.dev/type=workflow-http-deny` and unions their entries on top of an
+immutable builtin floor (link-local + cloud metadata) embedded in the binary.
+The Helm chart installs the ConfigTemplate and a labeled default ConfigMap with
+the same entries.
+
+Create additional denylists with the ConfigTemplate. The controller unions all
+matching ConfigMaps in its namespace:
 
 ```bash
-vela config-template apply \
-  -f charts/vela-workflow/config-templates/workflow-http-deny.cue
-
-vela config create workflow-http-deny \
+vela config create team-http-deny \
   --template workflow-http-deny \
   --namespace vela-system \
-  'denyHosts={metadata.google.internal,*.example.com}' \
-  'denyCIDRs={10.0.0.0/8,169.254.169.254}'
+  'denyHosts={*.example.com}' \
+  'denyCIDRs={10.0.0.0/8}'
 ```
 
-Configure the controller to load that ConfigMap:
+Optional legacy single-ConfigMap mode still works:
 
 ```bash
 helm upgrade workflow kubevela/vela-workflow \
@@ -23,6 +26,22 @@ helm upgrade workflow kubevela/vela-workflow \
   --set workflow.httpDeny.configMapName=workflow-http-deny
 ```
 
-The Helm chart does not install this config template or ConfigMap
-automatically. Creating a raw ConfigMap with the `denyHosts` and `denyCIDRs`
-data keys remains supported.
+Disable discovery or the shipped default ConfigMap if needed:
+
+```bash
+--set workflow.httpDeny.configTemplateName=""
+--set workflow.httpDeny.defaultConfig.enabled=false
+```
+
+Raw ConfigMaps remain supported when they carry:
+
+```yaml
+metadata:
+  labels:
+    config.oam.dev/type: workflow-http-deny
+data:
+  denyHosts: |
+    blocked.example
+  denyCIDRs: |
+    10.0.0.0/8
+```

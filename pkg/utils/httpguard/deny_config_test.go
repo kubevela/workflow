@@ -70,12 +70,28 @@ func TestWorkflowHTTPDenyConfigTemplate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "workflow-http-deny",
 				Namespace: "vela-system",
+				Labels: map[string]string{
+					"config.oam.dev/catalog": "velacore-config",
+					"config.oam.dev/type":    "workflow-http-deny",
+					"config.oam.dev/scope":   "system",
+				},
 			},
 			Data: map[string]string{
 				ConfigMapKeyDenyHosts: "metadata.google.internal\n*.example.com\n169.254.169.254\n2001:db8::1",
 				ConfigMapKeyDenyCIDRs: "10.0.0.0/8\n2001:db8::/32\n127.0.0.1",
 			},
 		}, got)
+	})
+
+	t.Run("defaults to empty lists", func(t *testing.T) {
+		value := loadWorkflowHTTPDenyTemplate(t, nil)
+		require.NoError(t, value.Validate(cue.Concrete(true)))
+		denyHosts, err := value.LookupPath(cue.ParsePath("template.outputs.configMap.data.denyHosts")).String()
+		require.NoError(t, err)
+		require.Empty(t, denyHosts)
+		denyCIDRs, err := value.LookupPath(cue.ParsePath("template.outputs.configMap.data.denyCIDRs")).String()
+		require.NoError(t, err)
+		require.Empty(t, denyCIDRs)
 	})
 
 	t.Run("renders empty lists", func(t *testing.T) {
@@ -138,6 +154,8 @@ func loadWorkflowHTTPDenyTemplate(t *testing.T, parameter map[string]interface{}
 		"namespace": "vela-system",
 	})
 	require.NoError(t, value.Err())
-	value = value.FillPath(cue.ParsePath("template.parameter"), parameter)
+	if parameter != nil {
+		value = value.FillPath(cue.ParsePath("template.parameter"), parameter)
+	}
 	return value
 }

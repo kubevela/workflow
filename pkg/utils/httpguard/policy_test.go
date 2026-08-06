@@ -28,8 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func TestDefaultPolicy_blocksMetadataAndLinkLocal(t *testing.T) {
-	policy := DefaultPolicy()
+func TestShippedDefaultDeny_blocksMetadataAndLinkLocal(t *testing.T) {
+	policy := shippedDefaultDeny(t)
 
 	blocked := []string{
 		"169.254.169.254",
@@ -42,6 +42,7 @@ func TestDefaultPolicy_blocksMetadataAndLinkLocal(t *testing.T) {
 		require.NotNil(t, ip, raw)
 		assert.True(t, policy.Blocked(ip), "expected %s blocked", raw)
 	}
+	require.Error(t, policy.BlockedHost("metadata.google.internal"))
 
 	allowed := []string{
 		"127.0.0.1",
@@ -54,6 +55,16 @@ func TestDefaultPolicy_blocksMetadataAndLinkLocal(t *testing.T) {
 		require.NotNil(t, ip, raw)
 		assert.False(t, policy.Blocked(ip), "expected %s allowed", raw)
 	}
+}
+
+func shippedDefaultDeny(t *testing.T) Policy {
+	t.Helper()
+	policy, err := ParseDenyList(
+		"169.254.0.0/16\nfe80::/10\nfd00:ec2::254\n100.100.100.200",
+		"metadata.google.internal",
+	)
+	require.NoError(t, err)
+	return policy
 }
 
 func TestParseDenyList(t *testing.T) {
@@ -109,7 +120,7 @@ func TestMergeDeny_doesNotMutateSourceMaps(t *testing.T) {
 func TestSecureTransport_disablesInheritedProxy(t *testing.T) {
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	require.NotNil(t, base.Proxy)
-	transport := SecureTransport(base, DefaultPolicy())
+	transport := SecureTransport(base, shippedDefaultDeny(t))
 	require.Nil(t, transport.Proxy)
 }
 
@@ -121,7 +132,7 @@ func TestBlockedHost_trailingDot(t *testing.T) {
 }
 
 func TestBlockedHost_ipv6Zone(t *testing.T) {
-	policy := DefaultPolicy()
+	policy := shippedDefaultDeny(t)
 	require.Error(t, policy.BlockedHost("fe80::1%eth0"))
 	require.Error(t, policy.BlockedAddress("[fe80::1%eth0]:80"))
 }
@@ -132,7 +143,7 @@ func TestSecureTransport_ignoresPresetDialContext(t *testing.T) {
 		return net.Dial(network, address)
 	}
 	client := &http.Client{
-		Transport: SecureTransport(base, DefaultPolicy()),
+		Transport: SecureTransport(base, shippedDefaultDeny(t)),
 	}
 	_, err := client.Get("http://169.254.169.254/latest/meta-data/")
 	require.Error(t, err)
@@ -145,7 +156,7 @@ func TestSecureTransport_wrapsDialTLSContext(t *testing.T) {
 		return net.Dial(network, addr)
 	}
 	client := &http.Client{
-		Transport: SecureTransport(base, DefaultPolicy()),
+		Transport: SecureTransport(base, shippedDefaultDeny(t)),
 	}
 	_, err := client.Get("https://169.254.169.254/latest/meta-data/")
 	require.Error(t, err)
@@ -202,14 +213,14 @@ func TestBlockedAddress_invalidAddress(t *testing.T) {
 }
 
 func TestBlockedHost_ipLiteral(t *testing.T) {
-	policy := DefaultPolicy()
+	policy := shippedDefaultDeny(t)
 	require.Error(t, policy.BlockedHost("169.254.169.254"))
 	require.NoError(t, policy.BlockedHost("8.8.8.8"))
 }
 
 func TestSecureTransport_nilBase(t *testing.T) {
 	client := &http.Client{
-		Transport: SecureTransport(nil, DefaultPolicy()),
+		Transport: SecureTransport(nil, shippedDefaultDeny(t)),
 	}
 	_, err := client.Get("http://169.254.169.254/latest/meta-data/")
 	require.Error(t, err)
@@ -241,14 +252,13 @@ func TestCurrent_mergesDenyAndEnhancer(t *testing.T) {
 
 	cur := Current()
 	assert.True(t, cur.BlockPrivate)
-	assert.True(t, cur.BlockLinkLocal)
 	require.Error(t, cur.BlockedHost("blocked.example"))
 	assert.True(t, cur.Blocked(net.ParseIP("10.0.0.1")))
 }
 
 func TestSecureTransport_blocksLinkLocalDial(t *testing.T) {
 	client := &http.Client{
-		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), DefaultPolicy()),
+		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), shippedDefaultDeny(t)),
 	}
 	_, err := client.Get("http://169.254.169.254/latest/meta-data/")
 	require.Error(t, err)
@@ -263,7 +273,7 @@ func TestSecureTransport_allowsLoopback(t *testing.T) {
 	defer ts.Close()
 
 	client := &http.Client{
-		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), DefaultPolicy()),
+		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), shippedDefaultDeny(t)),
 	}
 	resp, err := client.Get(ts.URL)
 	require.NoError(t, err)
@@ -278,7 +288,7 @@ func TestSecureTransport_redirectRevalidated(t *testing.T) {
 	defer redirector.Close()
 
 	client := &http.Client{
-		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), DefaultPolicy()),
+		Transport: SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), shippedDefaultDeny(t)),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return nil
 		},

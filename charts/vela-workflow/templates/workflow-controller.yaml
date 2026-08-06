@@ -143,6 +143,7 @@ spec:
             - "--feature-gates=EnableBackupWorkflowRecord={{- .Values.backup.enabled | toString -}}"
             - "--feature-gates=DisableWorkflowHTTP={{- .Values.workflow.disableWorkflowHTTP | toString -}}"
             - "--feature-gates=BlockPrivateHTTPAddresses={{- .Values.workflow.blockPrivateHTTPAddresses | toString -}}"
+            - "--workflow-http-deny-config-template-name={{ .Values.workflow.httpDeny.configTemplateName }}"
             {{ if .Values.workflow.httpDeny.configMapName }}
             - "--workflow-http-deny-configmap-name={{ .Values.workflow.httpDeny.configMapName }}"
             {{ end }}

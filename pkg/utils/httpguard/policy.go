@@ -26,11 +26,6 @@ import (
 // connect to. Host checks run on the URL before dial; IP checks run at dial
 // time on the resolved address.
 type Policy struct {
-	// BlockLinkLocal denies link-local unicast (169.254.0.0/16, fe80::/10).
-	BlockLinkLocal bool
-	// BlockMetadata denies curated cloud metadata endpoints that fall outside
-	// link-local (for example AWS IPv6 IMDS and Alibaba metadata).
-	BlockMetadata bool
 	// BlockPrivate denies RFC-1918 and RFC-4193 ULA ranges. Off by default
 	// because workflow HTTP steps legitimately call in-cluster ClusterIP services.
 	BlockPrivate bool
@@ -46,29 +41,13 @@ type Policy struct {
 	WildcardSuffixes []string
 }
 
-// DefaultPolicy is the secure-by-default posture for controller outbound HTTP:
-// block link-local and known cloud metadata, allow private and loopback.
+// DefaultPolicy returns the base outbound HTTP policy. Destination deny rules
+// are supplied by discovered workflow HTTP deny ConfigMaps.
 func DefaultPolicy() Policy {
 	return Policy{
-		BlockLinkLocal: true,
-		BlockMetadata:  true,
-		ExactHosts:     map[string]struct{}{},
+		ExactHosts: map[string]struct{}{},
 	}
 }
-
-var metadataIPs = func() []net.IP {
-	raw := []string{
-		"fd00:ec2::254",   // AWS IPv6 IMDS
-		"100.100.100.200", // Alibaba Cloud metadata
-	}
-	out := make([]net.IP, 0, len(raw))
-	for _, s := range raw {
-		if ip := net.ParseIP(s); ip != nil {
-			out = append(out, ip)
-		}
-	}
-	return out
-}()
 
 // MergeDeny overlays denylist CIDRs/hosts from other onto p.
 func (p Policy) MergeDeny(other Policy) Policy {
@@ -110,16 +89,6 @@ func (p Policy) Blocked(ip net.IP) bool {
 	}
 	if p.BlockPrivate && ip.IsPrivate() {
 		return true
-	}
-	if p.BlockLinkLocal && ip.IsLinkLocalUnicast() {
-		return true
-	}
-	if p.BlockMetadata {
-		for _, metadata := range metadataIPs {
-			if ip.Equal(metadata) {
-				return true
-			}
-		}
 	}
 	for _, exact := range p.ExactIPs {
 		if ip.Equal(exact) {

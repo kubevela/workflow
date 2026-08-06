@@ -26,6 +26,11 @@ template: {
 		metadata: {
 			name:      context.name
 			namespace: context.namespace
+			labels: {
+				"config.oam.dev/catalog": "velacore-config"
+				"config.oam.dev/type":    "workflow-http-deny"
+				"config.oam.dev/scope":   "system"
+			}
 		}
 		data: {
 			denyHosts: strings.Join(parameter.denyHosts, "\n")
@@ -34,8 +39,10 @@ template: {
 	}
 	parameter: {
 		// +usage=Exact hostnames, IP addresses, or leading wildcard hostnames to deny.
-		denyHosts: [...#DenyHost]
+		// Defaults ship via the Helm default ConfigMap and the controller builtin floor;
+		// non-empty CUE list defaults break ConfigTemplate OpenAPI schema generation.
+		denyHosts: *[] | [...#DenyHost]
 		// +usage=IP addresses or CIDR ranges to deny.
-		denyCIDRs: [...#DenyCIDR]
+		denyCIDRs: *[] | [...#DenyCIDR]
 	}
 }
