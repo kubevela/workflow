@@ -85,7 +85,7 @@ func init() {
 func main() {
 	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent, certDir string
 	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
-	var workflowHTTPDenyConfigMapName, workflowHTTPDenyConfigTemplateName string
+	var workflowHTTPDenyConfigTemplateName string
 	var enableLeaderElection, useWebhook, logDebug, backupCleanOnBackup bool
 	var qps float64
 	var logFileMaxSize uint64
@@ -131,7 +131,6 @@ func main() {
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
 	flag.StringVar(&workflowHTTPDenyConfigTemplateName, "workflow-http-deny-config-template-name", httpguard.WorkflowHTTPDenyConfigTemplate, "Discover and merge ConfigMaps produced by this ConfigTemplate in the controller namespace")
-	flag.StringVar(&workflowHTTPDenyConfigMapName, "workflow-http-deny-configmap-name", "", "ConfigMap name (in controller namespace) containing workflow HTTP denylist")
 	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")
 	flag.BoolVar(&providers.EnableExternalPackageWatchForDefaultCompiler, "enable-external-package-watch-for-default-compiler", false, "Enable external package watch for default compiler")
 	flag.BoolVar(wfupgrade.EnableCUEVersionCompatibility, "enable-cue-version-compatibility", *wfupgrade.EnableCUEVersionCompatibility, "Automatically rewrite legacy CUE syntax in stored definitions at render time.")
@@ -241,8 +240,8 @@ func main() {
 	kubeClient := mgr.GetClient()
 	controllerNamespace := resolveControllerNamespace()
 	blockPrivate := feature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses)
-	if err := configureWorkflowHTTPDeny(context.Background(), mgr.GetAPIReader(), mgr, workflowHTTPDenyConfigTemplateName, workflowHTTPDenyConfigMapName, controllerNamespace, blockPrivate); err != nil {
-		klog.ErrorS(err, "unable to configure workflow HTTP deny policy", "template", workflowHTTPDenyConfigTemplateName, "name", workflowHTTPDenyConfigMapName, "namespace", controllerNamespace)
+	if err := configureWorkflowHTTPDeny(context.Background(), mgr.GetAPIReader(), mgr, workflowHTTPDenyConfigTemplateName, controllerNamespace, blockPrivate); err != nil {
+		klog.ErrorS(err, "unable to configure workflow HTTP deny policy", "template", workflowHTTPDenyConfigTemplateName, "namespace", controllerNamespace)
 		os.Exit(1)
 	}
 	if groupByLabel != "" {

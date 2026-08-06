@@ -47,7 +47,7 @@ func TestResolveControllerNamespace_unset(t *testing.T) {
 	require.Equal(t, "vela-system", resolveControllerNamespace())
 }
 
-func TestConfigureWorkflowHTTPDeny_emptyConfigMap(t *testing.T) {
+func TestConfigureWorkflowHTTPDeny_emptyTemplate(t *testing.T) {
 	t.Cleanup(func() {
 		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 		httpguard.SetEnhancer(nil)
@@ -56,7 +56,7 @@ func TestConfigureWorkflowHTTPDeny_emptyConfigMap(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, "", "", "vela-system", false))
+	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, "", "vela-system", false))
 	require.False(t, httpguard.Current().BlockPrivate)
 	require.True(t, httpguard.Current().Blocked(net.ParseIP("169.254.169.254")))
 }
@@ -70,11 +70,11 @@ func TestConfigureWorkflowHTTPDeny_blockPrivateEnhancer(t *testing.T) {
 	require.NoError(t, corev1.AddToScheme(scheme))
 	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, "", "", "vela-system", true))
+	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, "", "vela-system", true))
 	require.True(t, httpguard.Current().BlockPrivate)
 }
 
-func TestConfigureWorkflowHTTPDeny_loadsConfigMap(t *testing.T) {
+func TestConfigureWorkflowHTTPDeny_loadsConfigMaps(t *testing.T) {
 	t.Cleanup(func() {
 		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 		httpguard.SetEnhancer(nil)
@@ -93,16 +93,6 @@ func TestConfigureWorkflowHTTPDeny_loadsConfigMap(t *testing.T) {
 	}
 	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
 
-	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, httpguard.WorkflowHTTPDenyConfigTemplate, "", "vela-system", false))
+	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, httpguard.WorkflowHTTPDenyConfigTemplate, "vela-system", false))
 	require.Error(t, httpguard.Current().BlockedHost("denied.example"))
-}
-
-func TestConfigureWorkflowHTTPDeny_missingConfigMap(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
-
-	err := configureWorkflowHTTPDeny(context.Background(), cli, nil, "", "missing", "vela-system", false)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "initialize workflow HTTP deny ConfigMaps")
 }

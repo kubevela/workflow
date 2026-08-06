@@ -23,7 +23,6 @@ import (
 	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,21 +78,14 @@ func Current() Policy {
 	return base.MergeDeny(fragment)
 }
 
-// LoadConfigMap reads one legacy, explicitly named ConfigMap.
-func LoadConfigMap(ctx context.Context, c client.Reader, name, namespace string) error {
-	return LoadConfigMaps(ctx, c, "", name, namespace)
-}
-
-// LoadConfigMaps discovers ConfigMaps produced by templateName, optionally
-// includes one legacy explicitly named ConfigMap, and atomically installs the
-// union of all deny entries on top of BuiltinDeny. A missing legacy ConfigMap
-// fails closed. Zero discovered labeled ConfigMaps is allowed and leaves only
-// the builtin floor in effect.
-func LoadConfigMaps(ctx context.Context, c client.Reader, templateName, legacyName, namespace string) error {
+// LoadConfigMaps discovers ConfigMaps produced by templateName and atomically
+// installs the union of all deny entries on top of BuiltinDeny. Zero discovered
+// labeled ConfigMaps is allowed and leaves only the builtin floor in effect.
+func LoadConfigMaps(ctx context.Context, c client.Reader, templateName, namespace string) error {
 	if err := builtinDenyLoadError(); err != nil {
 		return err
 	}
-	configMaps, err := listDenyConfigMaps(ctx, c, templateName, legacyName, namespace)
+	configMaps, err := listDenyConfigMaps(ctx, c, templateName, namespace)
 	if err != nil {
 		return err
 	}
@@ -105,32 +97,17 @@ func LoadConfigMaps(ctx context.Context, c client.Reader, templateName, legacyNa
 	return nil
 }
 
-func listDenyConfigMaps(ctx context.Context, c client.Reader, templateName, legacyName, namespace string) ([]corev1.ConfigMap, error) {
-	configMaps := make([]corev1.ConfigMap, 0)
-	seen := map[types.NamespacedName]struct{}{}
-	if templateName != "" {
-		var list corev1.ConfigMapList
-		if err := c.List(ctx, &list, client.InNamespace(namespace), client.MatchingLabels{
-			ConfigTemplateLabel: templateName,
-		}); err != nil {
-			return nil, fmt.Errorf("list workflow HTTP deny ConfigMaps for template %q in namespace %s: %w", templateName, namespace, err)
-		}
-		for _, cm := range list.Items {
-			key := types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}
-			seen[key] = struct{}{}
-			configMaps = append(configMaps, cm)
-		}
+func listDenyConfigMaps(ctx context.Context, c client.Reader, templateName, namespace string) ([]corev1.ConfigMap, error) {
+	if templateName == "" {
+		return nil, nil
 	}
-	if legacyName != "" {
-		key := types.NamespacedName{Name: legacyName, Namespace: namespace}
-		if _, ok := seen[key]; !ok {
-			var cm corev1.ConfigMap
-			if err := c.Get(ctx, key, &cm); err != nil {
-				return nil, fmt.Errorf("get workflow HTTP deny ConfigMap %s: %w", key, err)
-			}
-			configMaps = append(configMaps, cm)
-		}
+	var list corev1.ConfigMapList
+	if err := c.List(ctx, &list, client.InNamespace(namespace), client.MatchingLabels{
+		ConfigTemplateLabel: templateName,
+	}); err != nil {
+		return nil, fmt.Errorf("list workflow HTTP deny ConfigMaps for template %q in namespace %s: %w", templateName, namespace, err)
 	}
+	configMaps := append([]corev1.ConfigMap(nil), list.Items...)
 	sort.Slice(configMaps, func(i, j int) bool {
 		return configMaps[i].Name < configMaps[j].Name
 	})
@@ -152,39 +129,38 @@ func mergeDenyConfigMaps(configMaps []corev1.ConfigMap) (Policy, error) {
 
 // SetupWatcher registers a cache-backed ConfigMap watch in the controller
 // namespace. After startup, reload failures keep the last good aggregate.
-func SetupWatcher(mgr manager.Manager, templateName, legacyName, namespace string) error {
-	if templateName == "" && legacyName == "" {
+func SetupWatcher(mgr manager.Manager, templateName, namespace string) error {
+	if templateName == "" {
 		return nil
 	}
 	if mgr == nil {
 		return nil
 	}
 	return mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		return watchAndReload(ctx, mgr.GetClient(), mgr, templateName, legacyName, namespace)
+		return watchAndReload(ctx, mgr.GetClient(), mgr, templateName, namespace)
 	}))
 }
 
-func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager, templateName, legacyName, namespace string) error {
+func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager, templateName, namespace string) error {
 	informer, err := mgr.GetCache().GetInformer(ctx, &corev1.ConfigMap{})
 	if err != nil {
 		return fmt.Errorf("get ConfigMap informer for HTTP deny watch: %w", err)
 	}
-	return watchAndReloadInformer(ctx, cli, informer, templateName, legacyName, namespace)
+	return watchAndReloadInformer(ctx, cli, informer, templateName, namespace)
 }
 
 type configMapInformer interface {
 	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
 }
 
-func watchAndReloadInformer(ctx context.Context, cli client.Client, informer configMapInformer, templateName, legacyName, namespace string) error {
+func watchAndReloadInformer(ctx context.Context, cli client.Client, informer configMapInformer, templateName, namespace string) error {
 	reload := func() {
-		tryReloadDenyConfigMaps(ctx, cli, templateName, legacyName, namespace)
+		tryReloadDenyConfigMaps(ctx, cli, templateName, namespace)
 	}
 
 	handler := &denyEventHandler{
 		reload:       reload,
 		templateName: templateName,
-		legacyName:   legacyName,
 		namespace:    namespace,
 	}
 	_, err := informer.AddEventHandler(handler)
@@ -195,20 +171,20 @@ func watchAndReloadInformer(ctx context.Context, cli client.Client, informer con
 	return nil
 }
 
-func tryReloadDenyConfigMaps(ctx context.Context, cli client.Client, templateName, legacyName, namespace string) {
-	if err := LoadConfigMaps(ctx, cli, templateName, legacyName, namespace); err != nil {
+func tryReloadDenyConfigMaps(ctx context.Context, cli client.Client, templateName, namespace string) {
+	if err := LoadConfigMaps(ctx, cli, templateName, namespace); err != nil {
 		klog.ErrorS(err, "failed to reload workflow HTTP deny ConfigMaps; keeping last good policy",
-			"template", templateName, "legacyName", legacyName, "namespace", namespace)
+			"template", templateName, "namespace", namespace)
 		return
 	}
 	klog.InfoS("reloaded workflow HTTP deny ConfigMaps",
-		"template", templateName, "legacyName", legacyName, "namespace", namespace)
+		"template", templateName, "namespace", namespace)
 }
 
 type denyEventHandler struct {
-	reload                   func()
-	templateName, legacyName string
-	namespace                string
+	reload       func()
+	templateName string
+	namespace    string
 }
 
 var _ cache.ResourceEventHandler = &denyEventHandler{}
@@ -241,9 +217,6 @@ func (h *denyEventHandler) matches(obj interface{}) bool {
 	}
 	if cm.Namespace != h.namespace {
 		return false
-	}
-	if h.legacyName != "" && cm.Name == h.legacyName {
-		return true
 	}
 	return h.templateName != "" && cm.Labels[ConfigTemplateLabel] == h.templateName
 }

@@ -17,15 +17,6 @@ vela config create team-http-deny \
   'denyCIDRs={10.0.0.0/8}'
 ```
 
-Optional legacy single-ConfigMap mode still works:
-
-```bash
-helm upgrade workflow kubevela/vela-workflow \
-  --namespace vela-system \
-  --reuse-values \
-  --set workflow.httpDeny.configMapName=workflow-http-deny
-```
-
 Disable discovery or the shipped default ConfigMap if needed:
 
 ```bash

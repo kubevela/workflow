@@ -25,17 +25,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func configureWorkflowHTTPDeny(ctx context.Context, reader client.Reader, mgr manager.Manager, templateName, configMapName, namespace string, blockPrivate bool) error {
+func configureWorkflowHTTPDeny(ctx context.Context, reader client.Reader, mgr manager.Manager, templateName, namespace string, blockPrivate bool) error {
 	httpguard.SetEnhancer(func(p httpguard.Policy) httpguard.Policy {
 		if blockPrivate {
 			p.BlockPrivate = true
 		}
 		return p
 	})
-	if err := httpguard.LoadConfigMaps(ctx, reader, templateName, configMapName, namespace); err != nil {
+	if err := httpguard.LoadConfigMaps(ctx, reader, templateName, namespace); err != nil {
 		return fmt.Errorf("initialize workflow HTTP deny ConfigMaps: %w", err)
 	}
-	if err := httpguard.SetupWatcher(mgr, templateName, configMapName, namespace); err != nil {
+	if err := httpguard.SetupWatcher(mgr, templateName, namespace); err != nil {
 		return fmt.Errorf("watch workflow HTTP deny ConfigMaps: %w", err)
 	}
 	return nil

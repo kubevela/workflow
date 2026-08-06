@@ -30,7 +30,6 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
 ## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
 ## @param workflow.httpDeny.configTemplateName Discover and merge ConfigMaps produced by this ConfigTemplate
-## @param workflow.httpDeny.configMapName Optional legacy ConfigMap name to merge with discovered configs
 ## @param workflow.httpDeny.installConfigTemplate Install the workflow HTTP deny ConfigTemplate
 ## @param workflow.httpDeny.defaultConfig.enabled Install the default metadata and link-local deny ConfigMap
 ## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap
@@ -59,7 +58,6 @@ workflow:
   blockPrivateHTTPAddresses: false
   httpDeny:
     configTemplateName: workflow-http-deny
-    configMapName: ""
     installConfigTemplate: true
     defaultConfig:
       enabled: true
