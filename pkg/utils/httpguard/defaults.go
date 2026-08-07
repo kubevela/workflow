@@ -24,7 +24,7 @@ import (
 
 // Builtin floor entries. Keep in sync with charts/vela-workflow values
 // workflow.httpDeny.defaultConfig. Helm ships the same list as a labeled
-// ConfigMap for Day 1; this binary floor remains if that ConfigMap is removed.
+// ConfigMap on Day 1; this binary floor remains if that ConfigMap is removed.
 const (
 	denyHostsDefaults = "metadata.google.internal"
 	denyCIDRsDefaults = "169.254.0.0/16\nfe80::/10\nfd00:ec2::254\n100.100.100.200"
