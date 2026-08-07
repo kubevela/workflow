@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -458,12 +459,21 @@ func TestWatchAndReloadInformer_addHandlerError(t *testing.T) {
 }
 
 type capturingInformer struct {
+	mu      sync.Mutex
 	handler toolscache.ResourceEventHandler
 }
 
 func (c *capturingInformer) AddEventHandler(handler toolscache.ResourceEventHandler) (toolscache.ResourceEventHandlerRegistration, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.handler = handler
 	return stubRegistration{}, nil
+}
+
+func (c *capturingInformer) getHandler() toolscache.ResourceEventHandler {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.handler
 }
 
 func TestWatchAndReloadInformer_reloadsOnMatchingEvent(t *testing.T) {
@@ -489,8 +499,12 @@ func TestWatchAndReloadInformer_reloadsOnMatchingEvent(t *testing.T) {
 		errCh <- watchAndReloadInformer(ctx, cli, inf, WorkflowHTTPDenyConfigTemplate, "vela-system")
 	}()
 
-	require.Eventually(t, func() bool { return inf.handler != nil }, time.Second, 10*time.Millisecond)
-	inf.handler.OnAdd(cm, false)
+	var handler toolscache.ResourceEventHandler
+	require.Eventually(t, func() bool {
+		handler = inf.getHandler()
+		return handler != nil
+	}, time.Second, 10*time.Millisecond)
+	handler.OnAdd(cm, false)
 	require.Eventually(t, func() bool {
 		return Current().BlockedHost("from-watch.example") != nil
 	}, time.Second, 10*time.Millisecond)
