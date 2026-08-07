@@ -27,8 +27,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
+	toolscache "k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 func TestLoadConfigMaps_mergesTemplateConfigs(t *testing.T) {
@@ -157,6 +160,72 @@ func TestSetupWatcher_emptyName(t *testing.T) {
 	require.NoError(t, SetupWatcher(nil, "", "vela-system"))
 }
 
+func TestSetupWatcher_nilManager(t *testing.T) {
+	require.NoError(t, SetupWatcher(nil, WorkflowHTTPDenyConfigTemplate, "vela-system"))
+}
+
+type stubManager struct {
+	manager.Manager
+	addErr   error
+	runnable manager.Runnable
+	cache    cache.Cache
+	client   client.Client
+}
+
+func (s *stubManager) Add(r manager.Runnable) error {
+	s.runnable = r
+	return s.addErr
+}
+
+func (s *stubManager) GetCache() cache.Cache { return s.cache }
+
+func (s *stubManager) GetClient() client.Client { return s.client }
+
+type errCache struct {
+	cache.Cache
+	err error
+}
+
+func (e *errCache) GetInformer(ctx context.Context, obj client.Object, opts ...cache.InformerGetOption) (cache.Informer, error) {
+	return nil, e.err
+}
+
+func TestSetupWatcher_registersRunnable(t *testing.T) {
+	scheme := testScheme(t)
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+	mgr := &stubManager{
+		client: cli,
+		cache:  &errCache{err: fmt.Errorf("no informer")},
+	}
+	require.NoError(t, SetupWatcher(mgr, WorkflowHTTPDenyConfigTemplate, "vela-system"))
+	require.NotNil(t, mgr.runnable)
+
+	err := mgr.runnable.Start(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "get ConfigMap informer")
+}
+
+func TestSetupWatcher_addError(t *testing.T) {
+	mgr := &stubManager{addErr: fmt.Errorf("add failed")}
+	err := SetupWatcher(mgr, WorkflowHTTPDenyConfigTemplate, "vela-system")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "add failed")
+}
+
+type errListReader struct {
+	client.Reader
+}
+
+func (e errListReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return fmt.Errorf("list failed")
+}
+
+func TestLoadConfigMaps_listError(t *testing.T) {
+	err := LoadConfigMaps(context.Background(), errListReader{}, WorkflowHTTPDenyConfigTemplate, "vela-system")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "list workflow HTTP deny ConfigMaps")
+}
+
 func TestDenyEventHandler_triggersReload(t *testing.T) {
 	var reloads int
 	h := &denyEventHandler{
@@ -203,6 +272,35 @@ func TestDenyEventHandler_ignoresOtherConfigMaps(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "other", Namespace: "vela-system"},
 	}, false)
 	require.Equal(t, 0, reloads)
+
+	h.OnAdd(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "wrong-ns",
+			Namespace: "other-ns",
+			Labels:    map[string]string{ConfigTemplateLabel: WorkflowHTTPDenyConfigTemplate},
+		},
+	}, false)
+	require.Equal(t, 0, reloads)
+}
+
+func TestDenyEventHandler_updateMatchesOldObject(t *testing.T) {
+	var reloads int
+	h := &denyEventHandler{
+		reload:       func() { reloads++ },
+		templateName: WorkflowHTTPDenyConfigTemplate,
+		namespace:    "vela-system",
+	}
+	oldCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "team-extra",
+			Namespace: "vela-system",
+			Labels:    map[string]string{ConfigTemplateLabel: WorkflowHTTPDenyConfigTemplate},
+		},
+	}
+	h.OnUpdate(oldCM, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "team-extra", Namespace: "vela-system"},
+	})
+	require.Equal(t, 1, reloads)
 }
 
 func TestDenyEventHandler_deletedFinalStateUnknown(t *testing.T) {
@@ -212,7 +310,7 @@ func TestDenyEventHandler_deletedFinalStateUnknown(t *testing.T) {
 		templateName: WorkflowHTTPDenyConfigTemplate,
 		namespace:    "vela-system",
 	}
-	h.OnDelete(cache.DeletedFinalStateUnknown{
+	h.OnDelete(toolscache.DeletedFinalStateUnknown{
 		Obj: &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "team-extra",
@@ -232,7 +330,7 @@ func TestDenyEventHandler_ignoresInvalidObjects(t *testing.T) {
 		namespace:    "vela-system",
 	}
 	h.OnAdd("not-a-configmap", false)
-	h.OnDelete(cache.DeletedFinalStateUnknown{Obj: "still-not-a-configmap"})
+	h.OnDelete(toolscache.DeletedFinalStateUnknown{Obj: "still-not-a-configmap"})
 	require.Equal(t, 0, reloads)
 }
 
@@ -316,7 +414,7 @@ type stubRegistration struct{}
 func (stubRegistration) HasSynced() bool { return true }
 func (stubRegistration) Remove() error   { return nil }
 
-func (s *stubInformer) AddEventHandler(_ cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+func (s *stubInformer) AddEventHandler(_ toolscache.ResourceEventHandler) (toolscache.ResourceEventHandlerRegistration, error) {
 	return stubRegistration{}, s.addErr
 }
 
@@ -357,4 +455,51 @@ func TestWatchAndReloadInformer_addHandlerError(t *testing.T) {
 	err := watchAndReloadInformer(ctx, cli, &stubInformer{addErr: fmt.Errorf("add failed")}, WorkflowHTTPDenyConfigTemplate, "vela-system")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "add failed")
+}
+
+type capturingInformer struct {
+	handler toolscache.ResourceEventHandler
+}
+
+func (c *capturingInformer) AddEventHandler(handler toolscache.ResourceEventHandler) (toolscache.ResourceEventHandlerRegistration, error) {
+	c.handler = handler
+	return stubRegistration{}, nil
+}
+
+func TestWatchAndReloadInformer_reloadsOnMatchingEvent(t *testing.T) {
+	t.Cleanup(func() {
+		SetDenyFragment(Policy{ExactHosts: map[string]struct{}{}})
+	})
+	scheme := testScheme(t)
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "from-watch",
+			Namespace: "vela-system",
+			Labels:    map[string]string{ConfigTemplateLabel: WorkflowHTTPDenyConfigTemplate},
+		},
+		Data: map[string]string{ConfigMapKeyDenyHosts: "from-watch.example"},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+	inf := &capturingInformer{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watchAndReloadInformer(ctx, cli, inf, WorkflowHTTPDenyConfigTemplate, "vela-system")
+	}()
+
+	require.Eventually(t, func() bool { return inf.handler != nil }, time.Second, 10*time.Millisecond)
+	inf.handler.OnAdd(cm, false)
+	require.Eventually(t, func() bool {
+		return Current().BlockedHost("from-watch.example") != nil
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("watch did not stop after context cancellation")
+	}
 }

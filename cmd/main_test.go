@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
@@ -95,4 +97,51 @@ func TestConfigureWorkflowHTTPDeny_loadsConfigMaps(t *testing.T) {
 
 	require.NoError(t, configureWorkflowHTTPDeny(context.Background(), cli, nil, httpguard.WorkflowHTTPDenyConfigTemplate, "vela-system", false))
 	require.Error(t, httpguard.Current().BlockedHost("denied.example"))
+}
+
+func TestConfigureWorkflowHTTPDeny_loadError(t *testing.T) {
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bad",
+			Namespace: "vela-system",
+			Labels: map[string]string{
+				httpguard.ConfigTemplateLabel: httpguard.WorkflowHTTPDenyConfigTemplate,
+			},
+		},
+		Data: map[string]string{httpguard.ConfigMapKeyDenyCIDRs: "not-a-cidr"},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cm).Build()
+
+	err := configureWorkflowHTTPDeny(context.Background(), cli, nil, httpguard.WorkflowHTTPDenyConfigTemplate, "vela-system", false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "initialize workflow HTTP deny ConfigMaps")
+}
+
+type stubAddManager struct {
+	manager.Manager
+	err error
+}
+
+func (s *stubAddManager) Add(_ manager.Runnable) error {
+	return s.err
+}
+
+func TestConfigureWorkflowHTTPDeny_watchError(t *testing.T) {
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	err := configureWorkflowHTTPDeny(context.Background(), cli, &stubAddManager{err: fmt.Errorf("add failed")}, httpguard.WorkflowHTTPDenyConfigTemplate, "vela-system", false)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "watch workflow HTTP deny ConfigMaps")
 }

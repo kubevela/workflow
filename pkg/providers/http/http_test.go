@@ -472,6 +472,29 @@ func TestHttpDo_blocksDeniedHost(t *testing.T) {
 	r.Contains(err.Error(), "blocked SSRF host")
 }
 
+func TestHttpDo_redirectBlocked(t *testing.T) {
+	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	_, err := Do(context.Background(), &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    redirector.URL,
+		},
+	})
+	r := require.New(t)
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF")
+}
+
 func newMockHttpsServer() *httptest.Server {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {

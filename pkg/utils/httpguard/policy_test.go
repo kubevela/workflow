@@ -18,6 +18,7 @@ package httpguard
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -188,6 +189,28 @@ func TestParseDenyList_commentOnlyLine(t *testing.T) {
 	assert.True(t, policy.Blocked(net.ParseIP("10.0.0.1")))
 }
 
+func TestParseDenyList_emptyHostAfterDot(t *testing.T) {
+	_, err := ParseDenyList("", ".")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid empty deny host")
+}
+
+func TestParseDenyList_hostWithColon(t *testing.T) {
+	_, err := ParseDenyList("", "evil:host")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "port qualifiers are not supported")
+
+	_, err = ParseDenyList("", "a:b:c")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "port or scheme qualifiers are not supported")
+}
+
+func TestParseDenyList_hostWithWhitespace(t *testing.T) {
+	_, err := ParseDenyList("", "evil example")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "path or whitespace")
+}
+
 func TestPolicy_blockLoopbackAndPrivate(t *testing.T) {
 	policy := Policy{
 		BlockLoopback: true,
@@ -321,4 +344,58 @@ func TestSecureTransport_blocksDenyCIDR(t *testing.T) {
 	_, err = client.Get(ts.URL)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "blocked SSRF target")
+}
+
+func TestMergeDeny_nilExactHostsInitialized(t *testing.T) {
+	merged := Policy{}.MergeDeny(Policy{})
+	require.NotNil(t, merged.ExactHosts)
+}
+
+func TestBlocked_nilAndInvalidIP(t *testing.T) {
+	policy := shippedDefaultDeny(t)
+	assert.False(t, policy.Blocked(nil))
+	assert.False(t, policy.Blocked(net.IP{1, 2, 3}))
+}
+
+func TestBlockedHost_empty(t *testing.T) {
+	require.NoError(t, DefaultPolicy().BlockedHost(""))
+	require.NoError(t, DefaultPolicy().BlockedHost("   "))
+}
+
+func TestBlockedHost_stripsPort(t *testing.T) {
+	fragment, err := ParseDenyList("", "blocked.example")
+	require.NoError(t, err)
+	require.Error(t, DefaultPolicy().MergeDeny(fragment).BlockedHost("blocked.example:8443"))
+}
+
+func TestBlockedAddress_hostnameAllowed(t *testing.T) {
+	require.NoError(t, shippedDefaultDeny(t).BlockedAddress("example.com:443"))
+}
+
+func TestBlockedAddress_emptyHost(t *testing.T) {
+	require.NoError(t, DefaultPolicy().BlockedAddress(":80"))
+}
+
+func TestClonePolicy_copiesWildcards(t *testing.T) {
+	out := clonePolicy(Policy{
+		ExactHosts:       map[string]struct{}{"a.example": {}},
+		WildcardSuffixes: []string{"corp.internal"},
+	})
+	require.Equal(t, []string{"corp.internal"}, out.WildcardSuffixes)
+	require.Error(t, out.BlockedHost("a.example"))
+}
+
+func TestSecureTransport_dialTLSAllowsSafeTarget(t *testing.T) {
+	called := false
+	base := &http.Transport{}
+	base.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		called = true
+		require.Equal(t, "8.8.8.8:443", addr)
+		return nil, fmt.Errorf("dial-ok-sentinel")
+	}
+	transport := SecureTransport(base, shippedDefaultDeny(t))
+	_, err := transport.DialTLSContext(context.Background(), "tcp", "8.8.8.8:443")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dial-ok-sentinel")
+	assert.True(t, called)
 }
