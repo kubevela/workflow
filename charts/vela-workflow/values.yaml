@@ -32,7 +32,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. Keep in sync with the controller flag; the chart rewrites the shipped CUE labels to match. Empty disables discovery and skips installing the template/default ConfigMap.
 ## @param workflow.httpDeny.installConfigTemplate Install the workflow HTTP deny ConfigTemplate
 ## @param workflow.httpDeny.defaultConfig.enabled Install the default metadata and link-local deny ConfigMap
-## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap
+## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap (unique per chart)
 ## @param workflow.httpDeny.defaultConfig.denyHosts Default hostnames denied by workflow HTTP
 ## @param workflow.httpDeny.defaultConfig.denyCIDRs Default IP addresses and CIDR ranges denied by workflow HTTP
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
@@ -57,11 +57,13 @@ workflow:
   disableWorkflowHTTP: false
   blockPrivateHTTPAddresses: false
   httpDeny:
-    configTemplateName: workflow-http-deny
+    # Prefixed per chart so dual-install with vela-core owns distinct ConfigTemplates
+    # and default ConfigMaps. Keep in sync with controller flag default.
+    configTemplateName: vela-workflow-http-deny
     installConfigTemplate: true
     defaultConfig:
       enabled: true
-      name: workflow-http-deny-default
+      name: vela-workflow-http-deny-default
       denyHosts:
         - metadata.google.internal
       denyCIDRs:
@@ -69,6 +71,7 @@ workflow:
         - fe80::/10
         - fd00:ec2::254
         - 100.100.100.200
+
   backoff:
     maxTime:
       waitState: 60

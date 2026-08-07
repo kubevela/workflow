@@ -16,7 +16,7 @@ data:
   expanded-writer: |
     nacos: null
   template: |
-{{ .Files.Get "config-templates/workflow-http-deny.cue" | replace "workflow-http-deny" $tpl | indent 4 }}
+{{ .Files.Get "config-templates/workflow-http-deny.cue" | replace "vela-workflow-http-deny" $tpl | indent 4 }}
 ---
 {{- end }}
 {{- if and .Values.workflow.httpDeny.defaultConfig.enabled $tpl }}

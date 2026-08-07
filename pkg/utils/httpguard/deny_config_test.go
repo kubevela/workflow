@@ -53,7 +53,7 @@ func TestWorkflowHTTPDenyConfigTemplate(t *testing.T) {
 			Sensitive   bool   `json:"sensitive"`
 		}
 		require.NoError(t, value.LookupPath(cue.ParsePath("metadata")).Decode(&metadata))
-		require.Equal(t, "workflow-http-deny", metadata.Name)
+		require.Equal(t, "vela-workflow-http-deny", metadata.Name)
 		require.Equal(t, "Workflow HTTP Denylist", metadata.Alias)
 		require.NotEmpty(t, metadata.Description)
 		require.Equal(t, "system", metadata.Scope)
@@ -72,7 +72,7 @@ func TestWorkflowHTTPDenyConfigTemplate(t *testing.T) {
 				Namespace: "vela-system",
 				Labels: map[string]string{
 					"config.oam.dev/catalog": "velacore-config",
-					"config.oam.dev/type":    "workflow-http-deny",
+					"config.oam.dev/type":    "vela-workflow-http-deny",
 					"config.oam.dev/scope":   "system",
 				},
 			},

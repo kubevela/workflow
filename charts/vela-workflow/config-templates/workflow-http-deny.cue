@@ -4,7 +4,7 @@ import (
 )
 
 metadata: {
-	name:        "workflow-http-deny"
+	name:        "vela-workflow-http-deny"
 	alias:       "Workflow HTTP Denylist"
 	description: "Additional host, IP, and CIDR destinations denied for workflow HTTP requests."
 	scope:       "system"
@@ -28,7 +28,7 @@ template: {
 			namespace: context.namespace
 			labels: {
 				"config.oam.dev/catalog": "velacore-config"
-				"config.oam.dev/type":    "workflow-http-deny"
+				"config.oam.dev/type":    "vela-workflow-http-deny"
 				"config.oam.dev/scope":   "system"
 			}
 		}

@@ -32,8 +32,11 @@ import (
 const (
 	// ConfigTemplateLabel identifies the ConfigTemplate that produced a config.
 	ConfigTemplateLabel = "config.oam.dev/type"
-	// WorkflowHTTPDenyConfigTemplate is the workflow HTTP deny ConfigTemplate name.
-	WorkflowHTTPDenyConfigTemplate = "workflow-http-deny"
+	// WorkflowHTTPDenyConfigTemplate is the vela-workflow chart ConfigTemplate
+	// name and discovery label value (config.oam.dev/type). vela-core uses its
+	// own prefixed default (vela-core-http-deny) so dual install has no shared
+	// Helm-owned ConfigTemplate.
+	WorkflowHTTPDenyConfigTemplate = "vela-workflow-http-deny"
 )
 
 // PolicyEnhancer optionally mutates base policy (for example enabling
