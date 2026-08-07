@@ -19,9 +19,7 @@ template:
 | vela-core | `vela-core-http-deny` | `vela-core-http-deny-default` |
 
 Each controller only merges ConfigMaps matching **its** discovery label (plus
-the Go builtin floor). WorkflowStepDefinitions that both charts ship use Helm
-`lookup` create-if-absent so dual install does not require disabling definition
-or deny flags.
+the Go builtin floor).
 
 Create additional denylists with the ConfigTemplate:
 

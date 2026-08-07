@@ -72,21 +72,3 @@ systemDefinitionNamespace value defaulter
     {{ .Release.Namespace }}
 {{- end -}}
 {{- end -}}
-
-{{/*
-Return "true" when a looked-up object is absent, or already owned by this release.
-Used for create-if-absent dual-install of shared WorkflowStepDefinitions between
-vela-core and vela-workflow (HTTP deny ConfigTemplates are uniquely named per chart).
-Usage: {{ include "oam.helm.manageIfAbsentOrOwned" (list $existing .) }}
-*/}}
-{{- define "oam.helm.manageIfAbsentOrOwned" -}}
-{{- $existing := index . 0 -}}
-{{- $root := index . 1 -}}
-{{- $releaseName := "" -}}
-{{- $releaseNamespace := "" -}}
-{{- if and $existing $existing.metadata $existing.metadata.annotations -}}
-{{- $releaseName = index $existing.metadata.annotations "meta.helm.sh/release-name" | default "" -}}
-{{- $releaseNamespace = index $existing.metadata.annotations "meta.helm.sh/release-namespace" | default "" -}}
-{{- end -}}
-{{- if or (not $existing) (and (eq $releaseName $root.Release.Name) (eq $releaseNamespace $root.Release.Namespace)) -}}true{{- end -}}
-{{- end -}}
