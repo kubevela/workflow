@@ -11,6 +11,7 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/main.go cmd/main.go
+COPY cmd/http_deny.go cmd/http_deny.go
 COPY api/ api/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
@@ -22,7 +23,7 @@ ARG VERSION
 ARG GITVERSION
 RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -a -ldflags "-s -w -X github.com/kubevela/workflow/version.VelaVersion=${VERSION:-undefined} -X github.com/kubevela/workflow/version.GitRevision=${GITVERSION:-undefined}" \
-    -o vela-workflow-${TARGETARCH} cmd/main.go
+    -o vela-workflow-${TARGETARCH} ./cmd
 
 FROM ${BASE_IMAGE:-alpine:3.15}
 # This is required by daemon connecting with cri
