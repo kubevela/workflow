@@ -33,14 +33,17 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/test"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/pkg/cue/model/value"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/providers/http/ratelimiter"
 	"github.com/kubevela/workflow/pkg/providers/http/testdata"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -312,6 +315,111 @@ url: "https://127.0.0.1:8443/api/v1/token?val=test-token"
 	prd := &provider{cli, "default"}
 	err = prd.Do(ctx, nil, v, nil)
 	r.NoError(err)
+}
+
+func TestHttpDoBlocksDeniedHost(t *testing.T) {
+	ctx := monitorContext.NewTraceContext(context.Background(), "")
+	httpguard.SetDenyFragment(httpguard.Policy{
+		ExactHosts: map[string]struct{}{"blocked.example.com": {}},
+	})
+	defer httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+
+	v, err := value.NewValue(`
+method: "GET"
+url: "http://blocked.example.com/path"
+response: close({
+	body: string
+	header?:  [string]: [...string]
+	trailer?: [string]: [...string]
+	statusCode: int
+})
+`, nil, "")
+	require.NoError(t, err)
+
+	prd := &provider{}
+	err = prd.Do(ctx, nil, v, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "blocked SSRF host")
+}
+
+// doGet runs a GET through the release-0.6 provider and returns its error.
+func doGet(t *testing.T, url string) error {
+	t.Helper()
+	v, err := value.NewValue(fmt.Sprintf(`
+method: "GET"
+url: %q
+response: close({
+	body: string
+	header?:  [string]: [...string]
+	trailer?: [string]: [...string]
+	statusCode: int
+})
+`, url), nil, "")
+	require.NoError(t, err)
+	prd := &provider{}
+	return prd.Do(monitorContext.NewTraceContext(context.Background(), ""), nil, v, nil)
+}
+
+func TestHttpDo_blocksMetadata(t *testing.T) {
+	// Rely on BuiltinDeny()/Current() so a regression in the builtin floor fails this test.
+	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+
+	err := doGet(t, "http://169.254.169.254/latest/meta-data/")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "blocked SSRF target")
+}
+
+func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
+	r := require.New(t)
+	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.DisableWorkflowHTTP): true,
+	}))
+	t.Cleanup(func() {
+		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.DisableWorkflowHTTP): false,
+		})
+	})
+
+	err := doGet(t, "http://127.0.0.1:1229/hello")
+	r.Error(err)
+	r.Contains(err.Error(), "DisableWorkflowHTTP")
+}
+
+func TestHttpDo_blockPrivateHTTPAddresses(t *testing.T) {
+	r := require.New(t)
+	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.BlockPrivateHTTPAddresses): true,
+	}))
+	t.Cleanup(func() {
+		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.BlockPrivateHTTPAddresses): false,
+		})
+	})
+
+	err := doGet(t, "http://10.0.0.1/path")
+	r.Error(err)
+	r.Contains(err.Error(), "blocked SSRF target")
+}
+
+func TestHttpDo_redirectBlocked(t *testing.T) {
+	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+	t.Cleanup(func() {
+		httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
+		httpguard.SetEnhancer(nil)
+	})
+
+	redirector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
+	}))
+	defer redirector.Close()
+
+	err := doGet(t, redirector.URL)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "blocked SSRF")
 }
 
 func newMockHttpsServer() *httptest.Server {

@@ -48,6 +48,14 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 | `workflow.step.errorRetryTimes`        | The max retry times of a failed workflow step                                                                                                                                          | `10`                    |
 | `workflow.groupByLabel`                | The label used to group workflow record                                                                                                                                                | `pipeline.oam.dev/name` |
 
+| `workflow.disableWorkflowHTTP`                          | Disable outbound HTTP from workflow request/webhook steps                                                                                                                               | `false`                 |
+| `workflow.blockPrivateHTTPAddresses`                    | Block outbound HTTP to RFC-1918 and ULA destinations                                                                                                                                   | `false`                 |
+| `workflow.httpDeny.configTemplateName`                  | Discover and merge ConfigMaps produced by this ConfigTemplate                                                                                                                          | `vela-workflow-http-deny` |
+| `workflow.httpDeny.installConfigTemplate`               | Install the workflow HTTP deny ConfigTemplate                                                                                                                                          | `true`                  |
+| `workflow.httpDeny.defaultConfig.enabled`               | Install the default metadata and link-local deny ConfigMap                                                                                                                             | `true`                  |
+| `workflow.httpDeny.defaultConfig.name`                  | Name of the default workflow HTTP deny ConfigMap (unique vs vela-core for dual install)                                                                                                | `vela-workflow-http-deny-default` |
+| `workflow.httpDeny.defaultConfig.denyHosts`             | Default hostnames denied by workflow HTTP                                                                                                                                              | `["metadata.google.internal"]` |
+| `workflow.httpDeny.defaultConfig.denyCIDRs`             | Default IP addresses and CIDR ranges denied by workflow HTTP                                                                                                                           | `["169.254.0.0/16","fe80::/10","fd00:ec2::254","100.100.100.200"]` |
 
 ### KubeVela workflow backup parameters
 
