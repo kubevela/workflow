@@ -31,6 +31,10 @@ const (
 	EnablePatchStatusAtOnce featuregate.Feature = "EnablePatchStatusAtOnce"
 	// EnableWatchEventListener enable watch event listener
 	EnableWatchEventListener featuregate.Feature = "EnableWatchEventListener"
+	// DisableWorkflowHTTP if set, outbound HTTP from workflow request/webhook steps is disallowed
+	DisableWorkflowHTTP featuregate.Feature = "DisableWorkflowHTTP"
+	// BlockPrivateHTTPAddresses if set, outbound HTTP to RFC-1918 and ULA destinations is blocked
+	BlockPrivateHTTPAddresses featuregate.Feature = "BlockPrivateHTTPAddresses"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -38,6 +42,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableBackupWorkflowRecord: {Default: false, PreRelease: featuregate.Alpha},
 	EnablePatchStatusAtOnce:    {Default: false, PreRelease: featuregate.Alpha},
 	EnableWatchEventListener:   {Default: false, PreRelease: featuregate.Alpha},
+	DisableWorkflowHTTP:        {Default: false, PreRelease: featuregate.Alpha},
+	BlockPrivateHTTPAddresses:  {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

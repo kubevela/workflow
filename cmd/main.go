@@ -60,6 +60,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
+	"github.com/kubevela/workflow/pkg/utils/httpguard"
 	"github.com/kubevela/workflow/pkg/webhook"
 	"github.com/kubevela/workflow/version"
 	//+kubebuilder:scaffold:imports
@@ -81,6 +82,7 @@ func init() {
 func main() {
 	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent, certDir string
 	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
+	var workflowHTTPDenyConfigTemplateName string
 	var enableLeaderElection, useWebhook, logDebug, backupCleanOnBackup bool
 	var qps float64
 	var logFileMaxSize uint64
@@ -125,6 +127,7 @@ func main() {
 	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
+	flag.StringVar(&workflowHTTPDenyConfigTemplateName, "workflow-http-deny-config-template-name", httpguard.WorkflowHTTPDenyConfigTemplate, "Discover and merge ConfigMaps produced by this ConfigTemplate in the controller namespace")
 	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")
 	flag.BoolVar(&providers.EnableExternalPackageWatchForDefaultCompiler, "enable-external-package-watch-for-default-compiler", false, "Enable external package watch for default compiler")
 	multicluster.AddClusterGatewayClientFlags(flag.CommandLine)
@@ -223,6 +226,12 @@ func main() {
 	}
 
 	kubeClient := mgr.GetClient()
+	controllerNamespace := resolveControllerNamespace()
+	blockPrivate := feature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses)
+	if err := configureWorkflowHTTPDeny(context.Background(), mgr.GetAPIReader(), mgr, workflowHTTPDenyConfigTemplateName, controllerNamespace, blockPrivate); err != nil {
+		klog.ErrorS(err, "unable to configure workflow HTTP deny policy", "template", workflowHTTPDenyConfigTemplateName, "namespace", controllerNamespace)
+		os.Exit(1)
+	}
 	if groupByLabel != "" {
 		if err := mgr.Add(utils.NewRecycleCronJob(kubeClient, recycleDuration, "0 0 * * *", groupByLabel)); err != nil {
 			klog.Error(err, "unable to start recycle cronjob")
@@ -359,4 +368,11 @@ func waitWebhookSecretVolume(certDir string, timeout, interval time.Duration) er
 			}
 		}
 	}
+}
+
+func resolveControllerNamespace() string {
+	if ns := strings.TrimSpace(os.Getenv("POD_NAMESPACE")); ns != "" {
+		return ns
+	}
+	return "vela-system"
 }
