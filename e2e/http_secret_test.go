@@ -74,6 +74,9 @@ var _ = Describe("Test the request step resolving headers from a Kubernetes Secr
 })
 
 func deployMockServer(ctx context.Context) {
+	// The body must be valid JSON: the request step definition ends with
+	// response: json.Unmarshal(req.$returns.body), so a non-JSON body makes the step
+	// template fail to evaluate with `json: invalid JSON`.
 	nginxConfig := `
 server {
     listen 80;
@@ -81,7 +84,8 @@ server {
         if ($http_authorization != "Bearer sk-supersecret-12345") {
             return 401;
         }
-        return 200 "OK";
+        default_type application/json;
+        return 200 '{"status":"ok"}';
     }
 }
 `
