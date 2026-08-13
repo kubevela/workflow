@@ -17,33 +17,37 @@ limitations under the License.
 package ratelimiter
 
 import (
+	"context"
 	"time"
 
-	"github.com/golang/groupcache/lru"
+	"github.com/kubevela/pkg/cache"
 	"golang.org/x/time/rate"
 )
 
 // RateLimiter is the rate limiter.
 type RateLimiter struct {
-	store *lru.Cache
+	store *cache.LRUStore[string, *rate.Limiter]
 }
 
 // NewRateLimiter returns a new rate limiter.
-func NewRateLimiter(length int) *RateLimiter {
-	store := lru.New(length)
-	store.Clear()
+func NewRateLimiter(ctx context.Context, length int) *RateLimiter {
+	store, _ := cache.NewLRUStore(ctx, cache.Options[string, *rate.Limiter]{
+		MaxSize:       length,
+		MaxBytes:      0,
+		SweepInterval: 0,
+	})
+	store.Purge()
 	return &RateLimiter{store: store}
 }
 
 // Allow returns true if the operation is allowed.
 func (rl *RateLimiter) Allow(id string, limit int, duration time.Duration) bool {
-	if l, ok := rl.store.Get(id); ok {
-		limiter := l.(*rate.Limiter)
+	if limiter, ok := rl.store.Get(id); ok {
 		if limiter.Limit() == rate.Every(duration) && limiter.Burst() == limit {
 			return limiter.Allow()
 		}
 	}
 	limiter := rate.NewLimiter(rate.Every(duration), limit)
-	rl.store.Add(id, limiter)
+	rl.store.Put(id, limiter, time.Minute*5)
 	return limiter.Allow()
 }

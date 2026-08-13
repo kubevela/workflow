@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -45,12 +46,9 @@ const (
 )
 
 var (
-	rateLimiter *ratelimiter.RateLimiter
+	rateLimiterOnce sync.Once
+	rateLimiter     *ratelimiter.RateLimiter
 )
-
-func init() {
-	rateLimiter = ratelimiter.NewRateLimiter(128)
-}
 
 // Request .
 type Request struct {
@@ -97,7 +95,17 @@ func Do(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	return runHTTP(ctx, params)
 }
 
+// InitRateLimiter initializes the rate limiter. Must be called once at startup.
+func InitRateLimiter(ctx context.Context) {
+	rateLimiterOnce.Do(func() {
+		rateLimiter = ratelimiter.NewRateLimiter(ctx, 128)
+	})
+}
+
 func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
+	if rateLimiter == nil {
+		InitRateLimiter(ctx)
+	}
 	var (
 		err             error
 		header, trailer http.Header

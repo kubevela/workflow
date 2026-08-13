@@ -17,6 +17,7 @@ limitations under the License.
 package ratelimiter
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ import (
 )
 
 func TestRateLimiter(t *testing.T) {
-	rl := NewRateLimiter(2)
+	rl := NewRateLimiter(context.Background(), 2)
 	r := require.New(t)
 	duration := time.Second
 	testCases := []struct {
