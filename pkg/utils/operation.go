@@ -346,8 +346,8 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 	if run.Spec.WorkflowSpec != nil {
 		steps = run.Spec.WorkflowSpec.Steps
 	} else {
-		workflow := &oamv1alpha1.Workflow{}
-		if err := cli.Get(ctx, client.ObjectKey{Namespace: run.Namespace, Name: run.Spec.WorkflowRef}, workflow); err != nil {
+		workflow, err := GetWorkflow(ctx, cli, run.Namespace, run.Spec.WorkflowRef)
+		if err != nil {
 			return err
 		}
 		steps = workflow.Steps

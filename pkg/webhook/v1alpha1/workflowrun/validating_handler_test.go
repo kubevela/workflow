@@ -17,12 +17,16 @@ limitations under the License.
 package workflowrun
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 )
 
 var _ = Describe("Test WorkflowRun Validator", func() {
@@ -139,6 +143,47 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 		}
 		resp := handler.Handle(ctx, req)
 		Expect(resp.Allowed).Should(BeTrue())
+	})
+
+	It("Test WorkflowRun Validator [workflowRef from vela-system namespace, run in another namespace]", func() {
+		workflow := &oamv1alpha1.Workflow{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "wf-shared-across-namespaces",
+				Namespace: "vela-system",
+			},
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
+					{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "step1", Type: "suspend"}},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, workflow)).Should(Succeed())
+
+		req := admission.Request{
+			AdmissionRequest: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Create,
+				Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+				Object: runtime.RawExtension{
+					Raw: []byte(fmt.Sprintf(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-sample","namespace":"default"},"spec":{"workflowRef":%q}}`, workflow.Name)),
+				},
+			},
+		}
+		resp := handler.Handle(ctx, req)
+		Expect(resp.Allowed).Should(BeTrue())
+	})
+
+	It("Test WorkflowRun Validator [workflowRef not found anywhere, error]", func() {
+		req := admission.Request{
+			AdmissionRequest: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Create,
+				Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+				Object: runtime.RawExtension{
+					Raw: []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-missing","namespace":"default"},"spec":{"workflowRef":"does-not-exist"}}`),
+				},
+			},
+		}
+		resp := handler.Handle(ctx, req)
+		Expect(resp.Allowed).Should(BeFalse())
 	})
 
 })

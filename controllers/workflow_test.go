@@ -156,6 +156,57 @@ var _ = Describe("Test Workflow", func() {
 		Expect(wrObj.Status.Mode.SubSteps).Should(BeEquivalentTo(v1alpha1.WorkflowModeStep))
 	})
 
+	It("get steps from workflow ref shared from vela-system namespace", func() {
+		setupNamespace(ctx, "vela-system")
+
+		workflow := &oamv1alpha1.Workflow{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Workflow",
+				APIVersion: "core.oam.dev/v1alpha1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "shared-workflow",
+				Namespace: "vela-system",
+			},
+			Mode: &oamv1alpha1.WorkflowExecuteMode{
+				Steps: v1alpha1.WorkflowModeDAG,
+			},
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
+					{
+						WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+							Name: "step-1",
+							Type: "suspend",
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, workflow)).Should(Succeed())
+		defer func() {
+			Expect(k8sClient.Delete(ctx, workflow)).Should(Succeed())
+		}()
+
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-ref-shared-workflow"
+		wr.Spec = v1alpha1.WorkflowRunSpec{
+			WorkflowRef: workflow.Name,
+		}
+		Expect(k8sClient.Create(ctx, wr)).Should(Succeed())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		wrObj := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Name:      wr.Name,
+			Namespace: wr.Namespace,
+		}, wrObj)).Should(Succeed())
+
+		Expect(wrObj.Status.Suspend).Should(BeTrue())
+		Expect(wrObj.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(wrObj.Status.Mode.Steps).Should(BeEquivalentTo(v1alpha1.WorkflowModeDAG))
+	})
+
 	It("get failed to generate", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "failed-generate"
