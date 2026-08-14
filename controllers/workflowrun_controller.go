@@ -88,6 +88,7 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	defer cancel()
 
 	ctx = types.SetNamespaceInCtx(ctx, req.Namespace)
+	ctx = providertypes.WithKubeClient(ctx, r.Client)
 	ctx = context.WithValue(ctx, providertypes.ConfigFactoryKey, wfconfig.NewK8sFactory(r.Client))
 	ctx = providertypes.WithLabelParams(ctx, map[string]string{
 		types.LabelWorkflowRunName:      req.Name,

@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/kubevela/pkg/multicluster"
 	"github.com/kubevela/pkg/util/test/definition"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
@@ -85,6 +86,40 @@ var _ = Describe("Test Workflow", func() {
 		Expect(k8sClient.DeleteAllOf(ctx, &v1alpha1.WorkflowRun{}, client.InNamespace(namespace))).Should(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(namespace))).Should(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{}, client.InNamespace(namespace))).Should(Succeed())
+	})
+
+	It("uses the reconciler client for multi-cluster kube provider calls", func() {
+		recordingClient := &clusterRecordingClient{Client: k8sClient}
+		testReconciler := &WorkflowRunReconciler{
+			Client:   recordingClient,
+			Scheme:   testScheme,
+			Recorder: reconciler.Recorder,
+		}
+
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "multi-cluster-client"
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+				Name: "apply-remote-config",
+				Type: "apply-object",
+				Properties: &runtime.RawExtension{Raw: []byte(`{
+					"cluster":"managed-cluster",
+					"value":{
+						"apiVersion":"v1",
+						"kind":"ConfigMap",
+						"metadata":{"name":"remote-config","namespace":"test-ns"},
+						"data":{"key":"value"}
+					}
+				}`)},
+			},
+		}}
+
+		Expect(k8sClient.Create(ctx, wr)).Should(Succeed())
+		tryReconcile(testReconciler, wr.Name, wr.Namespace)
+
+		Expect(recordingClient.clusters).Should(ContainElement("managed-cluster"))
+		remoteConfig := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "remote-config", Namespace: namespace}, remoteConfig)).Should(Succeed())
 	})
 
 	It("get steps from workflow ref", func() {
@@ -1994,6 +2029,27 @@ func tryReconcile(r *WorkflowRunReconciler, name, ns string) {
 		By(fmt.Sprintf("reconcile err: %+v ", err))
 	}
 	Expect(err).Should(BeNil())
+}
+
+type clusterRecordingClient struct {
+	client.Client
+	clusters []string
+}
+
+func (c *clusterRecordingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	c.recordCluster(ctx)
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
+func (c *clusterRecordingClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	c.recordCluster(ctx)
+	return c.Client.Create(ctx, obj, opts...)
+}
+
+func (c *clusterRecordingClient) recordCluster(ctx context.Context) {
+	if cluster, ok := multicluster.ClusterFrom(ctx); ok && cluster != "" {
+		c.clusters = append(c.clusters, cluster)
+	}
 }
 
 func setupNamespace(ctx context.Context, namespace string) {
