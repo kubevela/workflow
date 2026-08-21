@@ -15,10 +15,10 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.23.8'
-  GOLANGCI_VERSION: 'v1.60.1'
-  K3D_IMAGE_VERSION: '[\"v1.31\"]'
-  K3D_IMAGE_VERSIONS: '[\"v1.31\"]'
+  GO_VERSION: '1.25.12'
+  GOLANGCI_VERSION: 'v2.12.2'
+  K3D_IMAGE_VERSION: '[\"v1.35\"]'
+  K3D_IMAGE_VERSIONS: '[\"v1.35\"]'
 
 jobs:
 

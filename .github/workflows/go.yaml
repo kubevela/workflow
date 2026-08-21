@@ -13,8 +13,8 @@ on:
 
 env:
   # Common versions
-  GO_VERSION: '1.23.8'
-  GOLANGCI_VERSION: 'v1.60.1'
+  GO_VERSION: '1.25.12'
+  GOLANGCI_VERSION: 'v2.12.2'
 
 jobs:
 
@@ -56,7 +56,7 @@ jobs:
           restore-keys: ${{ runner.os }}-pkg-
 
       - name: Install StaticCheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
 
       - name: Static Check
         run: staticcheck ./...
@@ -89,6 +89,6 @@ jobs:
       # version, but we prefer this action because it leaves 'annotations' (i.e.
       # it comments on PRs to point out linter violations).
       - name: Lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v8
         with:
           version: ${{ env.GOLANGCI_VERSION }}

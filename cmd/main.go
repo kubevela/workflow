@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
 	"github.com/kubevela/pkg/controller/sharding"
 	flag "github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
