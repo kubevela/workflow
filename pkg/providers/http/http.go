@@ -32,6 +32,7 @@ import (
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -121,7 +122,9 @@ func requestPolicy() httpguard.Policy {
 // InitRateLimiter initializes the rate limiter. Must be called once at startup.
 func InitRateLimiter(ctx context.Context) {
 	rateLimiterOnce.Do(func() {
-		rateLimiter = ratelimiter.NewRateLimiter(ctx, 128)
+		var err error
+		rateLimiter, err = ratelimiter.NewRateLimiter(ctx, 128)
+		utilruntime.Must(err)
 	})
 }
 
@@ -129,9 +132,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
 	if utilfeature.DefaultMutableFeatureGate.Enabled(features.DisableWorkflowHTTP) {
 		return nil, errors.New("workflow outbound HTTP is disabled by DisableWorkflowHTTP feature gate")
 	}
-	if rateLimiter == nil {
-		InitRateLimiter(ctx)
-	}
+	InitRateLimiter(context.WithoutCancel(ctx))
 	var (
 		err             error
 		header, trailer http.Header

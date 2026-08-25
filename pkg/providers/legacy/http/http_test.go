@@ -156,7 +156,9 @@ func TestHttpDo(t *testing.T) {
 	}
 
 	// test ratelimiter
-	rateLimiter = ratelimiter.NewRateLimiter(ctx, 1)
+	var err error
+	rateLimiter, err = ratelimiter.NewRateLimiter(ctx, 1)
+	require.NoError(t, err)
 	limiterTestCases := []struct {
 		request     RequestVars
 		expectedErr string

@@ -61,6 +61,7 @@ import (
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/providers"
 	httpProvider "github.com/kubevela/workflow/pkg/providers/http"
+	legacyhttpProvider "github.com/kubevela/workflow/pkg/providers/legacy/http"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
 	"github.com/kubevela/workflow/pkg/utils/httpguard"
@@ -153,6 +154,7 @@ func main() {
 	wfupgrade.InitCompatibilityCache(context.Background(), wfupgrade.CompatibilityCacheSize)
 	rootCtx := ctrl.SetupSignalHandler()
 	httpProvider.InitRateLimiter(rootCtx)
+	legacyhttpProvider.InitRateLimiter(rootCtx)
 	if logDebug {
 		_ = flag.Set("v", strconv.Itoa(int(common.LogDebug)))
 	}

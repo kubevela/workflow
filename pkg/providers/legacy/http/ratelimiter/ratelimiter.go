@@ -30,14 +30,17 @@ type RateLimiter struct {
 }
 
 // NewRateLimiter returns a new rate limiter.
-func NewRateLimiter(ctx context.Context, length int) *RateLimiter {
-	store, _ := cache.NewLRUStore(ctx, cache.Options[string, *rate.Limiter]{
+func NewRateLimiter(ctx context.Context, length int) (*RateLimiter, error) {
+	store, err := cache.NewLRUStore(ctx, cache.Options[string, *rate.Limiter]{
 		MaxSize:       length,
 		MaxBytes:      0,
 		SweepInterval: 0,
 	})
+	if err != nil {
+		return nil, err
+	}
 	store.Purge()
-	return &RateLimiter{store: store}
+	return &RateLimiter{store: store}, nil
 }
 
 // Allow returns true if the operation is allowed.
@@ -48,6 +51,6 @@ func (rl *RateLimiter) Allow(id string, limit int, duration time.Duration) bool 
 		}
 	}
 	limiter := rate.NewLimiter(rate.Every(duration), limit)
-	rl.store.Put(id, limiter, time.Minute*5)
+	rl.store.Put(id, limiter, 0)
 	return limiter.Allow()
 }
