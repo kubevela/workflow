@@ -8,7 +8,6 @@ require (
 	github.com/aliyun/aliyun-log-go-sdk v0.1.38
 	github.com/crossplane/crossplane-runtime v1.16.0
 	github.com/evanphx/json-patch v5.7.0+incompatible
-	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kubevela/kube-trigger v0.1.1-0.20250711201929-51c837aa9bd2
@@ -70,6 +69,7 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/cel-go v0.20.1 // indirect
