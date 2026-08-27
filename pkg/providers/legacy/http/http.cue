@@ -20,8 +20,8 @@
 		trailer?: [string]: string
 		// +usage=The rate limiter of the request
 		ratelimiter?: {
-			limit:  int
-			period: string
+			limit:  int & >0
+			period: string & =~"^(0|(([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(ns|us|µs|μs|ms|s|m|h))+)$"
 		}
 		...
 	}

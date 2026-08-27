@@ -60,6 +60,8 @@ import (
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/monitor/watcher"
 	"github.com/kubevela/workflow/pkg/providers"
+	httpProvider "github.com/kubevela/workflow/pkg/providers/http"
+	legacyhttpProvider "github.com/kubevela/workflow/pkg/providers/legacy/http"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
 	"github.com/kubevela/workflow/pkg/utils/httpguard"
@@ -150,6 +152,9 @@ func main() {
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 	wfupgrade.InitCompatibilityCache(context.Background(), wfupgrade.CompatibilityCacheSize)
+	rootCtx := ctrl.SetupSignalHandler()
+	httpProvider.InitRateLimiter(rootCtx)
+	legacyhttpProvider.InitRateLimiter(rootCtx)
 	if logDebug {
 		_ = flag.Set("v", strconv.Itoa(int(common.LogDebug)))
 	}
@@ -324,7 +329,7 @@ func main() {
 	watcher.StartWorkflowRunMetricsWatcher(informer)
 
 	klog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(rootCtx); err != nil {
 		klog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

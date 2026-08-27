@@ -26,10 +26,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
@@ -45,12 +47,9 @@ const (
 )
 
 var (
-	rateLimiter *ratelimiter.RateLimiter
+	rateLimiterOnce sync.Once
+	rateLimiter     *ratelimiter.RateLimiter
 )
-
-func init() {
-	rateLimiter = ratelimiter.NewRateLimiter(128)
-}
 
 // Request .
 type Request struct {
@@ -97,7 +96,17 @@ func Do(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	return runHTTP(ctx, params)
 }
 
+// InitRateLimiter initializes the rate limiter. Must be called once at startup.
+func InitRateLimiter(ctx context.Context) {
+	rateLimiterOnce.Do(func() {
+		var err error
+		rateLimiter, err = ratelimiter.NewRateLimiter(ctx, 128)
+		utilruntime.Must(err)
+	})
+}
+
 func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
+	InitRateLimiter(context.WithoutCancel(ctx))
 	var (
 		err             error
 		header, trailer http.Header
