@@ -164,6 +164,69 @@ func TestOutput(t *testing.T) {
 	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
 }
 
+func TestOutputSensitive(t *testing.T) {
+	wfCtx := mockContext(t)
+	r := require.New(t)
+	cuectx := cuecontext.New()
+
+	// Test sensitive output is stored in secret store
+	taskValue := cuectx.CompileString(`output: apiKey: "super-secret-key-12345"`)
+	stepStatus := make(map[string]v1alpha1.StepStatus)
+	err := Output(wfCtx, taskValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Properties: &runtime.RawExtension{
+				Raw: []byte("{\"name\":\"secret-step\"}"),
+			},
+			Outputs: oamv1alpha1.StepOutputs{{
+				ValueFrom: "output.apiKey",
+				Name:      "myApiKey",
+				Sensitive: true, // Mark as sensitive
+			}},
+		},
+	}, v1alpha1.StepStatus{
+		Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+	}, stepStatus)
+	r.NoError(err)
+
+	// Verify sensitive output is in secret store, not regular store
+	result, err := wfCtx.GetSensitiveVar("myApiKey")
+	r.NoError(err)
+	resultStr, err := result.String()
+	r.NoError(err)
+	r.Equal("super-secret-key-12345", resultStr)
+
+	// Verify it's NOT in the regular store
+	_, err = wfCtx.GetVar("myApiKey")
+	r.Error(err)
+	r.Contains(err.Error(), "not found")
+}
+
+func TestInputFromSensitiveStore(t *testing.T) {
+	wfCtx := mockContext(t)
+	r := require.New(t)
+	cuectx := cuecontext.New()
+
+	// Set a sensitive variable
+	err := wfCtx.SetSensitiveVar(cuectx.CompileString(`"secret-token-xyz"`), "secretToken")
+	r.NoError(err)
+
+	// Test that Input can retrieve from sensitive store
+	paramValue := cuectx.CompileString(`"name": "foo"`)
+	val, err := Input(wfCtx, paramValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Inputs: oamv1alpha1.StepInputs{{
+				From:         "secretToken",
+				ParameterKey: "token",
+			}},
+		},
+	})
+	r.NoError(err)
+	result := val.LookupPath(cue.ParsePath("parameter.token"))
+	resultStr, err := result.String()
+	r.NoError(err)
+	r.Equal("secret-token-xyz", resultStr)
+}
+
 func mockContext(t *testing.T) wfContext.Context {
 	cli := &test.MockClient{
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
