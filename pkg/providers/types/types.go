@@ -168,6 +168,11 @@ func WithLabelParams(parent context.Context, labels map[string]string) context.C
 	return context.WithValue(parent, LabelsKey, labels)
 }
 
+// WithKubeClient returns a copy of parent in which the kube client is set.
+func WithKubeClient(parent context.Context, kubeClient client.Client) context.Context {
+	return context.WithValue(parent, KubeClientKey, kubeClient)
+}
+
 // WithRuntimeParams returns a copy of parent in which the runtime params value is set
 func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Context {
 	ctx := context.WithValue(parent, WorkflowContextKey, params.WorkflowContext)
