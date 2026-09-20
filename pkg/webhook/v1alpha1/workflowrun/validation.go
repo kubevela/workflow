@@ -35,7 +35,7 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 	if wr.Spec.WorkflowSpec != nil {
 		steps = wr.Spec.WorkflowSpec.Steps
 	} else {
-		w, err := utils.GetWorkflow(ctx, h.Client, wr.Namespace, wr.Spec.WorkflowRef)
+		w, err := utils.GetWorkflow(ctx, h.Reader, wr.Namespace, wr.Spec.WorkflowRef)
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "workflowRef"), wr.Spec.WorkflowRef, fmt.Sprintf("failed to get workflow ref: %v", err)))
 			return errs

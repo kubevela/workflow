@@ -5,7 +5,7 @@
 {{- $existingCaBundle := "" -}}
 {{- if $existing -}}
 {{- range $existing.webhooks -}}
-{{- if eq .name "validating.core.oam.dev.v1alpha2.applicationconfigurations" -}}{{- $existingCaBundle = .clientConfig.caBundle -}}{{- end -}}
+{{- if or (eq .name "validating.core.oam.dev.v1alpha1.workflowruns") (eq .name "validating.core.oam.dev.v1alpha2.applicationconfigurations") -}}{{- $existingCaBundle = .clientConfig.caBundle -}}{{- end -}}
 {{- end -}}
 {{- end -}}
 apiVersion: admissionregistration.k8s.io/v1
@@ -24,12 +24,8 @@ webhooks:
         name: {{ template "kubevela.name" . }}-webhook
         namespace: {{ .Release.Namespace }}
         path: /validating-core-oam-dev-v1alpha1-workflowruns
-    {{- if .Values.admissionWebhooks.patch.enabled  }}
-    failurePolicy: Ignore
-    {{- else }}
     failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
-    {{- end }}
-    name: validating.core.oam.dev.v1alpha2.applicationconfigurations
+    name: validating.core.oam.dev.v1alpha1.workflowruns
     timeoutSeconds: {{ .Values.admissionWebhookTimeout }}
     sideEffects: None
     rules:

@@ -18,6 +18,7 @@ package workflowrun
 
 import (
 	"fmt"
+	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,7 +32,7 @@ import (
 
 var _ = Describe("Test WorkflowRun Validator", func() {
 	BeforeEach(func() {
-		handler.Client = k8sClient
+		handler.Reader = k8sClient
 		handler.Decoder = decoder
 	})
 
@@ -172,7 +173,37 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 		Expect(resp.Allowed).Should(BeTrue())
 	})
 
-	It("Test WorkflowRun Validator [workflowRef not found anywhere, error]", func() {
+	It("allows updates with inline and referenced workflows", func() {
+		workflow := &oamv1alpha1.Workflow{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "wf-valid-update",
+				Namespace: "vela-system",
+			},
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{
+				Steps: []oamv1alpha1.WorkflowStep{
+					{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "step1", Type: "suspend"}},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, workflow)).To(Succeed())
+
+		requests := []string{
+			`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-inline-update","namespace":"default"},"spec":{"workflowSpec":{"steps":[{"name":"step1","type":"suspend"}]}}}`,
+			fmt.Sprintf(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-update","namespace":"default"},"spec":{"workflowRef":%q}}`, workflow.Name),
+		}
+		for _, raw := range requests {
+			req := admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+					Object:    runtime.RawExtension{Raw: []byte(raw)},
+				},
+			}
+			Expect(handler.Handle(ctx, req).Allowed).To(BeTrue())
+		}
+	})
+
+	It("rejects a create when workflowRef cannot be resolved", func() {
 		req := admission.Request{
 			AdmissionRequest: admissionv1.AdmissionRequest{
 				Operation: admissionv1.Create,
@@ -183,7 +214,27 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 			},
 		}
 		resp := handler.Handle(ctx, req)
-		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Allowed).To(BeFalse())
+		Expect(resp.Result.Code).To(Equal(int32(http.StatusBadRequest)))
+		Expect(resp.Result.Message).To(ContainSubstring(`spec.workflowRef`))
+		Expect(resp.Result.Message).To(ContainSubstring(`does-not-exist`))
+	})
+
+	It("rejects an update when workflowRef cannot be resolved", func() {
+		req := admission.Request{
+			AdmissionRequest: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Update,
+				Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+				Object: runtime.RawExtension{
+					Raw: []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-missing","namespace":"default"},"spec":{"workflowRef":"does-not-exist"}}`),
+				},
+			},
+		}
+		resp := handler.Handle(ctx, req)
+		Expect(resp.Allowed).To(BeFalse())
+		Expect(resp.Result.Code).To(Equal(int32(http.StatusBadRequest)))
+		Expect(resp.Result.Message).To(ContainSubstring(`spec.workflowRef`))
+		Expect(resp.Result.Message).To(ContainSubstring(`does-not-exist`))
 	})
 
 })

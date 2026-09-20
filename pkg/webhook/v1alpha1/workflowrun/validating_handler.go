@@ -36,10 +36,11 @@ import (
 
 var _ admission.Handler = &ValidatingHandler{}
 
-// ValidatingHandler handles application
+// ValidatingHandler validates WorkflowRun admission requests.
 type ValidatingHandler struct {
-	Client client.Client
-	// Decoder decodes objects
+	// Reader reads referenced Workflows directly from the API server.
+	Reader client.Reader
+	// Decoder decodes objects.
 	Decoder admission.Decoder
 }
 
@@ -81,7 +82,7 @@ func (h *ValidatingHandler) Handle(ctx context.Context, req admission.Request) a
 func RegisterValidatingHandler(mgr manager.Manager, _ controllers.Args) {
 	server := mgr.GetWebhookServer()
 	server.Register("/validating-core-oam-dev-v1alpha1-workflowruns", &webhook.Admission{Handler: &ValidatingHandler{
-		Client:  mgr.GetClient(),
+		Reader:  mgr.GetAPIReader(),
 		Decoder: admission.NewDecoder(mgr.GetScheme()),
 	}})
 }
