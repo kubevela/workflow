@@ -197,6 +197,7 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 					Operation: admissionv1.Update,
 					Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
 					Object:    runtime.RawExtension{Raw: []byte(raw)},
+					OldObject: runtime.RawExtension{Raw: []byte(raw)},
 				},
 			}
 			Expect(handler.Handle(ctx, req).Allowed).To(BeTrue())
@@ -221,13 +222,13 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 	})
 
 	It("rejects an update when workflowRef cannot be resolved", func() {
+		raw := []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-missing","namespace":"default"},"spec":{"workflowRef":"does-not-exist"}}`)
 		req := admission.Request{
 			AdmissionRequest: admissionv1.AdmissionRequest{
 				Operation: admissionv1.Update,
 				Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
-				Object: runtime.RawExtension{
-					Raw: []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-ref-missing","namespace":"default"},"spec":{"workflowRef":"does-not-exist"}}`),
-				},
+				Object:    runtime.RawExtension{Raw: raw},
+				OldObject: runtime.RawExtension{Raw: raw},
 			},
 		}
 		resp := handler.Handle(ctx, req)
