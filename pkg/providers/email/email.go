@@ -24,6 +24,7 @@ import (
 
 	"gopkg.in/gomail.v2"
 
+	"github.com/kubevela/pkg/cache"
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
 	"github.com/kubevela/workflow/pkg/cue/model"
@@ -61,14 +62,23 @@ type MailVars struct {
 // MailParams .
 type MailParams = providertypes.Params[MailVars]
 
-var emailRoutine sync.Map
+var (
+	emailRoutine   cache.Cache[string]
+	emailCacheOnce sync.Once
+)
+
+func InitEmailCache(ctx context.Context) {
+	emailCacheOnce.Do(func() {
+		emailRoutine = cache.NewMemoryCacheStore[string](ctx)
+	})
+}
 
 // Send sends email
 func Send(_ context.Context, params *MailParams) (res *any, err error) {
 	pCtx := params.ProcessContext
 	act := params.Action
 	id := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))
-	routine, ok := emailRoutine.Load(id)
+	routine, ok := emailRoutine.Get(id)
 	if ok {
 		switch routine {
 		case "success":
@@ -82,7 +92,7 @@ func Send(_ context.Context, params *MailParams) (res *any, err error) {
 			return nil, fmt.Errorf("failed to send email: %v", routine)
 		}
 	} else {
-		emailRoutine.Store(id, "initializing")
+		emailRoutine.Put(id, "initializing", 0)
 	}
 
 	sender := params.Params.From
@@ -95,13 +105,13 @@ func Send(_ context.Context, params *MailParams) (res *any, err error) {
 
 	dial := gomail.NewDialer(sender.Host, sender.Port, sender.Address, sender.Password)
 	go func() {
-		if routine, ok := emailRoutine.Load(id); ok && routine == "initializing" {
-			emailRoutine.Store(id, "sending")
-			if err = dial.DialAndSend(m); err != nil {
-				emailRoutine.Store(id, err.Error())
+		if routine, ok := emailRoutine.Get(id); ok && routine == "initializing" {
+			emailRoutine.Put(id, "sending", 0)
+			if err := dial.DialAndSend(m); err != nil {
+				emailRoutine.Put(id, err.Error(), 0)
 				return
 			}
-			emailRoutine.Store(id, "success")
+			emailRoutine.Put(id, "success", 0)
 		}
 	}()
 	act.Wait("wait for the email")
