@@ -284,9 +284,10 @@ func TestSendEmailWaitsWhileInFlight(t *testing.T) {
 	r.Equal(int32(1), calls.Load())
 }
 
-// TestSendEmailConcurrentNoDoubleSend verifies that a burst of concurrent
-// reconciles while a send is in flight all wait and never trigger a second
-// DialAndSend.
+// TestSendEmailConcurrentNoDoubleSend releases a burst of concurrent first
+// invocations against an empty cache with a barrier, guarding the cold
+// initialization race: exactly one caller may claim the send and call
+// DialAndSend, the rest must wait.
 func TestSendEmailConcurrentNoDoubleSend(t *testing.T) {
 	resetEmailCache(t)
 	ctx := context.Background()
@@ -321,40 +322,38 @@ func TestSendEmailConcurrentNoDoubleSend(t *testing.T) {
 		})
 	defer patch.Reset()
 
-	r := require.New(t)
-
-	_, err := sendEmail(ctx, id, &mock.Action{}, mailVars)
-	_, isWait := err.(errors.GenericActionError)
-	r.True(isWait)
-
-	select {
-	case <-entered:
-	case <-time.After(5 * time.Second):
-		t.Fatal("send did not start")
-	}
-
 	const workers = 8
+	start := make(chan struct{})
 	var waits atomic.Int32
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			<-start
 			_, err := sendEmail(ctx, id, &mock.Action{}, mailVars)
 			if _, ok := err.(errors.GenericActionError); ok {
 				waits.Add(1)
 			}
 		}()
 	}
+	close(start)
 	wg.Wait()
 
-	r.Equal(int32(workers), waits.Load(), "concurrent reconciles should all wait")
-	r.Equal(int32(1), calls.Load(), "concurrent reconciles must not trigger a new send")
+	r := require.New(t)
+	r.Equal(int32(workers), waits.Load(), "all concurrent cold callers should wait")
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("send did not start")
+	}
+	r.Equal(int32(1), calls.Load(), "exactly one cold caller may dial")
 
 	close(release)
 	waitEmailTerminal(t, id)
 
-	_, err = sendEmail(ctx, id, &mock.Action{}, mailVars)
+	_, err := sendEmail(ctx, id, &mock.Action{}, mailVars)
 	r.NoError(err)
 	_, ok := emailRoutine.Get(id)
 	r.False(ok)

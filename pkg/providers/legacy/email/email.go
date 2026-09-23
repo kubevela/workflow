@@ -65,8 +65,10 @@ type MailParams = providertypes.LegacyParams[MailVars]
 var (
 	emailRoutine   cache.Cache[string]
 	emailCacheOnce sync.Once
+	emailMu        sync.Mutex
 )
 
+// InitEmailCache initializes the email cache for storing email sending routines.
 func InitEmailCache(ctx context.Context) {
 	emailCacheOnce.Do(func() {
 		emailRoutine = cache.NewMemoryCacheStore[string](ctx)
@@ -78,8 +80,10 @@ func Send(_ context.Context, params *MailParams) (res *any, err error) {
 	pCtx := params.ProcessContext
 	act := params.Action
 	id := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))
+	emailMu.Lock()
 	routine, ok := emailRoutine.Get(id)
 	if ok {
+		emailMu.Unlock()
 		switch routine {
 		case "success":
 			emailRoutine.Delete(id)
@@ -93,6 +97,7 @@ func Send(_ context.Context, params *MailParams) (res *any, err error) {
 		}
 	} else {
 		emailRoutine.Put(id, "initializing", 0)
+		emailMu.Unlock()
 	}
 
 	sender := params.Params.From
