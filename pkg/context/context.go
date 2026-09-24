@@ -42,6 +42,12 @@ import (
 const (
 	// ConfigMapKeyVars is the key in ConfigMap Data field for containing data of variable
 	ConfigMapKeyVars = "vars"
+	// SecretKeyVars is the key in the companion Secret Data field that holds
+	// sensitive workflow variables (step outputs derived from Secrets).
+	SecretKeyVars = "vars"
+	// SensitiveStoreSuffix is appended to the context ConfigMap name to build
+	// the name of the companion Secret that stores sensitive variables.
+	SensitiveStoreSuffix = "-sensitive"
 	// AnnotationStartTimestamp is the annotation key of the workflow start  timestamp
 	AnnotationStartTimestamp = "vela.io/startTime"
 )
@@ -56,12 +62,27 @@ type WorkflowContext struct {
 	memoryStore *sync.Map
 	vars        cue.Value
 	modified    bool
+
+	// sensitiveVars holds variables that were marked sensitive (e.g. step
+	// outputs whose values come from Kubernetes Secrets). They are persisted
+	// to a companion Secret instead of the plaintext context ConfigMap so that
+	// ConfigMap readers can never see them.
+	sensitiveVars cue.Value
+	// hasSensitive records that sensitive vars were ever set or loaded, so an
+	// existing companion Secret is kept in sync (including being cleared)
+	// while workflows without sensitive data never create one.
+	hasSensitive bool
 }
 
-// GetVar get variable from workflow context.
+// GetVar get variable from workflow context. Sensitive variables are read
+// transparently, so step inputs keep working regardless of where a variable
+// is stored.
 func (wf *WorkflowContext) GetVar(paths ...string) (cue.Value, error) {
 	v := wf.vars.LookupPath(value.FieldPath(paths...))
 	if !v.Exists() {
+		if sv := wf.sensitiveVars.LookupPath(value.FieldPath(paths...)); sv.Exists() {
+			return sv, nil
+		}
 		return v, fmt.Errorf("var %s not found", strings.Join(paths, "."))
 	}
 	return v, nil
@@ -82,6 +103,28 @@ func (wf *WorkflowContext) SetVar(v cue.Value, paths ...string) error {
 	if err := wf.vars.Err(); err != nil {
 		return err
 	}
+	wf.modified = true
+	return nil
+}
+
+// SetSensitiveVar sets a variable whose value is sensitive (e.g. derived from
+// a Kubernetes Secret). It behaves exactly like SetVar for readers, but the
+// value is persisted to a companion Secret instead of the plaintext context
+// ConfigMap. See kubevela/kubevela#6840 for the class of leak this prevents.
+func (wf *WorkflowContext) SetSensitiveVar(v cue.Value, paths ...string) error {
+	str, err := sets.ToString(v)
+	if err != nil {
+		return err
+	}
+
+	wf.sensitiveVars, err = value.FillRaw(wf.sensitiveVars, str, paths...)
+	if err != nil {
+		return err
+	}
+	if err := wf.sensitiveVars.Err(); err != nil {
+		return err
+	}
+	wf.hasSensitive = true
 	wf.modified = true
 	return nil
 }
@@ -168,6 +211,8 @@ func (wf *WorkflowContext) writeToStore() error {
 		wf.store.Data = make(map[string]string)
 	}
 
+	// Sensitive variables are intentionally NOT written into the ConfigMap
+	// data; they are persisted by syncSensitive to a companion Secret.
 	wf.store.Data[ConfigMapKeyVars] = varStr
 	return nil
 }
@@ -176,8 +221,18 @@ func (wf *WorkflowContext) sync(ctx context.Context) error {
 	cli := singleton.KubeClient.Get()
 	store := &corev1.ConfigMap{}
 	if EnableInMemoryContext {
+		// The in-memory store never reaches the API server, so sensitive vars
+		// can safely ride in the same in-memory ConfigMap object.
+		if err := wf.stashSensitiveInMemory(); err != nil {
+			return err
+		}
 		MemStore.UpdateInMemoryContext(wf.store)
-	} else if err := cli.Get(ctx, types.NamespacedName{
+		return nil
+	}
+	if err := wf.syncSensitive(ctx, cli); err != nil {
+		return errors.WithMessagef(err, "save sensitive context to secret(%s/%s)", wf.store.Namespace, wf.sensitiveStoreName())
+	}
+	if err := cli.Get(ctx, types.NamespacedName{
 		Name:      wf.store.Name,
 		Namespace: wf.store.Namespace,
 	}, store); err != nil {
@@ -189,6 +244,72 @@ func (wf *WorkflowContext) sync(ctx context.Context) error {
 	return cli.Patch(ctx, wf.store, client.MergeFrom(store.DeepCopy()))
 }
 
+// sensitiveStoreName returns the name of the companion Secret that stores
+// sensitive variables for this context.
+func (wf *WorkflowContext) sensitiveStoreName() string {
+	return wf.store.Name + SensitiveStoreSuffix
+}
+
+// stashSensitiveInMemory keeps sensitive vars inside the in-memory ConfigMap
+// object (memory-only mode never persists to the API server, so this is safe).
+func (wf *WorkflowContext) stashSensitiveInMemory() error {
+	if !wf.hasSensitive {
+		return nil
+	}
+	sensStr, err := sets.ToString(wf.sensitiveVars)
+	if err != nil {
+		return err
+	}
+	if wf.store.Data == nil {
+		wf.store.Data = make(map[string]string)
+	}
+	wf.store.Data[inMemorySensitiveKey] = sensStr
+	return nil
+}
+
+// inMemorySensitiveKey is only ever used in EnableInMemoryContext mode, where
+// the ConfigMap object never leaves process memory.
+const inMemorySensitiveKey = "sensitiveVars"
+
+// syncSensitive persists sensitive variables to the companion Secret. A Secret
+// is only created once sensitive data exists; afterwards it is kept in sync on
+// every commit — including being emptied when the sensitive vars are gone — so
+// stale credentials are never left behind. Errors fail the Commit (workflow
+// reconciliation retries), and sensitive data is NEVER written to the
+// ConfigMap as a fallback.
+func (wf *WorkflowContext) syncSensitive(ctx context.Context, cli client.Client) error {
+	if !wf.hasSensitive {
+		return nil
+	}
+	sensStr, err := sets.ToString(wf.sensitiveVars)
+	if err != nil {
+		return err
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            wf.sensitiveStoreName(),
+			Namespace:       wf.store.Namespace,
+			OwnerReferences: wf.store.OwnerReferences,
+			Labels:          wf.store.Labels,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			SecretKeyVars: []byte(sensStr),
+		},
+	}
+	existing := &corev1.Secret{}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Name:      secret.Name,
+		Namespace: secret.Namespace,
+	}, existing); err != nil {
+		if kerrors.IsNotFound(err) {
+			return cli.Create(ctx, secret)
+		}
+		return err
+	}
+	return cli.Patch(ctx, secret, client.MergeFrom(existing.DeepCopy()))
+}
+
 // LoadFromConfigMap recover workflow context from configMap.
 func (wf *WorkflowContext) LoadFromConfigMap(_ context.Context, cm corev1.ConfigMap) error {
 	if wf.store == nil {
@@ -197,6 +318,36 @@ func (wf *WorkflowContext) LoadFromConfigMap(_ context.Context, cm corev1.Config
 	data := cm.Data
 
 	wf.vars = cuecontext.New().CompileString(data[ConfigMapKeyVars])
+	wf.sensitiveVars = cuecontext.New().CompileString("")
+	// In-memory mode stashes sensitive vars inside the (never persisted)
+	// ConfigMap object; recover them on reload.
+	if sens, ok := data[inMemorySensitiveKey]; ok {
+		wf.sensitiveVars = cuecontext.New().CompileString(sens)
+		wf.hasSensitive = true
+	}
+	return nil
+}
+
+// loadSensitiveFromSecret recovers sensitive variables from the companion
+// Secret, if one exists. Absence is not an error: workflows without sensitive
+// outputs never create the Secret.
+func (wf *WorkflowContext) loadSensitiveFromSecret(ctx context.Context) error {
+	if EnableInMemoryContext {
+		return nil
+	}
+	cli := singleton.KubeClient.Get()
+	secret := &corev1.Secret{}
+	if err := cli.Get(ctx, types.NamespacedName{
+		Name:      wf.sensitiveStoreName(),
+		Namespace: wf.store.Namespace,
+	}, secret); err != nil {
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	wf.sensitiveVars = cuecontext.New().CompileString(string(secret.Data[SecretKeyVars]))
+	wf.hasSensitive = true
 	return nil
 }
 
@@ -278,6 +429,7 @@ func newContext(ctx context.Context, ns, name string, owner []metav1.OwnerRefere
 	}
 	var err error
 	wfCtx.vars = cuecontext.New().CompileString("")
+	wfCtx.sensitiveVars = cuecontext.New().CompileString("")
 
 	return wfCtx, err
 }
@@ -316,6 +468,9 @@ func LoadContext(ctx context.Context, ns, name, ctxName string) (Context, error)
 		memoryStore: memCache,
 	}
 	if err := wfCtx.LoadFromConfigMap(ctx, store); err != nil {
+		return nil, err
+	}
+	if err := wfCtx.loadSensitiveFromSecret(ctx); err != nil {
 		return nil, err
 	}
 	return wfCtx, nil
