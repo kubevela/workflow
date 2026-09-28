@@ -35,6 +35,7 @@ import (
 
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks"
+	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/template"
 	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
@@ -152,6 +153,9 @@ func generateTaskRunner(ctx context.Context,
 	taskDiscover types.TaskDiscover,
 	options *types.TaskGeneratorOptions,
 	stepOptions types.StepGeneratorOptions) (types.TaskRunner, error) {
+	if step.ForEach != nil {
+		return generateForEachRunner(ctx, instance, step, taskDiscover, options, stepOptions)
+	}
 	if step.Type == types.WorkflowStepTypeStepGroup {
 		var subTaskRunners []types.TaskRunner
 		for _, subStep := range step.SubSteps {
@@ -193,6 +197,35 @@ func generateTaskRunner(ctx context.Context,
 		return nil, err
 	}
 	return task, nil
+}
+
+// generateForEachRunner wraps a step that has forEach. Its iterations are generated
+// when it runs, since the items may come from an earlier step's output.
+func generateForEachRunner(ctx context.Context,
+	instance *types.WorkflowInstance,
+	step oamv1alpha1.WorkflowStep,
+	taskDiscover types.TaskDiscover,
+	options *types.TaskGeneratorOptions,
+	stepOptions types.StepGeneratorOptions) (types.TaskRunner, error) {
+	options.SubTaskGenerator = func(subStep oamv1alpha1.WorkflowStepBase, id string) (types.TaskRunner, error) {
+		if id == "" {
+			id = rand.RandomString(10)
+		}
+		o := &types.TaskGeneratorOptions{
+			ID:             id,
+			ProcessContext: options.ProcessContext,
+			StepConvertor:  stepOptions.StepConvertor[subStep.Type],
+		}
+		return generateTaskRunner(ctx, instance, oamv1alpha1.WorkflowStep{WorkflowStepBase: subStep}, taskDiscover, o, stepOptions)
+	}
+	options.SubStepExecuteMode = v1alpha1.WorkflowModeDAG
+	if instance.Mode != nil {
+		options.SubStepExecuteMode = instance.Mode.SubSteps
+	}
+	if step.Mode != "" {
+		options.SubStepExecuteMode = step.Mode
+	}
+	return builtin.ForEach(step, options)
 }
 
 func generateStepID(status v1alpha1.WorkflowRunStatus, name string) string {

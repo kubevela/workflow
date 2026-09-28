@@ -25,6 +25,7 @@ import (
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/utils"
 )
 
@@ -67,6 +68,13 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 			}
 		}
 	}
+	// Name the steps where the user wrote them: inline, or in the referenced Workflow.
+	stepsPath := field.NewPath("spec", "workflowSpec", "steps")
+	if wr.Spec.WorkflowSpec == nil {
+		stepsPath = field.NewPath("spec", "workflowRef").Key(wr.Spec.WorkflowRef).Child("steps")
+	}
+	// A WorkflowRun has nothing to resolve a $( ) expression, so forEach.items must be a list.
+	errs = append(errs, builtin.ValidateForEachSteps(stepsPath, steps, false)...)
 	return errs
 }
 
