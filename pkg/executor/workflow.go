@@ -40,6 +40,7 @@ import (
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 	"github.com/kubevela/workflow/pkg/providers/legacy/workspace"
+	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
 )
@@ -244,6 +245,10 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	minTime := maxTime
 	for _, step := range w.instance.Steps {
 		minTime = handleSuspendBackoffTime(w.wfCtx, step, stepStatus[step.Name], minTime)
+		if step.ForEach != nil {
+			minTime = forEachSuspendBackoffTime(w.wfCtx, step, w.instance.Status, minTime)
+			continue
+		}
 		for _, sub := range step.SubSteps {
 			minTime = handleSuspendBackoffTime(w.wfCtx, oamv1alpha1.WorkflowStep{
 				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
@@ -257,6 +262,26 @@ func (w *workflowExecutor) GetSuspendBackoffWaitTime() time.Duration {
 	}
 	if minTime == maxTime {
 		return 0
+	}
+	return minTime
+}
+
+// forEachSuspendBackoffTime visits a forEach step's passes, which only its status lists:
+// the spec holds the body they were expanded from, under other names.
+func forEachSuspendBackoffTime(wfCtx wfContext.Context, step oamv1alpha1.WorkflowStep, status v1alpha1.WorkflowRunStatus, minTime time.Duration) time.Duration {
+	for _, ss := range status.Steps {
+		if ss.Name != step.Name {
+			continue
+		}
+		for _, sub := range ss.SubStepsStatus {
+			template, ok := builtin.IterationTemplate(step, sub.Name)
+			if !ok {
+				continue
+			}
+			minTime = handleSuspendBackoffTime(wfCtx, oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: sub.Name, Type: sub.Type, Timeout: template.Timeout},
+			}, sub, minTime)
+		}
 	}
 	return minTime
 }
@@ -345,6 +370,13 @@ func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfCont
 	wfCtx, err := wfContext.NewContext(ctx, w.instance.Namespace, name, w.instance.ChildOwnerReferences)
 	if err != nil {
 		return nil, errors.WithMessage(err, "new context")
+	}
+	// A new run reuses the context ConfigMap but gives every step a new ID, so a list a
+	// forEach pinned under an earlier run's ID can never be read again.
+	for key := range wfCtx.GetStore().Data {
+		if builtin.IsPinnedItemsKey(key) {
+			wfCtx.DeleteMutableValue(key)
+		}
 	}
 
 	status.ContextBackend = wfCtx.StoreRef()
@@ -878,6 +910,10 @@ func (e *engine) GetCommonStepStatus(stepName string) v1alpha1.StepStatus {
 
 func (e *engine) SetParentRunner(name string) {
 	e.parentRunner = name
+}
+
+func (e *engine) SetDependsOn(name string, dependsOn []string) {
+	e.stepDependsOn[name] = dependsOn
 }
 
 func (e *engine) GetOperation() *types.Operation {

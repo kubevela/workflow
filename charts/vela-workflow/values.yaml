@@ -38,6 +38,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.backoff.maxTime.waitState The max backoff time of workflow in a wait condition
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
+## @param workflow.step.forEachMaxItems The max number of items a forEach step may iterate
 ## @param workflow.groupByLabel The label used to group workflow record
 
 workflow:
@@ -78,6 +79,7 @@ workflow:
       failedState: 300
   step:
     errorRetryTimes: 10
+    forEachMaxItems: 50
   groupByLabel: "pipeline.oam.dev/name"
 
 ## @section KubeVela workflow backup parameters
