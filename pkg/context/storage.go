@@ -17,10 +17,13 @@ limitations under the License.
 package context
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+
+	"github.com/kubevela/pkg/cache"
 )
 
 var (
@@ -28,53 +31,68 @@ var (
 	EnableInMemoryContext = false
 )
 
+// inMemoryContextStorage holds live workflow contexts, not a disposable cache:
+// entries are stored without expiration and are only removed explicitly.
 type inMemoryContextStorage struct {
+	// mu serializes writes so that GetOrCreateInMemoryContext is atomic.
 	mu       sync.Mutex
-	contexts map[string]*v1.ConfigMap
+	contexts cache.Cache[string]
 }
 
 // MemStore store in-memory context
 var MemStore = &inMemoryContextStorage{
-	contexts: map[string]*v1.ConfigMap{},
+	contexts: cache.NewMemoryCacheStore[string](context.Background()),
 }
 
-func (o *inMemoryContextStorage) getKey(cm *v1.ConfigMap) string {
-	ns := cm.GetNamespace()
+func contextKey(name, ns string) string {
 	if ns == "" {
 		ns = "default"
 	}
-	name := cm.GetName()
 	return ns + "/" + name
 }
 
-func (o *inMemoryContextStorage) GetOrCreateInMemoryContext(cm *v1.ConfigMap) {
-	if obj := o.GetInMemoryContext(cm.Name, cm.Namespace); obj != nil {
-		obj.DeepCopyInto(cm)
-	} else {
-		o.CreateInMemoryContext(cm)
+func (o *inMemoryContextStorage) getKey(cm *v1.ConfigMap) string {
+	return contextKey(cm.GetName(), cm.GetNamespace())
+}
+
+func (o *inMemoryContextStorage) load(key string) *v1.ConfigMap {
+	if obj, ok := o.contexts.Get(key); ok {
+		return obj.(*v1.ConfigMap)
 	}
+	return nil
+}
+
+func (o *inMemoryContextStorage) GetOrCreateInMemoryContext(cm *v1.ConfigMap) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if obj := o.load(o.getKey(cm)); obj != nil {
+		obj.DeepCopyInto(cm)
+		return
+	}
+	cm.Data = map[string]string{}
+	o.contexts.Put(o.getKey(cm), cm, 0)
 }
 
 func (o *inMemoryContextStorage) GetInMemoryContext(name, ns string) *v1.ConfigMap {
-	return o.contexts[ns+"/"+name]
+	return o.load(contextKey(name, ns))
 }
 
 func (o *inMemoryContextStorage) CreateInMemoryContext(cm *v1.ConfigMap) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	cm.Data = map[string]string{}
-	o.contexts[o.getKey(cm)] = cm
+	o.contexts.Put(o.getKey(cm), cm, 0)
 }
 
 func (o *inMemoryContextStorage) UpdateInMemoryContext(cm *v1.ConfigMap) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	o.contexts[o.getKey(cm)] = cm
+	o.contexts.Put(o.getKey(cm), cm, 0)
 }
 
 func (o *inMemoryContextStorage) DeleteInMemoryContext(appName string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	key := fmt.Sprintf("workflow-%s-context", appName)
-	delete(o.contexts, key)
+	o.contexts.Delete(key)
 }
