@@ -82,27 +82,34 @@ func TestGetOrCreateInMemoryContext(t *testing.T) {
 	r.NotSame(created, loaded, "existing context should be copied, not shared")
 }
 
-func TestInMemoryContextStorageConcurrentAccess(t *testing.T) {
+func TestInMemoryContextStorageConcurrentGetOrCreate(t *testing.T) {
 	r := require.New(t)
 	store := newStoreForTest()
 
 	const workers = 16
+	start := make(chan struct{})
+	results := make([]*corev1.ConfigMap, workers)
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			name := fmt.Sprintf("workflow-app-%d-context", i%4)
-			store.GetOrCreateInMemoryContext(newConfigMap(name, "prod"))
-			store.UpdateInMemoryContext(newConfigMap(name, "prod"))
-			_ = store.GetInMemoryContext(name, "prod")
-			store.DeleteInMemoryContext(fmt.Sprintf("app-%d", i%4))
+			cm := newConfigMap("workflow-app-context", "prod")
+			cm.Annotations = map[string]string{"worker": fmt.Sprint(i)}
+			<-start
+			store.GetOrCreateInMemoryContext(cm)
+			results[i] = cm
 		}(i)
 	}
+	close(start)
 	wg.Wait()
 
-	store.GetOrCreateInMemoryContext(newConfigMap("workflow-app-0-context", "prod"))
-	r.NotNil(store.GetInMemoryContext("workflow-app-0-context", "prod"))
+	stored := store.GetInMemoryContext("workflow-app-context", "prod")
+	r.NotNil(stored)
+	winner := stored.Annotations["worker"]
+	for i, cm := range results {
+		r.Equal(winner, cm.Annotations["worker"], "worker %d did not get the stored context", i)
+	}
 }
 
 func TestWorkflowContextInMemory(t *testing.T) {
