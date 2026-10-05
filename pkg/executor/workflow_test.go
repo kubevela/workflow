@@ -19,6 +19,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"time"
 
@@ -1626,6 +1627,52 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetBackoffWaitTime().Seconds()))).Should(Equal(30))
 	})
 
+	It("Test cases do not share a workflow context", func() {
+		run := func(step oamv1alpha1.WorkflowStep) *workflowExecutor {
+			instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{step})
+			ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+			wf := New(instance)
+			_, err := wf.ExecuteRunners(ctx, runners)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = wf.ExecuteRunners(ctx, runners)
+			Expect(err).ToNot(HaveOccurred())
+			return wf.(*workflowExecutor)
+		}
+		run(oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Name:       "s1",
+			Type:       "suspend",
+			Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"30s"}`)},
+		}})
+		wf := run(oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s1", Type: "suspend"}})
+		Expect(wf.GetSuspendBackoffWaitTime()).Should(BeZero(), "the first case's resume time must not reach the second")
+	})
+
+	It("Test get suspend backoff time takes a partly elapsed timeout", func() {
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "group", Type: "step-group"},
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
+				{Name: "sub1", Type: "suspend", Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"30s"}`)}},
+				{Name: "sub2", Type: "suspend", Timeout: "1m"},
+			},
+		}})
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+		wf := New(instance)
+		_, err := wf.ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		_, err = wf.ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+
+		// sub2 started 50s ago, so 10s of its minute remain: sooner than sub1's 30s.
+		subs := instance.Status.Steps[0].SubStepsStatus
+		Expect(subs).Should(HaveLen(2))
+		for i := range subs {
+			if subs[i].Name == "sub2" {
+				subs[i].FirstExecuteTime = metav1.NewTime(time.Now().Add(-50 * time.Second))
+			}
+		}
+		Expect(int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))).Should(Equal(10))
+	})
+
 	It("Test get suspend backoff time", func() {
 		By("if there's no timeout and duration, return 0")
 		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{
@@ -2229,19 +2276,25 @@ var _ = Describe("Test Workflow", func() {
 	})
 })
 
+// testCases numbers the instances makeTestCase builds. The workflow context and the
+// step status cache are both keyed by the instance name, so each case gets its own.
+var testCases int
+
 func makeTestCase(steps []oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, []types.TaskRunner) {
+	testCases++
+	name := fmt.Sprintf("app-%d", testCases)
 	instance := &types.WorkflowInstance{
 		WorkflowMeta: types.WorkflowMeta{
 			ChildOwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: v1alpha1.SchemeGroupVersion.String(),
 					Kind:       v1alpha1.WorkflowRunKind,
-					Name:       "app",
+					Name:       name,
 					UID:        "test-uid",
 					Controller: ptr.To(true),
 				},
 			},
-			Name:      "app",
+			Name:      name,
 			Namespace: "default",
 		},
 		Steps:  steps,

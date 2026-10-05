@@ -273,7 +273,7 @@ func handleSuspendBackoffTime(wfCtx wfContext.Context, step oamv1alpha1.Workflow
 		timeout := status.FirstExecuteTime.Add(duration)
 		if time.Now().Before(timeout) {
 			d := time.Until(timeout)
-			if duration < minTime {
+			if d < minTime {
 				minTime = d
 			}
 		}
