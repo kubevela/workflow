@@ -35,6 +35,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
+	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
@@ -376,6 +377,15 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 
 // CleanStatusFromStep cleans status and context data from a specified step
 func CleanStatusFromStep(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode oamv1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
+	for _, step := range steps {
+		if step.ForEach == nil {
+			continue
+		}
+		if index, ok := builtin.IterationIndex(step, stepName); ok {
+			return cleanStatusFromIteration(steps, stepStatus, mode, contextCM, step, index, stepName)
+		}
+	}
+	originalStatus := append([]v1alpha1.WorkflowStepStatus(nil), stepStatus...)
 	found := false
 	dependency := make([]string, 0)
 	for i, step := range stepStatus {
@@ -409,33 +419,138 @@ func CleanStatusFromStep(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1
 		return nil, nil, fmt.Errorf("failed step %s not found", stepName)
 	}
 	if contextCM != nil && contextCM.Data != nil {
-		v := cuecontext.New().CompileString(contextCM.Data[wfContext.ConfigMapKeyVars])
-		s, err := clearContextVars(steps, v, stepName, dependency)
-		if err != nil {
+		restarted := append([]string{stepName}, dependency...)
+		drop := either(outputsOf(steps, restarted), dropLoops(steps, restarted, originalStatus, contextCM))
+		if err := dropContextVars(contextCM, drop); err != nil {
 			return nil, nil, err
 		}
-		contextCM.Data[wfContext.ConfigMapKeyVars] = s
 	}
 	return stepStatus, contextCM, nil
 }
 
-// nolint:staticcheck
-func clearContextVars(steps []oamv1alpha1.WorkflowStep, v cue.Value, stepName string, dependency []string) (string, error) {
+// cleanStatusFromIteration restarts a forEach step from one of its passes: that pass
+// reruns from the start, and in StepByStep order every pass after it too. The loop keeps
+// its ID and so its pinned list, and reruns the same items.
+func cleanStatusFromIteration(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode oamv1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, loop oamv1alpha1.WorkflowStep, index int, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
+	rerun := func(i int) bool {
+		if loop.ForEach.Mode == v1alpha1.WorkflowModeDAG {
+			return i == index
+		}
+		return i >= index
+	}
+	found := false
+	for i := range stepStatus {
+		if stepStatus[i].Name != loop.Name {
+			continue
+		}
+		kept := make([]v1alpha1.StepStatus, 0, len(stepStatus[i].SubStepsStatus))
+		for _, sub := range stepStatus[i].SubStepsStatus {
+			if sub.Name == stepName {
+				if sub.Phase != v1alpha1.WorkflowStepPhaseFailed {
+					return nil, nil, fmt.Errorf("can not restart from a non-failed step")
+				}
+				found = true
+			}
+			if k, ok := builtin.IterationIndex(loop, sub.Name); ok && rerun(k) {
+				continue
+			}
+			kept = append(kept, sub)
+		}
+		stepStatus[i].SubStepsStatus = kept
+		stepStatus[i].Phase = v1alpha1.WorkflowStepPhaseRunning
+		stepStatus[i].Reason = ""
+		stepStatus[i].Message = ""
+	}
+	if !found {
+		return nil, nil, fmt.Errorf("failed step %s not found", stepName)
+	}
+	dependency := getStepDependency(steps, loop.Name, mode.Steps == v1alpha1.WorkflowModeDAG)
+	originalStatus := append([]v1alpha1.WorkflowStepStatus(nil), stepStatus...)
+	stepStatus = deleteStepStatus(dependency, stepStatus, loop.Name, true)
+	if contextCM != nil && contextCM.Data != nil {
+		// Later steps rerun from scratch; a later loop among them gets a new ID too.
+		drop := either(either(outputsOf(steps, dependency), dropLoops(steps, dependency, originalStatus, contextCM)), func(label string) bool {
+			if k, ok := builtin.IterationVarIndex(loop, label); ok {
+				return rerun(k)
+			}
+			return stringsContain(builtin.CollectedOutputs(loop), label)
+		})
+		if err := dropContextVars(contextCM, drop); err != nil {
+			return nil, nil, err
+		}
+	}
+	return stepStatus, contextCM, nil
+}
+
+// dropLoops matches every variable the named forEach steps keep for their passes, and
+// removes their pinned lists from the context: each reruns under a new ID, so its list
+// is resolved again and nothing its last run wrote may be read.
+func dropLoops(steps []oamv1alpha1.WorkflowStep, names []string, status []v1alpha1.WorkflowStepStatus, contextCM *corev1.ConfigMap) func(string) bool {
+	var loops []oamv1alpha1.WorkflowStep
+	for _, step := range steps {
+		if step.ForEach == nil || !stringsContain(names, step.Name) {
+			continue
+		}
+		loops = append(loops, step)
+		if id := stepStatusID(status, step.Name); id != "" {
+			delete(contextCM.Data, builtin.PinnedItemsKey(id))
+		}
+	}
+	return func(label string) bool {
+		for _, loop := range loops {
+			if _, ok := builtin.IterationVarIndex(loop, label); ok || stringsContain(builtin.CollectedOutputs(loop), label) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func stepStatusID(status []v1alpha1.WorkflowStepStatus, name string) string {
+	for _, s := range status {
+		if s.Name == name {
+			return s.ID
+		}
+	}
+	return ""
+}
+
+// outputsOf matches the variables the named steps, or their sub-steps, declare as outputs.
+func outputsOf(steps []oamv1alpha1.WorkflowStep, names []string) func(string) bool {
 	outputs := make([]string, 0)
 	for _, step := range steps {
-		if step.Name == stepName || stringsContain(dependency, step.Name) {
+		if stringsContain(names, step.Name) {
 			for _, output := range step.Outputs {
 				outputs = append(outputs, output.Name)
 			}
 		}
 		for _, sub := range step.SubSteps {
-			if sub.Name == stepName || stringsContain(dependency, sub.Name) {
+			if stringsContain(names, sub.Name) {
 				for _, output := range sub.Outputs {
 					outputs = append(outputs, output.Name)
 				}
 			}
 		}
 	}
+	return func(label string) bool { return stringsContain(outputs, label) }
+}
+
+func either(a, b func(string) bool) func(string) bool {
+	return func(label string) bool { return a(label) || b(label) }
+}
+
+func dropContextVars(contextCM *corev1.ConfigMap, drop func(string) bool) error {
+	v := cuecontext.New().CompileString(contextCM.Data[wfContext.ConfigMapKeyVars])
+	s, err := clearContextVars(v, drop)
+	if err != nil {
+		return err
+	}
+	contextCM.Data[wfContext.ConfigMapKeyVars] = s
+	return nil
+}
+
+// nolint:staticcheck
+func clearContextVars(v cue.Value, drop func(label string) bool) (string, error) {
 	node := v.Syntax(cue.ResolveReferences(true))
 	x, ok := node.(*ast.StructLit)
 	if !ok {
@@ -445,7 +560,7 @@ func clearContextVars(steps []oamv1alpha1.WorkflowStep, v cue.Value, stepName st
 	for i := range x.Elts {
 		if field, ok := x.Elts[i].(*ast.Field); ok {
 			label := strings.Trim(sets.LabelStr(field.Label), `"`)
-			if !stringsContain(outputs, label) {
+			if !drop(label) {
 				element = append(element, field)
 			}
 		}

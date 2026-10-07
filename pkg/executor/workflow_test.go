@@ -34,6 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -242,6 +243,105 @@ var _ = Describe("Test Workflow", func() {
 				},
 			}},
 		})).Should(BeEquivalentTo(""))
+	})
+
+	It("Workflow test forEach", func() {
+		items := func(v string) *apiextensionsv1.JSON { return &apiextensionsv1.JSON{Raw: []byte(v)} }
+		single := func(typ string, mode oamv1alpha1.WorkflowMode) oamv1alpha1.WorkflowStep {
+			return oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "loop", Type: typ},
+				ForEach:          &oamv1alpha1.ForEach{Items: items(`["a","b"]`), Mode: mode},
+			}
+		}
+		group := func(forEachMode, groupMode oamv1alpha1.WorkflowMode, body ...oamv1alpha1.WorkflowStepBase) oamv1alpha1.WorkflowStep {
+			return oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "loop", Type: "step-group"},
+				Mode:             groupMode,
+				ForEach:          &oamv1alpha1.ForEach{Items: items(`["a","b"]`), Mode: forEachMode},
+				SubSteps:         body,
+			}
+		}
+		subPhases := func(status v1alpha1.WorkflowRunStatus) map[string]v1alpha1.WorkflowStepPhase {
+			phases := map[string]v1alpha1.WorkflowStepPhase{}
+			for _, sub := range status.Steps[1].SubStepsStatus {
+				phases[sub.Name] = sub.Phase
+			}
+			return phases
+		}
+		run := func(steps ...oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, v1alpha1.WorkflowRunPhase) {
+			instance, runners := makeTestCase(append([]oamv1alpha1.WorkflowStep{
+				{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s1", Type: "success"}},
+			}, steps...))
+			state, err := New(instance).ExecuteRunners(monitorContext.NewTraceContext(context.Background(), "test-app"), runners)
+			Expect(err).ToNot(HaveOccurred())
+			return instance, state
+		}
+
+		By("Test a single step runs once per item")
+		instance, state := run(single("success", ""), oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s3", Type: "success"}})
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+		cleanStepTimeStamp(&instance.Status)
+		Expect(cmp.Diff(instance.Status.Steps[1], v1alpha1.WorkflowStepStatus{
+			StepStatus: v1alpha1.StepStatus{ID: "loop", Name: "loop", Type: "success", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+			SubStepsStatus: []v1alpha1.StepStatus{
+				{Name: "loop-0", Type: "success", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+				{Name: "loop-1", Type: "success", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+			},
+		})).Should(BeEquivalentTo(""))
+		Expect(instance.Status.Steps[2].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSucceeded))
+
+		By("Test step mode holds the next item while one is running")
+		instance, state = run(single("running", ""))
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateExecuting))
+		Expect(instance.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0": v1alpha1.WorkflowStepPhaseRunning,
+		}))
+
+		By("Test dag mode runs every item at once")
+		instance, _ = run(single("running", v1alpha1.WorkflowModeDAG))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0": v1alpha1.WorkflowStepPhaseRunning,
+			"loop-1": v1alpha1.WorkflowStepPhaseRunning,
+		}))
+
+		By("Test a failed item fails the loop and skips the rest")
+		instance, state = run(single("terminate", ""), oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s3", Type: "success"}})
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateTerminated))
+		Expect(instance.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0": v1alpha1.WorkflowStepPhaseFailed,
+			"loop-1": v1alpha1.WorkflowStepPhaseSkipped,
+		}))
+
+		By("Test items in dag, sub-steps in step order within each item")
+		instance, _ = run(group(v1alpha1.WorkflowModeDAG, v1alpha1.WorkflowModeStep,
+			oamv1alpha1.WorkflowStepBase{Name: "deploy", Type: "running"},
+			oamv1alpha1.WorkflowStepBase{Name: "verify", Type: "success"}))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0-deploy": v1alpha1.WorkflowStepPhaseRunning,
+			"loop-1-deploy": v1alpha1.WorkflowStepPhaseRunning,
+		}))
+
+		By("Test items in step order, sub-steps in dag within each item")
+		instance, _ = run(group("", v1alpha1.WorkflowModeDAG,
+			oamv1alpha1.WorkflowStepBase{Name: "deploy", Type: "running"},
+			oamv1alpha1.WorkflowStepBase{Name: "verify", Type: "success"}))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0-deploy": v1alpha1.WorkflowStepPhaseRunning,
+			"loop-0-verify": v1alpha1.WorkflowStepPhaseSucceeded,
+		}))
+
+		By("Test a body dependsOn that fails skips its dependent")
+		instance, _ = run(group(v1alpha1.WorkflowModeDAG, v1alpha1.WorkflowModeDAG,
+			oamv1alpha1.WorkflowStepBase{Name: "deploy", Type: "failed-after-retries"},
+			oamv1alpha1.WorkflowStepBase{Name: "verify", Type: "success", DependsOn: []string{"deploy"}}))
+		Expect(subPhases(instance.Status)).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"loop-0-deploy": v1alpha1.WorkflowStepPhaseFailed,
+			"loop-0-verify": v1alpha1.WorkflowStepPhaseSkipped,
+			"loop-1-deploy": v1alpha1.WorkflowStepPhaseFailed,
+			"loop-1-verify": v1alpha1.WorkflowStepPhaseSkipped,
+		}))
 	})
 
 	It("Workflow test for timeout", func() {
@@ -1627,6 +1727,159 @@ var _ = Describe("Test Workflow", func() {
 		Expect(int(math.Ceil(wf.GetBackoffWaitTime().Seconds()))).Should(Equal(30))
 	})
 
+	It("Test forEach under EnableSuspendOnFailure behaves as the step-group it expands to", func() {
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+		run := func(step oamv1alpha1.WorkflowStep) (v1alpha1.WorkflowRunPhase, v1alpha1.WorkflowRunStatus) {
+			instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{step})
+			state, err := New(instance).ExecuteRunners(ctx, runners)
+			Expect(err).ToNot(HaveOccurred())
+			return state, instance.Status
+		}
+		loopState, loop := run(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "loop", Type: "failed-after-retries"},
+			ForEach:          &oamv1alpha1.ForEach{Items: &apiextensionsv1.JSON{Raw: []byte(`["a","b"]`)}},
+		})
+		groupState, group := run(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "loop", Type: "step-group"},
+			Mode:             v1alpha1.WorkflowModeStep,
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
+				{Name: "loop-0", Type: "failed-after-retries"},
+				{Name: "loop-1", Type: "failed-after-retries"},
+			},
+		})
+		Expect(loopState).Should(Equal(groupState))
+		Expect(loop.Message).Should(Equal(group.Message))
+		Expect(loop.Steps[0].Phase).Should(Equal(group.Steps[0].Phase))
+		Expect(subPhasesOf(loop.Steps[0])).Should(Equal(subPhasesOf(group.Steps[0])))
+	})
+
+	It("Test a new run drops the lists earlier runs pinned", func() {
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+		loop := oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "loop", Type: "success"},
+			ForEach:          &oamv1alpha1.ForEach{Items: &apiextensionsv1.JSON{Raw: []byte(`["a","b"]`)}},
+		}
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{loop})
+		_, err := New(instance).ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		store := instance.Status.ContextBackend.Name
+		wfCtx, err := wfContext.LoadContext(ctx, instance.Namespace, instance.Name, store)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(wfCtx.GetStore().Data).Should(HaveKey(builtin.PinnedItemsKey("loop")))
+
+		// the next run of the same workflow: fresh status, the same context ConfigMap
+		next, runners := makeTestCase([]oamv1alpha1.WorkflowStep{{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s1", Type: "success"}}})
+		next.Name = instance.Name
+		next.ChildOwnerReferences = instance.ChildOwnerReferences
+		_, err = New(next).ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(next.Status.ContextBackend.Name).Should(Equal(store))
+		wfCtx, err = wfContext.LoadContext(ctx, next.Namespace, next.Name, store)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(wfCtx.GetStore().Data).ShouldNot(HaveKey(builtin.PinnedItemsKey("loop")))
+	})
+
+	It("Test forEach reports a suspended or timed out loop", func() {
+		items := &apiextensionsv1.JSON{Raw: []byte(`["a","b","c"]`)}
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+
+		By("a suspended item suspends the loop, not only the last one")
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "wait", Type: "suspend"},
+			ForEach:          &oamv1alpha1.ForEach{Items: items},
+		}})
+		state, err := New(instance).ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSuspending))
+		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSuspending))
+
+		By("a loop past its timeout fails, while an item is still pending")
+		pending = true
+		defer func() { pending = false }()
+		instance, runners = makeTestCase([]oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "wait-for-it", Type: "pending", Timeout: "1m"},
+			ForEach:          &oamv1alpha1.ForEach{Items: items},
+		}})
+		wf := New(instance)
+		_, err = wf.ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseRunning))
+		instance.Status.Steps[0].FirstExecuteTime = metav1.NewTime(time.Now().Add(-2 * time.Minute))
+		_, err = wf.ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseFailed))
+		Expect(instance.Status.Steps[0].Reason).Should(BeEquivalentTo(types.StatusReasonTimeout))
+	})
+
+	It("Test get suspend backoff time inside a forEach", func() {
+		run := func(steps ...oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, WorkflowExecutor) {
+			instance, runners := makeTestCase(steps)
+			ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+			wf := New(instance)
+			_, err := wf.ExecuteRunners(ctx, runners)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = wf.ExecuteRunners(ctx, runners)
+			Expect(err).ToNot(HaveOccurred())
+			return instance, wf
+		}
+		seconds := func(wf WorkflowExecutor) int {
+			return int(math.Ceil(wf.GetSuspendBackoffWaitTime().Seconds()))
+		}
+		backoff := func(steps ...oamv1alpha1.WorkflowStep) int {
+			_, wf := run(steps...)
+			return seconds(wf)
+		}
+		items := &apiextensionsv1.JSON{Raw: []byte(`["a","b"]`)}
+
+		By("a looped suspend step with a duration")
+		Expect(backoff(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+				Name:       "wait",
+				Type:       "suspend",
+				Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"30s"}`)},
+			},
+			ForEach: &oamv1alpha1.ForEach{Items: items},
+		})).Should(Equal(30))
+
+		By("a suspend sub-step with a duration in a looped group")
+		Expect(backoff(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: "step-group"},
+			ForEach:          &oamv1alpha1.ForEach{Items: items},
+			SubSteps: []oamv1alpha1.WorkflowStepBase{{
+				Name:       "wait",
+				Type:       "suspend",
+				Properties: &runtime.RawExtension{Raw: []byte(`{"duration":"30s"}`)},
+			}},
+		})).Should(Equal(30))
+
+		By("a suspend sub-step's own timeout in a looped group")
+		Expect(backoff(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: "step-group"},
+			ForEach:          &oamv1alpha1.ForEach{Items: items},
+			SubSteps:         []oamv1alpha1.WorkflowStepBase{{Name: "wait", Type: "suspend", Timeout: "1m"}},
+		})).Should(Equal(60))
+
+		By("a loop behind another step reads only its own passes")
+		looped := oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "wait", Type: "suspend", Timeout: "1m"},
+			ForEach:          &oamv1alpha1.ForEach{Items: items},
+		}
+		Expect(backoff(oamv1alpha1.WorkflowStep{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "first", Type: "success"},
+		}, looped)).Should(Equal(60))
+
+		By("a pass the body does not hold is not read")
+		instance, wf := run(looped)
+		loop := &instance.Status.Steps[0]
+		loop.SubStepsStatus = append(loop.SubStepsStatus, v1alpha1.StepStatus{
+			Name:             "wait-0-renamed",
+			Phase:            v1alpha1.WorkflowStepPhaseSuspending,
+			FirstExecuteTime: metav1.NewTime(time.Now().Add(-59 * time.Second)),
+		})
+		Expect(seconds(wf)).Should(Equal(60))
+	})
+
 	It("Test cases do not share a workflow context", func() {
 		run := func(step oamv1alpha1.WorkflowStep) *workflowExecutor {
 			instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{step})
@@ -2302,6 +2555,10 @@ func makeTestCase(steps []oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, []
 	}
 	runners := []types.TaskRunner{}
 	for _, step := range steps {
+		if step.ForEach != nil {
+			runners = append(runners, makeForEachRunner(step))
+			continue
+		}
 		if step.SubSteps != nil {
 			subStepRunners := []types.TaskRunner{}
 			for _, subStep := range step.SubSteps {
@@ -2319,6 +2576,30 @@ func makeTestCase(steps []oamv1alpha1.WorkflowStep) (*types.WorkflowInstance, []
 }
 
 var pending bool
+
+func subPhasesOf(step v1alpha1.WorkflowStepStatus) map[string]v1alpha1.WorkflowStepPhase {
+	phases := map[string]v1alpha1.WorkflowStepPhase{}
+	for _, sub := range step.SubStepsStatus {
+		phases[sub.Name] = sub.Phase
+	}
+	return phases
+}
+
+func makeForEachRunner(step oamv1alpha1.WorkflowStep) types.TaskRunner {
+	mode := step.Mode
+	if mode == "" {
+		mode = v1alpha1.WorkflowModeDAG
+	}
+	loop, _ := builtin.ForEach(step, &types.TaskGeneratorOptions{
+		ID:                 step.Name,
+		ProcessContext:     process.NewContext(process.ContextData{}),
+		SubStepExecuteMode: mode,
+		SubTaskGenerator: func(sub oamv1alpha1.WorkflowStepBase, _ string) (types.TaskRunner, error) {
+			return makeRunner(oamv1alpha1.WorkflowStep{WorkflowStepBase: sub}, nil), nil
+		},
+	})
+	return loop
+}
 
 func makeRunner(step oamv1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner) types.TaskRunner {
 	var run func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error)
@@ -2405,7 +2686,7 @@ func makeRunner(step oamv1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner
 			}, &types.Operation{}, err
 		}
 	case "step-group":
-		group, _ := builtin.StepGroup(step, &types.TaskGeneratorOptions{SubTaskRunners: subTaskRunners, ProcessContext: process.NewContext(process.ContextData{})})
+		group, _ := builtin.StepGroup(step, &types.TaskGeneratorOptions{SubTaskRunners: subTaskRunners, SubStepExecuteMode: step.Mode, ProcessContext: process.NewContext(process.ContextData{})})
 		run = group.Run
 	case "running":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {

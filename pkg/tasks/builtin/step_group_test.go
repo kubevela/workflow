@@ -42,6 +42,8 @@ func (e *testEngine) GetCommonStepStatus(stepName string) v1alpha1.StepStatus {
 func (e *testEngine) SetParentRunner(name string) {
 }
 
+func (e *testEngine) SetDependsOn(string, []string) {}
+
 func (e *testEngine) GetOperation() *types.Operation {
 	return e.operation
 }

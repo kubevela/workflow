@@ -79,6 +79,9 @@ type Engine interface {
 	GetCommonStepStatus(stepName string) v1alpha1.StepStatus
 	SetParentRunner(name string)
 	GetOperation() *Operation
+	// SetDependsOn records the dependsOn of a step generated at run time, which the
+	// workflow spec does not list.
+	SetDependsOn(name string, dependsOn []string)
 }
 
 // TaskRunOptions is the options for task run
@@ -138,6 +141,9 @@ type TaskGeneratorOptions struct {
 	SubTaskRunners     []TaskRunner
 	SubStepExecuteMode oamv1alpha1.WorkflowMode
 	ProcessContext     process.Context
+	// SubTaskGenerator builds a runner for a sub-step that only exists at run time,
+	// such as one iteration of a for-each body.
+	SubTaskGenerator func(step oamv1alpha1.WorkflowStepBase, id string) (TaskRunner, error)
 }
 
 // StepGeneratorOptions is the options for generate step.
@@ -227,6 +233,9 @@ const (
 )
 
 var (
+	// MaxForEachItems caps the iterations of a forEach step, since every iteration is
+	// recorded in the run's status object.
+	MaxForEachItems = 50
 	// MaxWorkflowStepErrorRetryTimes is the max retry times of the failed workflow step.
 	MaxWorkflowStepErrorRetryTimes = 10
 	// MaxWorkflowWaitBackoffTime is the max time to wait before reconcile wait workflow again

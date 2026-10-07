@@ -41,6 +41,14 @@ func WithGroupName(name string) StepMetaKV {
 	}
 }
 
+// WithLoop return the for-each item and index of the step
+func WithLoop(item interface{}, index int) StepMetaKV {
+	return StepMetaKV{
+		Key:   model.ContextLoop,
+		Value: map[string]interface{}{"item": item, "index": index},
+	}
+}
+
 // WithSpanID return spanID of the step
 func WithSpanID(id string) StepMetaKV {
 	return StepMetaKV{
