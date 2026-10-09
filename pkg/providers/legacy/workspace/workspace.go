@@ -148,7 +148,7 @@ func Suspend(_ context.Context, params *SuspendParams) (*any, error) {
 	stepID := fmt.Sprint(pCtx.GetData(model.ContextStepSessionID))
 	timestamp := wfCtx.GetMutableValue(stepID, ResumeTimeStamp)
 
-	var msg string
+	msg := params.Params.Message
 	if msg == "" {
 		msg = fmt.Sprintf("Suspended by field %s", params.FieldLabel)
 	}
