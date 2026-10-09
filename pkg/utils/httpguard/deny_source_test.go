@@ -415,6 +415,15 @@ type stubRegistration struct{}
 func (stubRegistration) HasSynced() bool { return true }
 func (stubRegistration) Remove() error   { return nil }
 
+func (s stubRegistration) HasSyncedChecker() toolscache.DoneChecker { return s }
+func (stubRegistration) Name() string                               { return "stubRegistration" }
+
+func (stubRegistration) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
+}
+
 func (s *stubInformer) AddEventHandler(_ toolscache.ResourceEventHandler) (toolscache.ResourceEventHandlerRegistration, error) {
 	return stubRegistration{}, s.addErr
 }

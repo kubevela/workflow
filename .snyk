@@ -1,0 +1,52 @@
+# Snyk (https://snyk.io) policy file, used to ignore false positives.
+version: v1.25.1
+ignore:
+  SNYK-GOLANG-GITHUBCOMSIGSTORETIMESTAMPAUTHORITYPKGGENERATEDRESTAPI-17744445:
+    - '*':
+        reason: >-
+          False positive. timestamp-authority resolves to v2.1.4 (go.mod replace), which already contains both fix commits 506ec57 (sigstore/timestamp-authority#1374) and 58ae149 (#1375). Only reached through crossplane-runtime; workflow does not build or run the TSA server.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNPKGOCI-6595950:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNPKGOCI-6596517:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNPKGCOSIGN-6596513:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNINTERNALPKGCOSIGN-6595947:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNCMDCOSIGNCLIVERIFY-6595946:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNCMDCOSIGNCLIVERIFY-6596515:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.4 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+  SNYK-GOLANG-GITHUBCOMSIGSTORECOSIGNPKGCOSIGN-6050281:
+    - '*':
+        reason: >-
+          False positive. cosign resolves to github.com/sigstore/cosign/v3 v3.1.3, which descends from the v2.2.1 fix release. Only reached through crossplane-runtime; workflow does not build cosign.
+        expires: 2027-04-09T00:00:00.000Z
+        created: 2026-10-09T00:00:00.000Z
+patch: {}

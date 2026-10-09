@@ -12,7 +12,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= 4.5.5
-CONTROLLER_TOOLS_VERSION ?= v0.18
+CONTROLLER_TOOLS_VERSION ?= v0.22.0
 
 .PHONY: tidy
 tidy:
@@ -43,7 +43,7 @@ ifeq (, $(shell which staticcheck))
 	@{ \
 	set -e ;\
 	echo 'installing honnef.co/go/tools/cmd/staticcheck ' ;\
-	go install honnef.co/go/tools/cmd/staticcheck@v0.5.1 ;\
+	go install honnef.co/go/tools/cmd/staticcheck@v0.8.1 ;\
 	}
 STATICCHECK=$(GOBIN)/staticcheck
 else
@@ -62,7 +62,7 @@ else
 GOIMPORTS=$(shell which goimports)
 endif
 
-GOLANGCILINT_VERSION ?= v1.60.0
+GOLANGCILINT_VERSION ?= v2.14.0
 
 .PHONY: golangci
 golangci:
