@@ -66,6 +66,23 @@ var _ = Describe("#List, called as its schema declares", func() {
 	It("lists without a filter", func() {
 		out := callThroughCUE("list", `#List & {$params: resource: {apiVersion: "v1", kind: "ConfigMap"}}`)
 		Expect(out.LookupPath(cue.ParsePath("$returns.err")).Exists()).To(BeFalse())
-		Expect(out.LookupPath(cue.ParsePath("$returns.values.items")).Exists()).To(BeTrue())
+		items, err := out.LookupPath(cue.ParsePath("$returns.values.items")).List()
+		Expect(err).ToNot(HaveOccurred())
+		var names []string
+		for items.Next() {
+			name, err := items.Value().LookupPath(cue.ParsePath("metadata.name")).String()
+			Expect(err).ToNot(HaveOccurred())
+			names = append(names, name)
+		}
+		Expect(names).To(ContainElements("listed-1", "listed-2"))
+	})
+
+	It("rejects a resource with an empty apiVersion", func() {
+		singleton.KubeClient.Set(k8sClient)
+		v := cuecontext.New().CompileString(GetTemplate() + `
+call: #List & {$params: resource: {apiVersion: "", kind: "ConfigMap"}}`)
+		Expect(v.Err()).ToNot(HaveOccurred())
+		_, err := GetProviders()["list"].Call(context.Background(), v.LookupPath(cue.ParsePath("call")))
+		Expect(err).To(MatchError(ContainSubstring("apiVersion and kind")))
 	})
 })

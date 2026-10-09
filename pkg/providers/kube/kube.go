@@ -294,7 +294,7 @@ type ListReturns = providertypes.Returns[ListReturnVars]
 // List lists CRs from cluster.
 func List(ctx context.Context, params *ListParams) (*ListReturns, error) {
 	workload := params.Params.Resource
-	if workload == nil {
+	if workload == nil || workload.GetAPIVersion() == "" || workload.GetKind() == "" {
 		return nil, fmt.Errorf("list needs $params.resource, naming the apiVersion and kind to list")
 	}
 	list := &unstructured.UnstructuredList{Object: map[string]interface{}{
