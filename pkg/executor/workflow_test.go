@@ -2335,25 +2335,25 @@ func makeRunner(step oamv1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner
 				}
 			}
 			return v1alpha1.StepStatus{
-					Name:   step.Name,
-					Type:   "suspend",
-					ID:     step.Name,
-					Phase:  v1alpha1.WorkflowStepPhaseSuspending,
-					Reason: types.StatusReasonSuspend,
-				}, &types.Operation{
-					Suspend: true,
-				}, nil
+				Name:   step.Name,
+				Type:   "suspend",
+				ID:     step.Name,
+				Phase:  v1alpha1.WorkflowStepPhaseSuspending,
+				Reason: types.StatusReasonSuspend,
+			}, &types.Operation{
+				Suspend: true,
+			}, nil
 		}
 	case "terminate":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
 			return v1alpha1.StepStatus{
-					Name:   step.Name,
-					Type:   "terminate",
-					Phase:  v1alpha1.WorkflowStepPhaseFailed,
-					Reason: types.StatusReasonTerminate,
-				}, &types.Operation{
-					Terminated: true,
-				}, nil
+				Name:   step.Name,
+				Type:   "terminate",
+				Phase:  v1alpha1.WorkflowStepPhaseFailed,
+				Reason: types.StatusReasonTerminate,
+			}, &types.Operation{
+				Terminated: true,
+			}, nil
 		}
 	case "success":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
@@ -2378,13 +2378,13 @@ func makeRunner(step oamv1alpha1.WorkflowStep, subTaskRunners []types.TaskRunner
 	case "failed-after-retries":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {
 			return v1alpha1.StepStatus{
-					Name:   step.Name,
-					Type:   "failed-after-retries",
-					Phase:  v1alpha1.WorkflowStepPhaseFailed,
-					Reason: types.StatusReasonFailedAfterRetries,
-				}, &types.Operation{
-					FailedAfterRetries: true,
-				}, nil
+				Name:   step.Name,
+				Type:   "failed-after-retries",
+				Phase:  v1alpha1.WorkflowStepPhaseFailed,
+				Reason: types.StatusReasonFailedAfterRetries,
+			}, &types.Operation{
+				FailedAfterRetries: true,
+			}, nil
 		}
 	case "error":
 		run = func(ctx wfContext.Context, options *types.TaskRunOptions) (v1alpha1.StepStatus, *types.Operation, error) {

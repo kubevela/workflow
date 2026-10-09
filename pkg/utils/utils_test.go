@@ -121,7 +121,7 @@ func TestGetStepLogConfig(t *testing.T) {
 			name:        "workflow-test-context",
 			step:        "step-test",
 			config:      `{"test": "test"}`,
-			expectedErr: "cannot unmarshal string into Go value of type types.LogConfig",
+			expectedErr: "of type types.LogConfig",
 		},
 		"no config for step": {
 			name:        "workflow-test-context",
