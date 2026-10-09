@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -47,7 +46,7 @@ import (
 
 func TestHttpDo(t *testing.T) {
 	shutdown := make(chan struct{})
-	runMockServer(shutdown)
+	baseURL := runMockServer(shutdown)
 	defer func() {
 		close(shutdown)
 	}()
@@ -61,7 +60,7 @@ func TestHttpDo(t *testing.T) {
 		"hello": {
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/hello",
+				URL:    baseURL + "/hello",
 				Request: &Request{
 					Timeout: "2s",
 				},
@@ -75,7 +74,7 @@ func TestHttpDo(t *testing.T) {
 		"echo": {
 			request: RequestVars{
 				Method: "POST",
-				URL:    "http://127.0.0.1:1229/echo",
+				URL:    baseURL + "/echo",
 				Request: &Request{
 					Body: "I am vela",
 					Header: map[string]string{
@@ -91,7 +90,7 @@ func TestHttpDo(t *testing.T) {
 		"json": {
 			request: RequestVars{
 				Method: "POST",
-				URL:    "http://127.0.0.1:1229/echo",
+				URL:    baseURL + "/echo",
 				Request: &Request{
 					Body: `{"name":"foo","score":100}`,
 					Header: map[string]string{
@@ -107,7 +106,7 @@ func TestHttpDo(t *testing.T) {
 		"timeout": {
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/timeout",
+				URL:    baseURL + "/timeout",
 				Request: &Request{
 					Timeout: "1s",
 				},
@@ -121,7 +120,7 @@ func TestHttpDo(t *testing.T) {
 		"not-timeout": {
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/timeout",
+				URL:    baseURL + "/timeout",
 				Request: &Request{
 					Timeout: "3s",
 				},
@@ -134,7 +133,7 @@ func TestHttpDo(t *testing.T) {
 		"notfound": {
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/notfound",
+				URL:    baseURL + "/notfound",
 				Request: &Request{
 					Timeout: "1s",
 				},
@@ -171,7 +170,7 @@ func TestHttpDo(t *testing.T) {
 		{
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/hello",
+				URL:    baseURL + "/hello",
 				Request: &Request{
 					RateLimiter: &RateLimiter{
 						Limit:  1,
@@ -183,7 +182,7 @@ func TestHttpDo(t *testing.T) {
 		{
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/hello?query=1",
+				URL:    baseURL + "/hello?query=1",
 				Request: &Request{
 					RateLimiter: &RateLimiter{
 						Limit:  1,
@@ -196,7 +195,7 @@ func TestHttpDo(t *testing.T) {
 		{
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/echo",
+				URL:    baseURL + "/echo",
 				Request: &Request{
 					RateLimiter: &RateLimiter{
 						Limit:  1,
@@ -208,7 +207,7 @@ func TestHttpDo(t *testing.T) {
 		{
 			request: RequestVars{
 				Method: "GET",
-				URL:    "http://127.0.0.1:1229/hello?query=2",
+				URL:    baseURL + "/hello?query=2",
 				Request: &Request{
 					RateLimiter: &RateLimiter{
 						Limit:  1,
@@ -233,38 +232,28 @@ func TestHttpDo(t *testing.T) {
 	}
 }
 
-func runMockServer(shutdown chan struct{}) {
-	http.HandleFunc("/timeout", func(w http.ResponseWriter, req *http.Request) {
+func runMockServer(shutdown chan struct{}) string {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/timeout", func(w http.ResponseWriter, req *http.Request) {
 		time.Sleep(time.Second * 2)
 		_, _ = w.Write([]byte("hello"))
 	})
-	http.HandleFunc("/hello", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/hello", func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte("hello"))
 	})
-	http.HandleFunc("/echo", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/echo", func(w http.ResponseWriter, req *http.Request) {
 		bt, _ := io.ReadAll(req.Body)
 		_, _ = w.Write(bt)
 	})
-	http.HandleFunc("/notfound", func(w http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc("/notfound", func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(404)
 	})
-	srv := &http.Server{Addr: ":1229"}
-	go srv.ListenAndServe() //nolint
+	srv := httptest.NewServer(mux)
 	go func() {
 		<-shutdown
 		srv.Close()
 	}()
-
-	client := &http.Client{}
-	// wait server started.
-	for {
-		time.Sleep(time.Millisecond * 300)
-		req, _ := http.NewRequest("GET", "http://127.0.0.1:1229/hello", nil)
-		_, err := client.Do(req)
-		if err == nil {
-			break
-		}
-	}
+	return srv.URL
 }
 
 func TestHTTPDoWithHeaderSecret(t *testing.T) {
@@ -380,7 +369,7 @@ func TestHTTPSDo(t *testing.T) {
 	_, err := Do(ctx, &DoParams{
 		Params: RequestVars{
 			Method: "GET",
-			URL:    "https://127.0.0.1:8443/api/v1/token?val=test-token",
+			URL:    s.URL + "/api/v1/token?val=test-token",
 			TLSConfig: &TLSConfig{
 				Secret:    "certs",
 				Namespace: "default",
@@ -512,9 +501,6 @@ func newMockHttpsServer() *httptest.Server {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(tokenBytes)
 	}))
-	l, _ := net.Listen("tcp", "127.0.0.1:8443")
-	ts.Listener.Close()
-	ts.Listener = l
 
 	decode := func(in string) []byte {
 		out, _ := base64.StdEncoding.DecodeString(in)
