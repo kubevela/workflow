@@ -105,6 +105,17 @@ type ListFilter struct {
 	MatchingLabels map[string]string `json:"matchingLabels,omitempty"`
 }
 
+// ListVars defines parameters for op.#List
+type ListVars struct {
+	Resource *unstructured.Unstructured `json:"resource,omitempty"`
+	Value    *unstructured.Unstructured `json:"value,omitempty"`
+	Filter   *ListFilter                `json:"filter,omitempty"`
+	Cluster  string                     `json:"cluster,omitempty"`
+}
+
+// ListParams .
+type ListParams = providertypes.LegacyParams[ListVars]
+
 // ResourceVars .
 type ResourceVars struct {
 	Resource *unstructured.Unstructured `json:"value"`
@@ -254,26 +265,45 @@ func Read(ctx context.Context, params *ResourceParams) (*ResourceReturns, error)
 
 // ListReturns .
 type ListReturns struct {
-	Resources *unstructured.UnstructuredList `json:"list"`
+	Resources *unstructured.UnstructuredList `json:"list,omitempty"`
 	Error     string                         `json:"err,omitempty"`
 }
 
 // List lists CRs from cluster.
-func List(ctx context.Context, params *ResourceParams) (*ListReturns, error) {
+func List(ctx context.Context, params *ListParams) (*ListReturns, error) {
 	workload := params.Params.Resource
+	if workload == nil {
+		workload = params.Params.Value
+	}
+	if workload == nil || workload.GetKind() == "" || workload.GetAPIVersion() == "" {
+		return &ListReturns{
+			Error: "resource kind and apiVersion must be specified",
+		}, nil
+	}
+
 	list := &unstructured.UnstructuredList{Object: map[string]interface{}{
 		"kind":       workload.GetKind(),
 		"apiVersion": workload.GetAPIVersion(),
 	}}
 
-	filter := params.Params.Filter
-	listOpts := []client.ListOption{
-		client.InNamespace(filter.Namespace),
-		client.MatchingLabels(filter.MatchingLabels),
+	var listOpts []client.ListOption
+	if filter := params.Params.Filter; filter != nil {
+		if filter.Namespace != "" {
+			listOpts = append(listOpts, client.InNamespace(filter.Namespace))
+		}
+		if len(filter.MatchingLabels) > 0 {
+			listOpts = append(listOpts, client.MatchingLabels(filter.MatchingLabels))
+		}
 	}
 	readCtx := handleContext(ctx, params.Params.Cluster)
-	if err := params.KubeClient.List(readCtx, list, listOpts...); err != nil {
+	if params.KubeClient == nil {
 		return &ListReturns{
+			Resources: list,
+			Error:     "kube client is not initialized",
+		}, nil
+	}
+	if err := params.KubeClient.List(readCtx, list, listOpts...); err != nil {
+		return &ListReturns{ //nolint:nilerr
 			Resources: list,
 			Error:     err.Error(),
 		}, nil
@@ -327,7 +357,7 @@ func GetProviders() map[string]cuexruntime.ProviderFn {
 		"apply":             providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Apply),
 		"apply-in-parallel": providertypes.LegacyGenericProviderFn[ApplyInParallelVars, ApplyInParallelReturns](ApplyInParallel),
 		"read":              providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Read),
-		"list":              providertypes.LegacyGenericProviderFn[ResourceVars, ListReturns](List),
+		"list":              providertypes.LegacyGenericProviderFn[ListVars, ListReturns](List),
 		"delete":            providertypes.LegacyGenericProviderFn[ResourceVars, ResourceReturns](Delete),
 		"patch":             providertypes.LegacyNativeProviderFn(Patch),
 	}

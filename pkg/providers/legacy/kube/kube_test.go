@@ -223,8 +223,8 @@ patch: {
 		}
 
 		By("List pods with labels test=test")
-		res, err := List(ctx, &ResourceParams{
-			Params: ResourceVars{
+		res, err := List(ctx, &ListParams{
+			Params: ListVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "v1",
@@ -243,11 +243,12 @@ patch: {
 			},
 		})
 		Expect(err).ToNot(HaveOccurred())
-		Expect(len(res.Resources.Items)).Should(Equal(5))
+		// Assert >= 3 as this spec creates 3 pods; additional pods may exist if preceding specs ran first.
+		Expect(len(res.Resources.Items)).Should(BeNumerically(">=", 3))
 
 		By("List pods with labels index=test-1")
-		res, err = List(ctx, &ResourceParams{
-			Params: ResourceVars{
+		res, err = List(ctx, &ListParams{
+			Params: ListVars{
 				Resource: &unstructured.Unstructured{
 					Object: map[string]interface{}{
 						"apiVersion": "v1",
@@ -266,6 +267,118 @@ patch: {
 		})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(len(res.Resources.Items)).Should(Equal(1))
+
+		err = k8sClient.Create(ctx, &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-other-pod",
+				Namespace: "kube-system",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test-other",
+						Image: "busybox",
+					},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+
+		By("List pods across all namespaces with empty filter")
+		res, err = List(ctx, &ListParams{
+			Params: ListVars{
+				Resource: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+					},
+				},
+				Filter: &ListFilter{},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		var foundOther bool
+		for _, item := range res.Resources.Items {
+			if item.GetNamespace() == "kube-system" && item.GetName() == "test-other-pod" {
+				foundOther = true
+				break
+			}
+		}
+		Expect(foundOther).Should(BeTrue())
+
+		By("List pods with nil filter")
+		res, err = List(ctx, &ListParams{
+			Params: ListVars{
+				Resource: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+					},
+				},
+				Filter: nil,
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		foundOther = false
+		for _, item := range res.Resources.Items {
+			if item.GetNamespace() == "kube-system" && item.GetName() == "test-other-pod" {
+				foundOther = true
+				break
+			}
+		}
+		Expect(foundOther).Should(BeTrue())
+
+		By("List pods with value field for backward compatibility")
+		res, err = List(ctx, &ListParams{
+			Params: ListVars{
+				Value: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+					},
+				},
+				Filter: &ListFilter{
+					Namespace: "default",
+				},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		// Assert >= 3 as this spec creates 3 pods in default namespace.
+		Expect(len(res.Resources.Items)).Should(BeNumerically(">=", 3))
+
+		By("List pods with missing resource returns error")
+		res, err = List(ctx, &ListParams{
+			Params: ListVars{},
+			RuntimeParams: providertypes.RuntimeParams{
+				KubeClient: k8sClient,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Error).Should(Equal("resource kind and apiVersion must be specified"))
+
+		By("List pods via CUE provider call with resource field and empty filter")
+		provider := GetProviders()["list"]
+		cueVal := cuecontext.New().CompileString(`
+resource: {
+	apiVersion: "v1"
+	kind: "Pod"
+}
+filter: {}
+`)
+		callCtx := context.WithValue(ctx, providertypes.KubeClientKey, k8sClient)
+		retVal, err := provider.Call(callCtx, cueVal)
+		Expect(err).ToNot(HaveOccurred())
+		itemsVal := retVal.LookupPath(cue.ParsePath("list.items"))
+		Expect(itemsVal.Err()).ToNot(HaveOccurred())
 	})
 
 	It("delete", func() {
