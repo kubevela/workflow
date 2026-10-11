@@ -75,8 +75,9 @@ func TestSendEmail(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := map[string]struct {
-		vars   MailVars
-		errMsg string
+		vars        MailVars
+		expectedErr error
+		errMsg      string
 	}{
 		"success": {
 			vars: MailVars{
@@ -125,33 +126,21 @@ func TestSendEmail(t *testing.T) {
 				func(_ *gomail.Dialer, _ ...*gomail.Message) error {
 					calls.Add(1)
 					if tc.errMsg != "" {
-						return fmt.Errorf(tc.errMsg)
+						return fmt.Errorf("%s", tc.errMsg)
 					}
 					return nil
 				})
 			defer patch.Reset()
 
-			if tc.errMsg != "" {
-				patch.Reset()
-				patch = ApplyMethod(reflect.TypeOf(dial), "DialAndSend", func(_ *gomail.Dialer, _ ...*gomail.Message) error {
-					return fmt.Errorf("%s", tc.errMsg)
-				})
-				defer patch.Reset()
-			}
-			_, err := Send(ctx, &MailParams{
-				Params: tc.vars,
-				RuntimeParams: providertypes.RuntimeParams{
-					ProcessContext: pCtx,
-					Action:         act,
-				},
-			})
+			// first invocation initializes the send
+			_, err := sendEmail(ctx, id, act, tc.vars)
 			if tc.expectedErr != nil {
 				r.Equal(tc.expectedErr.Error(), err.Error())
 				return
 			}
-			_, ok := err.(errors.GenericActionError)
-			r.Equal(ok, true)
-			r.Equal(act.Phase, "Wait")
+			_, isWait := err.(errors.GenericActionError)
+			r.True(isWait)
+			r.Equal("Wait", act.Phase)
 
 			// wait until the goroutine records the outcome
 			waitEmailTerminal(t, id)
