@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -1816,6 +1817,51 @@ var _ = Describe("Test Workflow", func() {
 		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 		Expect(countedRuns["rollout-0-deploy"]).Should(Equal(1), "the item's succeeded deploy is not run again")
 		Expect(countedRuns["rollout-1-deploy"]).Should(Equal(1))
+	})
+
+	It("Test a keyed loop names its items by key and restarts from one by name", func() {
+		ctx := monitorContext.NewTraceContext(context.Background(), "test-app")
+		flakyFails = true
+		defer func() { flakyFails = false }()
+		instance, runners := makeTestCase([]oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: "step-group"},
+			Mode:             v1alpha1.WorkflowModeStep,
+			ForEach: &oamv1alpha1.ForEach{
+				Items: &apiextensionsv1.JSON{Raw: []byte(`[{"cluster":"prod-us"},{"cluster":"prod-us-shop"}]`)},
+				Key:   []string{"cluster"},
+			},
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
+				{Name: "deploy", Type: "counted"},
+				{Name: "verify", Type: "flaky"},
+			},
+		}})
+		delete(countedRuns, "rollout-prod-us-deploy")
+		delete(countedRuns, "rollout-prod-us-shop-deploy")
+		_, err := New(instance).ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(subPhasesOf(instance.Status.Steps[0])).Should(Equal(map[string]v1alpha1.WorkflowStepPhase{
+			"rollout-prod-us-deploy":      v1alpha1.WorkflowStepPhaseSucceeded,
+			"rollout-prod-us-verify":      v1alpha1.WorkflowStepPhaseFailed,
+			"rollout-prod-us-shop-deploy": v1alpha1.WorkflowStepPhaseSkipped,
+			"rollout-prod-us-shop-verify": v1alpha1.WorkflowStepPhaseSkipped,
+		}))
+		Expect(instance.Status.Steps[0].Message).Should(HavePrefix("item 0 (prod-us) failed at verify"))
+
+		By("restarting from the failed verify by its keyed name, as RestartFromStep does")
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Status.ContextBackend.Name}, cm)).Should(Succeed())
+		instance.Status.Terminated = false
+		instance.Status.Finished = false
+		steps, cm, err := utils.CleanStatusFromStep(instance.Steps, instance.Status.Steps, oamv1alpha1.WorkflowExecuteMode{}, cm, "rollout-prod-us-verify")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(k8sClient.Update(context.Background(), cm)).Should(Succeed())
+		instance.Status.Steps = steps
+		flakyFails = false
+		state, err := New(instance).ExecuteRunners(ctx, runners)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+		Expect(countedRuns["rollout-prod-us-deploy"]).Should(Equal(1), "the item's succeeded deploy is not run again")
+		Expect(countedRuns["rollout-prod-us-shop-deploy"]).Should(Equal(1))
 	})
 
 	It("Test forEach reports a suspended or timed out loop", func() {

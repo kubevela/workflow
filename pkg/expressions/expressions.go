@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -182,7 +183,7 @@ func (ws workflowSteps) readerOf(pCtx process.Context) reader {
 	// The longest match wins, so a loop named like another's passes cannot take
 	// its readers; admission refuses such names anyway.
 	for loop := range ws.loops {
-		prefix := types.IterationName(loop, index, "")
+		prefix := types.IterationName(loop, strconv.Itoa(index), "")
 		switch {
 		case len(loop) <= len(r.loop):
 		case r.name == fmt.Sprintf("%s-%d", loop, index):
@@ -295,7 +296,7 @@ func (ws workflowSteps) located(step, name string, r reader, what string) (statu
 	if loop, ok := ws.loopOf[step]; ok {
 		statusOf = loop
 		if loop == r.loop {
-			statusOf, varOf = types.IterationName(loop, r.index, step), types.IterationName(loop, r.index, name)
+			statusOf, varOf = types.IterationName(loop, strconv.Itoa(r.index), step), types.IterationName(loop, strconv.Itoa(r.index), name)
 		}
 	}
 	if (r.name != "" && statusOf == r.name) || (r.loop != "" && step == r.loop) {

@@ -44,6 +44,16 @@ func TestValidateForEachSteps(t *testing.T) {
 		SubSteps:         []oamv1alpha1.WorkflowStepBase{{Name: "deploy", Type: "deploy"}},
 	}
 
+	withEndpoint := func(step oamv1alpha1.WorkflowStep) oamv1alpha1.WorkflowStep {
+		step.Outputs = oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "v"}}
+		return step
+	}
+	outputting := func(name string) oamv1alpha1.WorkflowStep {
+		s := plain("other")
+		s.Outputs = oamv1alpha1.StepOutputs{{Name: name, ValueFrom: "v"}}
+		return s
+	}
+
 	cases := map[string]struct {
 		steps      []oamv1alpha1.WorkflowStep
 		expression bool
@@ -129,12 +139,15 @@ func TestValidateForEachSteps(t *testing.T) {
 			want: []string{"steps[0].outputs", "declare them on its sub-steps"},
 		},
 		"an output named like a pass's variable": {
-			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r"}), func() oamv1alpha1.WorkflowStep {
-				s := plain("other")
-				s.Outputs = oamv1alpha1.StepOutputs{{Name: "scale-0-endpoint", ValueFrom: "v"}}
-				return s
-			}()},
-			want: []string{"steps[1].outputs[0].name", "clashes with the variables forEach step scale keeps"},
+			steps: []oamv1alpha1.WorkflowStep{withEndpoint(loop(oamv1alpha1.ForEach{From: "r"})), outputting("scale-0-endpoint")},
+			want:  []string{"steps[1].outputs[0].name", "clashes with the variables forEach step scale keeps"},
+		},
+		"an output named like a pass's loop variable": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r"}), outputting("scale-0-each")},
+			want:  []string{"steps[1].outputs[0].name", "clashes with the variables forEach step scale keeps"},
+		},
+		"an output named like a variable no pass writes": {
+			steps: []oamv1alpha1.WorkflowStep{withEndpoint(loop(oamv1alpha1.ForEach{From: "r"})), outputting("scale-0-other")},
 		},
 		"two groups whose passes would share names": {
 			steps: []oamv1alpha1.WorkflowStep{
@@ -153,6 +166,35 @@ func TestValidateForEachSteps(t *testing.T) {
 		},
 		"a similar name that cannot clash": {
 			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r"}), plain("scale-x"), plain("scale-01")},
+		}, "a key": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster", "spec.zone"}})},
+		},
+		"an empty key path": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"spec."}})},
+			want:  []string{"steps[0].forEach.key[0]", "is not a path into the item"},
+		},
+		"a key path given twice": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster", "cluster"}})},
+			want:  []string{"steps[0].forEach.key[1]", "Duplicate value"},
+		},
+		"a step named like a keyed loop's items": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}}), plain("scale-prod")},
+			want:  []string{"steps[1].name", "scale-prod", "clashes with the names forEach step scale generates"},
+		},
+		"an output named like a keyed loop's variables": {
+			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}}), outputting("scale-prod-each")},
+			want:  []string{"steps[1].outputs[0].name", "clashes with the variables forEach step scale keeps"},
+		},
+		"a loop named like a keyed group's items": {
+			steps: []oamv1alpha1.WorkflowStep{
+				{
+					WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: types.WorkflowStepTypeStepGroup},
+					ForEach:          &oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}},
+					SubSteps:         []oamv1alpha1.WorkflowStepBase{{Name: "deploy", Type: "t"}},
+				},
+				{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout-x", Type: "t"}, ForEach: &oamv1alpha1.ForEach{From: "r"}},
+			},
+			want: []string{"steps[1].name", "is named like the passes of forEach step rollout"},
 		},
 	}
 	for name, tc := range cases {
