@@ -29,11 +29,13 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/kubevela/pkg/cel"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/types"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
@@ -420,7 +422,7 @@ func TestForEachInvalidItems(t *testing.T) {
 		message string
 	}{
 		"not a list":         {forEach: oamv1alpha1.ForEach{Items: itemsJSON(t, map[string]any{"a": 1})}, message: "must be a list"},
-		"unresolved expr":    {forEach: oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.inventory.clusters)")}, message: "EnableCelExpressions"},
+		"unresolved expr":    {forEach: oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.inventory.clusters)")}, message: "expressions are not turned on"},
 		"neither":            {forEach: oamv1alpha1.ForEach{}, message: "one of"},
 		"both":               {forEach: oamv1alpha1.ForEach{Items: itemsJSON(t, []int{1}), From: "x"}, message: "one of"},
 		"from is not a list": {forEach: oamv1alpha1.ForEach{From: "scalar"}, message: "must be a list"},
@@ -443,6 +445,140 @@ func TestForEachInvalidItems(t *testing.T) {
 			r.Empty(f.generated)
 		})
 	}
+}
+
+// itemsEvaluator answers an items expression with items, or with err, and keeps
+// the context it was called with.
+type itemsEvaluator struct {
+	items string
+	err   error
+	ctx   *context.Context
+}
+
+type stepCtxKey struct{}
+
+func (e itemsEvaluator) Properties(ctx context.Context, _ types.ExpressionStep, _ *runtime.RawExtension, _ wfContext.Context,
+	_ process.Context, _ map[string]v1alpha1.StepStatus) (*runtime.RawExtension, error) {
+	if e.ctx != nil {
+		*e.ctx = ctx
+	}
+	if e.err != nil {
+		return nil, e.err
+	}
+	return &runtime.RawExtension{Raw: []byte(`{"items":` + e.items + `}`)}, nil
+}
+
+func TestForEachItemsExpression(t *testing.T) {
+	run := func(t *testing.T, ev types.PropertyEvaluator) (v1alpha1.StepStatus, *types.Operation, *forEachFixture) {
+		wfCtx := newWorkflowContextForTest(t)
+		f := newFixture()
+		opts := f.options("loop-id", "")
+		opts.Expressions = ev
+		runner, err := ForEach(singleStep("t", oamv1alpha1.ForEach{Items: itemsJSON(t, "$(steps.list.outputs.items)")}), opts)
+		require.NoError(t, err)
+		status, operation, err := runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+		require.NoError(t, err)
+		return status, operation, f
+	}
+
+	t.Run("resolved when the loop starts", func(t *testing.T) {
+		wfCtx := newWorkflowContextForTest(t)
+		f := newFixture()
+		opts := f.options("loop-id", "")
+		opts.Expressions = itemsEvaluator{items: `["a","b"]`}
+		runner, err := ForEach(singleStep("t", oamv1alpha1.ForEach{
+			Items: itemsJSON(t, "$(steps.list.outputs.items)"), Mode: v1alpha1.WorkflowModeDAG}), opts)
+		require.NoError(t, err)
+		_, _, err = runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+		require.NoError(t, err)
+		require.Equal(t, []string{"scale-0", "scale-1"}, f.names(), "a pass per resolved item")
+	})
+	t.Run("resolved in the step's context", func(t *testing.T) {
+		var got context.Context
+		wfCtx := newWorkflowContextForTest(t)
+		f := newFixture()
+		opts := f.options("loop-id", "")
+		opts.Expressions = itemsEvaluator{items: `["a"]`, ctx: &got}
+		runner, err := ForEach(singleStep("t", oamv1alpha1.ForEach{Items: itemsJSON(t, "$(steps.list.outputs.items)")}), opts)
+		require.NoError(t, err)
+		options := runOptions(&runningEngine{wfCtx: wfCtx})
+		options.GetTracer = func(string, oamv1alpha1.WorkflowStep) monitorContext.Context {
+			return monitorContext.NewTraceContext(context.WithValue(context.Background(), stepCtxKey{}, "step"), "")
+		}
+		_, _, err = runner.Run(wfCtx, options)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.Equal(t, "step", got.Value(stepCtxKey{}))
+	})
+	t.Run("expressions inside a list of items", func(t *testing.T) {
+		ev, err := expressions.NewEvaluator(types.ExpressionOptions{}, nil, "")
+		require.NoError(t, err)
+		wfCtx := newWorkflowContextForTest(t)
+		f := newFixture()
+		opts := f.options("loop-id", "")
+		opts.Expressions = ev
+		runner, err := ForEach(singleStep("t", oamv1alpha1.ForEach{
+			Items: itemsJSON(t, []any{"$(1 + 1)", "east-$(2 * 2)", "plain"}), Mode: v1alpha1.WorkflowModeDAG}), opts)
+		require.NoError(t, err)
+		_, _, err = runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+		require.NoError(t, err)
+		var items []any
+		for _, seen := range f.seen {
+			items = append(items, seen.(map[string]any)["item"])
+		}
+		require.Equal(t, []any{float64(2), "east-4", "plain"}, items, "each entry resolved, a whole one keeping its type")
+	})
+	t.Run("pinned once resolved", func(t *testing.T) {
+		wfCtx := newWorkflowContextForTest(t)
+		loop := singleStep("t", oamv1alpha1.ForEach{
+			Items: itemsJSON(t, "$(steps.list.outputs.items)"), Mode: v1alpha1.WorkflowModeDAG})
+		runWith := func(items string) []string {
+			f := newFixture()
+			opts := f.options("loop-id", "")
+			opts.Expressions = itemsEvaluator{items: items}
+			runner, err := ForEach(loop, opts)
+			require.NoError(t, err)
+			_, _, err = runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+			require.NoError(t, err)
+			return f.names()
+		}
+		require.Equal(t, []string{"scale-0", "scale-1"}, runWith(`["a","b"]`))
+		require.Equal(t, []string{"scale-0", "scale-1"}, runWith(`["a","b","c"]`),
+			"a later reconcile iterates the list the loop started with")
+	})
+	t.Run("an expression written with an escaped marker", func(t *testing.T) {
+		ev, err := expressions.NewEvaluator(types.ExpressionOptions{}, nil, "")
+		require.NoError(t, err)
+		wfCtx := newWorkflowContextForTest(t)
+		f := newFixture()
+		opts := f.options("loop-id", "")
+		opts.Expressions = ev
+		runner, err := ForEach(singleStep("t", oamv1alpha1.ForEach{
+			Items: &apiextensionsv1.JSON{Raw: []byte(`["\u0024(1 + 1)"]`)}, Mode: v1alpha1.WorkflowModeDAG}), opts)
+		require.NoError(t, err)
+		_, _, err = runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+		require.NoError(t, err)
+		require.Len(t, f.seen, 1)
+		require.Equal(t, float64(2), f.seen[0].(map[string]any)["item"], "JSON escapes are the same text")
+	})
+	t.Run("not ready: the loop waits", func(t *testing.T) {
+		status, operation, f := run(t, itemsEvaluator{err: fmt.Errorf("waiting for step list: %w", cel.ErrNotReady)})
+		require.Equal(t, v1alpha1.WorkflowStepPhaseRunning, status.Phase)
+		require.Equal(t, types.StatusReasonWait, status.Reason)
+		require.Contains(t, status.Message, "waiting for step list")
+		require.True(t, operation.Waiting)
+		require.Empty(t, f.generated)
+	})
+	t.Run("failed: the loop fails", func(t *testing.T) {
+		status, operation, _ := run(t, itemsEvaluator{err: errors.New("step list was skipped")})
+		require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+		require.True(t, operation.Terminated)
+	})
+	t.Run("not a list", func(t *testing.T) {
+		status, _, _ := run(t, itemsEvaluator{items: `"a"`})
+		require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+		require.Contains(t, status.Message, "must be a list")
+	})
 }
 
 func TestForEachStepModeWaitsForEachIteration(t *testing.T) {

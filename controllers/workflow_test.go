@@ -443,6 +443,96 @@ var _ = Describe("Test Workflow", func() {
 		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
 	})
 
+	It("test a step reading another's output with an expression", func() {
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableCelExpressions, true)
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-with-expressions"
+		wr.Annotations = map[string]string{wfTypes.AnnotationCelExpressions: "true"}
+		wr.Spec.Mode = &oamv1alpha1.WorkflowExecuteMode{Steps: v1alpha1.WorkflowModeDAG}
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{
+			{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+					Name: "step2",
+					Type: "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(
+						`{"cmd":["sleep","1000"],"image":"busybox","message":"$(steps.step1.outputs.message) from $(context.name)"}`)},
+				},
+			},
+			{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+					Name:       "step1",
+					Type:       "test-apply",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox"}`)},
+					Outputs: oamv1alpha1.StepOutputs{{
+						Name:      "message",
+						ValueFrom: `"message: " +output.$returns.value.status.conditions[0].message`,
+					}},
+				},
+			}}
+
+		Expect(k8sClient.Create(context.Background(), wr)).Should(BeNil())
+		wrKey := types.NamespacedName{Namespace: wr.Namespace, Name: wr.Name}
+		step1Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}
+		step2Key := types.NamespacedName{Namespace: wr.Namespace, Name: "step2"}
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		By("step2, listed first, waits on step1 through the dependsOn its read implies")
+		expDeployment := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(utils.NotFoundMatcher{})
+		Expect(k8sClient.Get(ctx, step1Key, expDeployment)).Should(BeNil())
+		checkRun := &v1alpha1.WorkflowRun{}
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Spec.WorkflowSpec.Steps[0].DependsOn).Should(BeEmpty(), "the implied dependsOn is not written to the spec")
+		pending := map[string]string{}
+		for _, ss := range checkRun.Status.Steps {
+			pending[ss.Name] = string(ss.Phase) + ": " + ss.Message
+		}
+		Expect(pending["step2"]).Should(Equal("pending: Pending on DependsOn: step1"),
+			"held by the dependsOn, not by its read waiting")
+
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		expDeployment.Status.Conditions = []appsv1.DeploymentCondition{{Message: "hello"}}
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		By("step2 runs with the value resolved")
+		Expect(k8sClient.Get(ctx, step2Key, expDeployment)).Should(BeNil())
+		Expect(expDeployment.Spec.Template.Spec.Containers[0].Env[0].Value).Should(Equal("message: hello from wr-with-expressions"))
+		expDeployment.Status.Replicas = 1
+		expDeployment.Status.ReadyReplicas = 1
+		Expect(k8sClient.Status().Update(ctx, expDeployment)).Should(BeNil())
+
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		Expect(k8sClient.Get(ctx, wrKey, checkRun)).Should(BeNil())
+		Expect(checkRun.Status.Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+		Expect(checkRun.Status.Dependencies).Should(Equal([]v1alpha1.StepDependency{
+			{Step: "step2", DependsOn: "step1", Source: v1alpha1.StepDependencySourceExpression},
+		}))
+	})
+
+	It("test an expression stays as written on a run that does not opt in", func() {
+		featuregatetesting.SetFeatureGateDuringTest(GinkgoT(), utilfeature.DefaultFeatureGate, features.EnableCelExpressions, true)
+		wr := wrTemplate.DeepCopy()
+		wr.Name = "wr-without-expressions"
+		wr.Spec.WorkflowSpec.Steps = []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+				Name:       "step1",
+				Type:       "test-apply",
+				Properties: &runtime.RawExtension{Raw: []byte(`{"cmd":["sleep","1000"],"image":"busybox","message":"$(context.name)"}`)},
+			},
+		}}
+		Expect(k8sClient.Create(context.Background(), wr)).Should(BeNil())
+		tryReconcile(reconciler, wr.Name, wr.Namespace)
+
+		expDeployment := &appsv1.Deployment{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: wr.Namespace, Name: "step1"}, expDeployment)).Should(BeNil())
+		Expect(expDeployment.Spec.Template.Spec.Containers[0].Env[0].Value).Should(Equal("$(context.name)"))
+	})
+
 	It("test input/output in dag mode", func() {
 		wr := wrTemplate.DeepCopy()
 		wr.Name = "wr-with-inout"

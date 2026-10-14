@@ -1,0 +1,45 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: expressions
+  annotations:
+    workflowrun.oam.dev/cel-expressions: "true"
+spec:
+  # DAG, so only dependsOn orders the steps: each read below implies one.
+  mode:
+    steps: DAG
+  workflowSpec:
+    steps:
+      - name: summary
+        type: create-config
+        properties:
+          name: summary
+          config:
+            message: '$(steps.list.outputs.tenants.size()) tenants, from $(context.name)'
+      - name: per-tenant
+        type: step-group
+        forEach:
+          items: '$(steps.list.outputs.tenants)'
+        subSteps:
+          - name: save
+            type: create-config
+            properties:
+              name: 'greeting-$(each.item.name)'
+              config:
+                message: 'hi $(each.item.name) #$(each.index) in $(context.name)'
+      - name: list
+        type: read-config
+        dependsOn: [create]
+        properties:
+          name: tenants
+        outputs:
+          - name: tenants
+            valueFrom: output.config.tenants
+      - name: create
+        type: create-config
+        properties:
+          name: tenants
+          config:
+            tenants:
+              - name: a
+              - name: b

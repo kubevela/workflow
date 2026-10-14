@@ -25,6 +25,7 @@ import (
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	"github.com/kubevela/workflow/pkg/utils"
 )
@@ -33,6 +34,7 @@ import (
 func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.WorkflowRun) field.ErrorList {
 	var errs field.ErrorList
 	var steps []oamv1alpha1.WorkflowStep
+	mode := wr.Spec.Mode
 	if wr.Spec.WorkflowSpec != nil {
 		steps = wr.Spec.WorkflowSpec.Steps
 	} else {
@@ -42,6 +44,9 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 			return errs
 		}
 		steps = w.Steps
+		if mode == nil {
+			mode = w.Mode
+		}
 	}
 	stepName := make(map[string]interface{})
 	for _, step := range steps {
@@ -73,8 +78,14 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 	if wr.Spec.WorkflowSpec == nil {
 		stepsPath = field.NewPath("spec", "workflowRef").Key(wr.Spec.WorkflowRef).Child("steps")
 	}
-	// A WorkflowRun has nothing to resolve a $( ) expression, so forEach.items must be a list.
-	errs = append(errs, builtin.ValidateForEachSteps(stepsPath, steps, false)...)
+	enabled := expressions.EnabledFor(wr.Annotations)
+	errs = append(errs, builtin.ValidateForEachSteps(stepsPath, steps, enabled)...)
+	if enabled {
+		// No host roots: a WorkflowRun is resolved by the workflow alone, so a root
+		// only a host answers, such as KubeVela's source, is undeclared here. KubeVela
+		// admits its own Applications in its own webhook.
+		errs = append(errs, expressions.Validate(stepsPath, steps, mode)...)
+	}
 	return errs
 }
 

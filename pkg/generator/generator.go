@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -31,6 +32,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/executor"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
 
 	"github.com/kubevela/workflow/pkg/providers"
@@ -52,11 +54,24 @@ func GenerateRunners(ctx monitorContext.Context, instance *types.WorkflowInstanc
 	defer subCtx.Commit("finish generate task runners")
 	options = initStepGeneratorOptions(ctx, instance, options)
 	taskDiscover := tasks.NewTaskDiscover(ctx, options)
+	var evaluator types.PropertyEvaluator
+	if options.Expressions != nil {
+		// A run is known by when it started, which its status keeps to the second.
+		run := instance.Status.StartTime.UTC().Format(time.RFC3339)
+		ev, err := expressions.NewEvaluator(*options.Expressions, instance.Steps, run)
+		if err != nil {
+			return nil, err
+		}
+		evaluator = ev
+		// The executor orders steps by the instance's dependsOn.
+		instance.Steps, instance.InferredDependsOn = ev.WithReadDependencies(instance.Steps, instance.Mode)
+	}
 	var tasks []types.TaskRunner
 	for _, step := range instance.Steps {
 		opt := &types.TaskGeneratorOptions{
 			ID:             generateStepID(instance.Status, step.Name),
 			ProcessContext: options.ProcessCtx,
+			Expressions:    evaluator,
 		}
 		for typ, convertor := range options.StepConvertor {
 			if step.Type == typ {
@@ -165,6 +180,7 @@ func generateTaskRunner(ctx context.Context,
 			o := &types.TaskGeneratorOptions{
 				ID:             generateSubStepID(instance.Status, subStep.Name, step.Name),
 				ProcessContext: options.ProcessContext,
+				Expressions:    options.Expressions,
 			}
 			for typ, convertor := range stepOptions.StepConvertor {
 				if subStep.Type == typ {
@@ -215,6 +231,7 @@ func generateForEachRunner(ctx context.Context,
 			ID:             id,
 			ProcessContext: options.ProcessContext,
 			StepConvertor:  stepOptions.StepConvertor[subStep.Type],
+			Expressions:    options.Expressions,
 		}
 		return generateTaskRunner(ctx, instance, oamv1alpha1.WorkflowStep{WorkflowStepBase: subStep}, taskDiscover, o, stepOptions)
 	}

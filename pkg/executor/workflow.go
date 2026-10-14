@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -114,6 +116,7 @@ func InitializeWorkflowInstance(instance *types.WorkflowInstance) {
 func (w *workflowExecutor) ExecuteRunners(ctx monitorContext.Context, taskRunners []types.TaskRunner) (v1alpha1.WorkflowRunPhase, error) {
 	InitializeWorkflowInstance(w.instance)
 	status := &w.instance.Status
+	status.Dependencies = dependencies(w.instance)
 	dagMode := status.Mode.Steps == v1alpha1.WorkflowModeDAG
 	cacheKey := fmt.Sprintf("%s-%s", w.instance.Name, w.instance.Namespace)
 
@@ -199,6 +202,37 @@ func checkWorkflowSuspended(status *v1alpha1.WorkflowRunStatus) bool {
 		}
 	}
 	return status.Suspend
+}
+
+// dependencies is what each step and sub-step waits on: each dependsOn entry,
+// marked by whether the step's expressions added it, and each earlier step a
+// workflow run in order puts first that its expressions read. Sorted by step.
+func dependencies(instance *types.WorkflowInstance) []v1alpha1.StepDependency {
+	var out []v1alpha1.StepDependency
+	add := func(step oamv1alpha1.WorkflowStepBase) {
+		read := instance.InferredDependsOn[step.Name]
+		for _, d := range step.DependsOn {
+			source := v1alpha1.StepDependencySourceDependsOn
+			if slices.Contains(read, d) {
+				source = v1alpha1.StepDependencySourceExpression
+			}
+			out = append(out, v1alpha1.StepDependency{Step: step.Name, DependsOn: d, Source: source})
+		}
+		for _, d := range read {
+			if !slices.Contains(step.DependsOn, d) {
+				out = append(out, v1alpha1.StepDependency{Step: step.Name, DependsOn: d,
+					Source: v1alpha1.StepDependencySourceExpression})
+			}
+		}
+	}
+	for _, step := range instance.Steps {
+		add(step.WorkflowStepBase)
+		for _, sub := range step.SubSteps {
+			add(sub)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b v1alpha1.StepDependency) int { return strings.Compare(a.Step, b.Step) })
+	return out
 }
 
 func newEngine(ctx monitorContext.Context, wfCtx wfContext.Context, w *workflowExecutor, wfStatus *v1alpha1.WorkflowRunStatus, taskRunners []types.TaskRunner) *engine { //nolint:revive,unused
@@ -841,6 +875,11 @@ func (e *engine) findDependPhase(taskRunners []types.TaskRunner, index int, dag 
 
 func (e *engine) findDependsOnPhase(name string) v1alpha1.WorkflowStepPhase {
 	for _, dependsOn := range e.stepDependsOn[name] {
+		// A step a read added, unlike one dependsOn names, may have been skipped: the
+		// read answers that as an input does, so the reader still runs.
+		if e.stepStatus[dependsOn].Phase == v1alpha1.WorkflowStepPhaseSkipped && e.readOnly(name, dependsOn) {
+			continue
+		}
 		if e.stepStatus[dependsOn].Phase != v1alpha1.WorkflowStepPhaseSucceeded {
 			return e.stepStatus[dependsOn].Phase
 		}
@@ -849,6 +888,32 @@ func (e *engine) findDependsOnPhase(name string) v1alpha1.WorkflowStepPhase {
 		}
 	}
 	return v1alpha1.WorkflowStepPhaseSucceeded
+}
+
+// readOnly reports whether step depends on dep only because its expressions read
+// dep, rather than through dependsOn. A forEach iteration's step is matched through
+// the body step it was expanded from, within the same iteration.
+func (e *engine) readOnly(step, dep string) bool {
+	if slices.Contains(e.instance.InferredDependsOn[step], dep) {
+		return true
+	}
+	for _, loop := range e.instance.Steps {
+		if loop.ForEach == nil {
+			continue
+		}
+		reader, ok := builtin.IterationTemplate(loop, step)
+		if !ok {
+			continue
+		}
+		read, ok := builtin.IterationTemplate(loop, dep)
+		if !ok {
+			continue
+		}
+		i, _ := builtin.IterationIndex(loop, step)
+		j, _ := builtin.IterationIndex(loop, dep)
+		return i == j && slices.Contains(e.instance.InferredDependsOn[reader.Name], read.Name)
+	}
+	return false
 }
 
 // skipExecutionOfNextStep returns true if the next step should be skipped

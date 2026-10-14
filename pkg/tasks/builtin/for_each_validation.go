@@ -93,7 +93,7 @@ func validateForEach(path *field.Path, step oamv1alpha1.WorkflowStep, allowExpre
 	switch {
 	case isExpr && allowExpression:
 	case isExpr:
-		errs = append(errs, field.Invalid(itemsPath, expr, "must be a list; a $( ) expression here needs KubeVela with EnableCelExpressions"))
+		errs = append(errs, field.Invalid(itemsPath, expr, "must be a list; a $( ) expression here needs expressions turned on: the EnableCelExpressions feature gate, and the cel-expressions annotation on the WorkflowRun or Application"))
 	default:
 		errs = append(errs, field.Invalid(itemsPath, string(forEach.Items.Raw), "must be a list"))
 	}

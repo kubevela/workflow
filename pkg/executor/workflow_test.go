@@ -827,8 +827,9 @@ var _ = Describe("Test Workflow", func() {
 		instance.Status.ContextBackend = nil
 		cleanStepTimeStamp(&instance.Status)
 		Expect(cmp.Diff(instance.Status, v1alpha1.WorkflowRunStatus{
-			Mode:       defaultMode,
-			Terminated: true,
+			Dependencies: written("s2-sub1", "s2-sub2"),
+			Mode:         defaultMode,
+			Terminated:   true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:   "s1",
@@ -1251,8 +1252,9 @@ var _ = Describe("Test Workflow", func() {
 		workflowStatus.ContextBackend = nil
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
-			Mode:       dagMode,
-			Terminated: true,
+			Dependencies: written("s3", "s2", "s4", "s3", "s5", "s3", "s6", "s1", "s6", "s5"),
+			Mode:         dagMode,
+			Terminated:   true,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s1",
@@ -1436,7 +1438,8 @@ var _ = Describe("Test Workflow", func() {
 		workflowStatus.ContextBackend = nil
 		cleanStepTimeStamp(&workflowStatus)
 		Expect(cmp.Diff(workflowStatus, v1alpha1.WorkflowRunStatus{
-			Mode: dagMode,
+			Dependencies: written("s3", "s2", "s4", "s3"),
+			Mode:         dagMode,
 			Steps: []v1alpha1.WorkflowStepStatus{{
 				StepStatus: v1alpha1.StepStatus{
 					Name:  "s1",
@@ -2858,6 +2861,16 @@ func (tr *testTaskRunner) Pending(ctx monitorContext.Context, wfCtx wfContext.Co
 // FillRunTime fill runtime data to context.
 func (tr *testTaskRunner) FillContextData(ctx monitorContext.Context, processCtx process.Context) types.ContextDataResetter {
 	return tr.fillContext(ctx, processCtx)
+}
+
+// written is the dependencies a run's status records for written dependsOn, as
+// step, dependsOn pairs.
+func written(pairs ...string) []v1alpha1.StepDependency {
+	var out []v1alpha1.StepDependency
+	for i := 0; i+1 < len(pairs); i += 2 {
+		out = append(out, v1alpha1.StepDependency{Step: pairs[i], DependsOn: pairs[i+1], Source: v1alpha1.StepDependencySourceDependsOn})
+	}
+	return out
 }
 
 func cleanStepTimeStamp(wfStatus *v1alpha1.WorkflowRunStatus) {

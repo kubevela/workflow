@@ -95,6 +95,9 @@ type WorkflowRunStatus struct {
 
 	ContextBackend *corev1.ObjectReference `json:"contextBackend,omitempty"`
 	Steps          []WorkflowStepStatus    `json:"steps,omitempty"`
+	// Dependencies is what each step and sub-step waits on before it starts,
+	// whether named in its dependsOn or read by its expressions.
+	Dependencies []StepDependency `json:"dependencies,omitempty"`
 
 	StartTime metav1.Time `json:"startTime,omitempty"`
 	EndTime   metav1.Time `json:"endTime,omitempty"`
@@ -141,6 +144,24 @@ type StepStatus struct {
 	FirstExecuteTime metav1.Time `json:"firstExecuteTime,omitempty"`
 	// LastExecuteTime is the last time this step execution.
 	LastExecuteTime metav1.Time `json:"lastExecuteTime,omitempty"`
+}
+
+// StepDependencySource is why a step depends on another.
+type StepDependencySource string
+
+const (
+	// StepDependencySourceDependsOn is a step named in dependsOn.
+	StepDependencySourceDependsOn StepDependencySource = "dependsOn"
+	// StepDependencySourceExpression is a step whose outputs an expression in the
+	// step's properties reads.
+	StepDependencySourceExpression StepDependencySource = "expression"
+)
+
+// StepDependency is one step a step waits on before it starts, and why.
+type StepDependency struct {
+	Step      string               `json:"step"`
+	DependsOn string               `json:"dependsOn"`
+	Source    StepDependencySource `json:"source"`
 }
 
 // WorkflowStepStatus record the status of a workflow step, include step status and subStep status
