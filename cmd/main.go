@@ -125,6 +125,7 @@ func main() {
 	flag.IntVar(&types.MaxWorkflowWaitBackoffTime, "max-workflow-wait-backoff-time", 60, "Set the max workflow wait backoff time, default is 60")
 	flag.IntVar(&types.MaxWorkflowFailedBackoffTime, "max-workflow-failed-backoff-time", 300, "Set the max workflow wait backoff time, default is 300")
 	flag.IntVar(&types.MaxWorkflowStepErrorRetryTimes, "max-workflow-step-error-retry-times", 10, "Set the max workflow step error retry times, default is 10")
+	flag.IntVar(&types.MaxForEachItems, "max-for-each-items", types.MaxForEachItems, "Set the max number of items a forEach step may iterate, each of which is recorded in the run's status")
 	flag.StringVar(&backupStrategy, "backup-strategy", "BackupFinishedRecord", "Set the strategy for backup workflow records, default is RemainLatestFailedRecord")
 	flag.StringVar(&backupIgnoreStrategy, "backup-ignore-strategy", "", "Set the strategy for ignore backup workflow records, default is IgnoreLatestFailedRecord")
 	flag.StringVar(&backupPersistType, "backup-persist-type", "", "Set the persist type for backup workflow records, default is empty")
@@ -327,6 +328,9 @@ func main() {
 		klog.ErrorS(err, "Unable to get informer for application")
 	}
 	watcher.StartWorkflowRunMetricsWatcher(informer)
+
+	utils.WarnIfCRDLacksForEach(rootCtx, mgr.GetAPIReader(), "workflowruns.core.oam.dev", "spec", "workflowSpec", "steps")
+	utils.WarnIfCRDLacksForEach(rootCtx, mgr.GetAPIReader(), "workflows.core.oam.dev", "steps")
 
 	klog.Info("starting manager")
 	if err := mgr.Start(rootCtx); err != nil {

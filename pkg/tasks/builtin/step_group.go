@@ -92,28 +92,7 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	}
 	defer handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, basicVal)
 
-	for _, hook := range options.PreCheckHooks {
-		result, err := hook(tr.step, &types.PreCheckOptions{
-			BasicValue: basicVal,
-		})
-		if err != nil {
-			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
-			status.Reason = types.StatusReasonSkip
-			status.Message = fmt.Sprintf("pre check error: %s", err.Error())
-			continue
-		}
-		if result.Skip {
-			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
-			status.Reason = types.StatusReasonSkip
-			options.StepStatus[tr.step.Name] = status
-			break
-		}
-		if result.Timeout {
-			status.Phase = v1alpha1.WorkflowStepPhaseFailed
-			status.Reason = types.StatusReasonTimeout
-			options.StepStatus[tr.step.Name] = status
-		}
-	}
+	runPreChecks(tr.step, options, basicVal, pStatus)
 	// step-group has no properties so there is no need to fill in the properties with the input values
 	// skip input handle here
 	e := options.Engine
@@ -155,6 +134,33 @@ func (tr *stepGroupTaskRunner) FillContextData(ctx monitorContext.Context, proce
 				return t.Key
 			}),
 		)
+	}
+}
+
+// runPreChecks applies the if/timeout pre-check hooks to a step that holds sub-steps,
+// recording a skip or timeout in status.
+func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, basicVal cue.Value, status *v1alpha1.StepStatus) {
+	for _, hook := range options.PreCheckHooks {
+		result, err := hook(step, &types.PreCheckOptions{
+			BasicValue: basicVal,
+		})
+		if err != nil {
+			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
+			status.Reason = types.StatusReasonSkip
+			status.Message = fmt.Sprintf("pre check error: %s", err.Error())
+			continue
+		}
+		if result.Skip {
+			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
+			status.Reason = types.StatusReasonSkip
+			options.StepStatus[step.Name] = *status
+			break
+		}
+		if result.Timeout {
+			status.Phase = v1alpha1.WorkflowStepPhaseFailed
+			status.Reason = types.StatusReasonTimeout
+			options.StepStatus[step.Name] = *status
+		}
 	}
 }
 

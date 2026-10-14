@@ -132,6 +132,45 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 		Expect(resp.Allowed).Should(BeFalse())
 	})
 
+	It("Test WorkflowRun Validator forEach", func() {
+		handle := func(steps string) admission.Response {
+			return handler.Handle(ctx, admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+					Object: runtime.RawExtension{
+						Raw: []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-sample"},"spec":{"workflowSpec":{"steps":` + steps + `}}}`),
+					},
+				},
+			})
+		}
+		By("allowing a literal list")
+		Expect(handle(`[{"name":"s","type":"suspend","forEach":{"items":["a","b"],"mode":"DAG"}}]`).Allowed).Should(BeTrue())
+
+		By("rejecting neither items nor from")
+		resp := handle(`[{"name":"s","type":"suspend","forEach":{}}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("spec.workflowSpec.steps[0].forEach"))
+
+		By("allowing a list read from a variable")
+		Expect(handle(`[{"name":"s","type":"suspend","forEach":{"from":"regions"}}]`).Allowed).Should(BeTrue())
+
+		By("rejecting both items and from")
+		resp = handle(`[{"name":"s","type":"suspend","forEach":{"items":["a"],"from":"regions"}}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("exactly one of items and from"))
+
+		By("rejecting a mode in the wrong case")
+		resp = handle(`[{"name":"s","type":"suspend","forEach":{"items":["a"],"mode":"dag"}}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("forEach.mode"))
+
+		By("rejecting an expression, which a WorkflowRun has nothing to resolve")
+		resp = handle(`[{"name":"s","type":"suspend","forEach":{"items":"$(source.a.b)"}}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("EnableCelExpressions"))
+	})
+
 	It("Test WorkflowRun Validator workflow step valid timeout [allow]", func() {
 		req := admission.Request{
 			AdmissionRequest: admissionv1.AdmissionRequest{
@@ -202,6 +241,28 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 			}
 			Expect(handler.Handle(ctx, req).Allowed).To(BeTrue())
 		}
+	})
+
+	It("reports a referenced workflow's forEach error under spec.workflowRef", func() {
+		workflow := &oamv1alpha1.Workflow{
+			ObjectMeta: metav1.ObjectMeta{Name: "wf-bad-foreach", Namespace: "vela-system"},
+			WorkflowSpec: oamv1alpha1.WorkflowSpec{Steps: []oamv1alpha1.WorkflowStep{{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "s", Type: "suspend"},
+				ForEach:          &oamv1alpha1.ForEach{},
+			}}},
+		}
+		Expect(k8sClient.Create(ctx, workflow)).To(Succeed())
+		resp := handler.Handle(ctx, admission.Request{
+			AdmissionRequest: admissionv1.AdmissionRequest{
+				Operation: admissionv1.Create,
+				Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+				Object: runtime.RawExtension{Raw: []byte(fmt.Sprintf(
+					`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-bad-ref","namespace":"default"},"spec":{"workflowRef":%q}}`, workflow.Name))},
+			},
+		})
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring(`spec.workflowRef[wf-bad-foreach].steps[0].forEach`))
+		Expect(resp.Result.Message).ShouldNot(ContainSubstring("spec.workflowSpec"))
 	})
 
 	It("rejects a create when workflowRef cannot be resolved", func() {
