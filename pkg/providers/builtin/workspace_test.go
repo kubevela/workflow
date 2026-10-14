@@ -169,6 +169,38 @@ func TestProvider_Suspend(t *testing.T) {
 	r.Equal(act.suspend, false)
 }
 
+func TestProvider_SuspendMessage(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	ctx := context.Background()
+	pCtx := process.NewContext(process.ContextData{})
+	pCtx.PushData(model.ContextStepSessionID, "test-id")
+	r := require.New(t)
+	act := &mockAction{}
+
+	params := &SuspendParams{
+		Params: SuspendVars{
+			Duration:   "1h",
+			ActionVars: ActionVars{Message: "waiting for approval"},
+		},
+		RuntimeParams: providertypes.RuntimeParams{
+			Action:          act,
+			WorkflowContext: wfCtx,
+			ProcessContext:  pCtx,
+		},
+	}
+	_, err := Suspend(ctx, params)
+	_, ok := err.(errors.GenericActionError)
+	r.True(ok)
+	r.True(act.suspend)
+	r.Equal("waiting for approval", act.msg)
+	// the second call suspends again from the stored resume timestamp
+	act.msg = ""
+	_, err = Suspend(ctx, params)
+	_, ok = err.(errors.GenericActionError)
+	r.True(ok)
+	r.Equal("waiting for approval", act.msg)
+}
+
 func TestProvider_Fail(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)
