@@ -272,6 +272,16 @@ func Read(ctx context.Context, params *ResourceParams) (*ResourceReturns, error)
 	}, nil
 }
 
+// ListVars are #List's $params: the resource names the kind to list.
+type ListVars struct {
+	Resource *unstructured.Unstructured `json:"resource"`
+	Filter   *ListFilter                `json:"filter,omitempty"`
+	Cluster  string                     `json:"cluster,omitempty"`
+}
+
+// ListParams .
+type ListParams = providertypes.Params[ListVars]
+
 // ListReturnVars .
 type ListReturnVars struct {
 	Resources *unstructured.UnstructuredList `json:"values"`
@@ -282,14 +292,20 @@ type ListReturnVars struct {
 type ListReturns = providertypes.Returns[ListReturnVars]
 
 // List lists CRs from cluster.
-func List(ctx context.Context, params *ResourceParams) (*ListReturns, error) {
+func List(ctx context.Context, params *ListParams) (*ListReturns, error) {
 	workload := params.Params.Resource
+	if workload == nil || workload.GetAPIVersion() == "" || workload.GetKind() == "" {
+		return nil, fmt.Errorf("list needs $params.resource, naming the apiVersion and kind to list")
+	}
 	list := &unstructured.UnstructuredList{Object: map[string]interface{}{
 		"kind":       workload.GetKind(),
 		"apiVersion": workload.GetAPIVersion(),
 	}}
 
 	filter := params.Params.Filter
+	if filter == nil {
+		filter = &ListFilter{}
+	}
 	listOpts := []client.ListOption{
 		client.InNamespace(filter.Namespace),
 		client.MatchingLabels(filter.MatchingLabels),
@@ -358,7 +374,7 @@ func GetProviders() map[string]cuexruntime.ProviderFn {
 		"apply":             providertypes.GenericProviderFn[ResourceVars, ResourceReturns](Apply),
 		"apply-in-parallel": providertypes.GenericProviderFn[ApplyInParallelVars, ApplyInParallelReturns](ApplyInParallel),
 		"read":              providertypes.GenericProviderFn[ResourceVars, ResourceReturns](Read),
-		"list":              providertypes.GenericProviderFn[ResourceVars, ListReturns](List),
+		"list":              providertypes.GenericProviderFn[ListVars, ListReturns](List),
 		"delete":            providertypes.GenericProviderFn[ResourceVars, ResourceReturns](Delete),
 		"patch":             providertypes.NativeProviderFn(Patch),
 	}
