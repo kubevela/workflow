@@ -53,10 +53,10 @@
 	...
 }
 
-#HTTPGet: #HTTPDo & {method: "GET"}
+#HTTPGet: #HTTPDo & {$params: method: "GET"}
 
-#HTTPPost: #HTTPDo & {method: "POST"}
+#HTTPPost: #HTTPDo & {$params: method: "POST"}
 
-#HTTPPut: #HTTPDo & {method: "PUT"}
+#HTTPPut: #HTTPDo & {$params: method: "PUT"}
 
-#HTTPDelete: #HTTPDo & {method: "DELETE"}
+#HTTPDelete: #HTTPDo & {$params: method: "DELETE"}
