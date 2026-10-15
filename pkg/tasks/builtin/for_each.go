@@ -319,7 +319,8 @@ func describeItem(item any) string {
 // with the engine. Once an earlier iteration has failed in step mode, the runners
 // record a skip instead of running, as the engine does for later steps in step mode.
 func (tr *forEachTaskRunner) iterationRunners(ctx wfContext.Context, cueCtx *cue.Context, e types.Engine, it iteration, ids map[string]string, skip bool) ([]types.TaskRunner, error) {
-	if _, err := ctx.GetVar(it.loopVar); err != nil {
+	// A pass begun before each.key existed keeps {item, index}, so key is filled in on resume.
+	if v, err := ctx.GetVar(it.loopVar); err != nil || !v.LookupPath(cue.ParsePath("key")).Exists() {
 		b, err := json.Marshal(map[string]any{"item": it.item, "index": it.index, "key": it.key})
 		if err != nil {
 			return nil, err

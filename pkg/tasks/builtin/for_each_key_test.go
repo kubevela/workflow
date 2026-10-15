@@ -166,6 +166,23 @@ func TestForEachKeyNamesTheItems(t *testing.T) {
 	r.Equal("prod-us", endpoints[0]["cluster"])
 }
 
+func TestForEachKeyFillsAResumedPass(t *testing.T) {
+	r := require.New(t)
+	wfCtx := newWorkflowContextForTest(t)
+	r.NoError(wfCtx.SetVar(cuecontext.New().CompileString(`[{cluster: "prod-us", namespace: "shop"}]`), "targets"))
+	r.NoError(wfCtx.SetVar(cuecontext.New().CompileString(`{item: {cluster: "prod-us", namespace: "shop"}, index: 0}`), "scale-prod-us-each"))
+	f := newFixture()
+	runner, err := ForEach(keyedStep("scale-component", "cluster"), f.options("loop-id", ""))
+	r.NoError(err)
+	_, _, err = runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+	r.NoError(err)
+	loopVar, err := wfCtx.GetVar("scale-prod-us-each")
+	r.NoError(err)
+	got, err := loopVar.MarshalJSON()
+	r.NoError(err)
+	r.JSONEq(`{"item": {"cluster": "prod-us", "namespace": "shop"}, "index": 0, "key": "prod-us"}`, string(got))
+}
+
 func TestForEachKeyedGroup(t *testing.T) {
 	r := require.New(t)
 	wfCtx := newWorkflowContextForTest(t)
