@@ -35,6 +35,10 @@ const (
 	DisableWorkflowHTTP featuregate.Feature = "DisableWorkflowHTTP"
 	// BlockPrivateHTTPAddresses if set, outbound HTTP to RFC-1918 and ULA destinations is blocked
 	BlockPrivateHTTPAddresses featuregate.Feature = "BlockPrivateHTTPAddresses"
+	// EnableCelExpressions lets a WorkflowRun that opts in with the
+	// workflowrun.oam.dev/cel-expressions annotation use $( ) expressions in its
+	// step properties and forEach items.
+	EnableCelExpressions featuregate.Feature = "EnableCelExpressions"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -44,6 +48,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableWatchEventListener:   {Default: false, PreRelease: featuregate.Alpha},
 	DisableWorkflowHTTP:        {Default: false, PreRelease: featuregate.Alpha},
 	BlockPrivateHTTPAddresses:  {Default: false, PreRelease: featuregate.Alpha},
+	EnableCelExpressions:       {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

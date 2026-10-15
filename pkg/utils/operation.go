@@ -35,6 +35,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/model/sets"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 
@@ -352,6 +353,11 @@ func RestartFromStep(ctx context.Context, cli client.Client, run *v1alpha1.Workf
 			return err
 		}
 		steps = workflow.Steps
+	}
+
+	// A step reading the one restarted waits on it, so restarts with it.
+	if expressions.EnabledFor(run.Annotations) {
+		steps = expressions.StepsWithReadDependencies(steps, &mode)
 	}
 
 	cm := &corev1.ConfigMap{}

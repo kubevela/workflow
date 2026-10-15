@@ -28,6 +28,7 @@ import (
 	"github.com/kubevela/workflow/pkg/types"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
+	"github.com/kubevela/pkg/cel/template"
 )
 
 // ValidateForEachSteps checks the forEach of each step at admission. base is the path of
@@ -91,9 +92,14 @@ func validateForEach(path *field.Path, step oamv1alpha1.WorkflowStep, allowExpre
 	var expr string
 	isExpr := json.Unmarshal(forEach.Items.Raw, &expr) == nil && strings.Contains(expr, "$(")
 	switch {
+	case isExpr && !soleExpression(expr):
+		// Text around an expression, or two of them, resolve to a string.
+		errs = append(errs, field.Invalid(itemsPath, expr, "must be a list or one $( ) expression that resolves to one"))
 	case isExpr && allowExpression:
 	case isExpr:
-		errs = append(errs, field.Invalid(itemsPath, expr, "must be a list; a $( ) expression here needs KubeVela with EnableCelExpressions"))
+		errs = append(errs, field.Invalid(itemsPath, expr, "must be a list; a $( ) expression here needs expressions turned on: "+
+			`the EnableCelExpressions feature gate, and workflowrun.oam.dev/cel-expressions: "true" on the WorkflowRun `+
+			`or app.oam.dev/cel-expressions: "true" on the Application`))
 	default:
 		errs = append(errs, field.Invalid(itemsPath, string(forEach.Items.Raw), "must be a list"))
 	}
@@ -165,4 +171,15 @@ func validateGeneratedNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, 
 		}
 	}
 	return errs
+}
+
+// soleExpression reports whether a value is exactly one $( ) expression, as the
+// engine reads it: whitespace around one is not text.
+func soleExpression(v string) bool {
+	parsed, err := template.Parse(v)
+	if err != nil {
+		return false
+	}
+	_, sole := parsed.SoleExpr()
+	return sole
 }

@@ -25,9 +25,12 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
+
+	"github.com/kubevela/workflow/pkg/features"
 )
 
 var _ = Describe("Test WorkflowRun Validator", func() {
@@ -169,6 +172,55 @@ var _ = Describe("Test WorkflowRun Validator", func() {
 		resp = handle(`[{"name":"s","type":"suspend","forEach":{"items":"$(source.a.b)"}}]`)
 		Expect(resp.Allowed).Should(BeFalse())
 		Expect(resp.Result.Message).Should(ContainSubstring("EnableCelExpressions"))
+	})
+
+	It("Test WorkflowRun Validator expressions", func() {
+		handle := func(annotations, steps string) admission.Response {
+			return handler.Handle(ctx, admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: "core.oam.dev", Version: "v1alpha1", Resource: "workflowruns"},
+					Object: runtime.RawExtension{
+						Raw: []byte(`{"apiVersion":"core.oam.dev/v1alpha1","kind":"WorkflowRun","metadata":{"name":"wr-sample",` +
+							`"annotations":` + annotations + `},"spec":{"workflowSpec":{"steps":` + steps + `}}}`),
+					},
+				},
+			})
+		}
+		optedIn := `{"workflowrun.oam.dev/cel-expressions":"true"}`
+		valid := `[{"name":"list","type":"suspend","outputs":[{"name":"tenants","valueFrom":"value"}]},` +
+			`{"name":"per-tenant","type":"step-group","forEach":{"items":"$(steps.list.outputs.tenants)"},` +
+			`"subSteps":[{"name":"greet","type":"suspend","properties":{"message":"hi $(each.item)"}}]}]`
+
+		before := utilfeature.DefaultMutableFeatureGate.Enabled(features.EnableCelExpressions)
+		DeferCleanup(func() {
+			Expect(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(features.EnableCelExpressions): before})).Should(Succeed())
+		})
+
+		By("refusing them with the feature gate off, even when the run opts in")
+		Expect(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(features.EnableCelExpressions): false})).Should(Succeed())
+		resp := handle(optedIn, valid)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("EnableCelExpressions"))
+
+		Expect(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(features.EnableCelExpressions): true})).Should(Succeed())
+		By("refusing them on a run that does not opt in")
+		Expect(handle(`{}`, valid).Allowed).Should(BeFalse())
+
+		By("allowing them on a run that opts in")
+		resp = handle(optedIn, valid)
+		Expect(resp.Allowed).Should(BeTrue(), resp.Result.Message)
+
+		By("refusing a read that could never be answered")
+		resp = handle(optedIn, `[{"name":"notify","type":"suspend","properties":{"message":"$(steps.build.outputs.image)"}},`+
+			`{"name":"build","type":"suspend","outputs":[{"name":"image","valueFrom":"value"}]}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring("build runs after notify"))
+
+		By("refusing a root the workflow does not offer")
+		resp = handle(optedIn, `[{"name":"notify","type":"suspend","properties":{"message":"$(source.cfg.data)"}}]`)
+		Expect(resp.Allowed).Should(BeFalse())
+		Expect(resp.Result.Message).Should(ContainSubstring(`undeclared reference to 'source'`))
 	})
 
 	It("Test WorkflowRun Validator workflow step valid timeout [allow]", func() {

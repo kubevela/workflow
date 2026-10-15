@@ -59,7 +59,22 @@ func TestValidateForEachSteps(t *testing.T) {
 		"items an object": {steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, map[string]int{"a": 1})})}, want: []string{"steps[0].forEach.items", "must be a list"}},
 		"items expression, not allowed": {
 			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.inv.clusters)")})},
-			want:  []string{"must be a list", "EnableCelExpressions"},
+			want: []string{"must be a list", "EnableCelExpressions",
+				`workflowrun.oam.dev/cel-expressions: "true"`, `app.oam.dev/cel-expressions: "true"`},
+		},
+		"text around an expression is not a list": {
+			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, "prefix $(steps.list.outputs.items)")})},
+			expression: true,
+			want:       []string{"steps[0].forEach.items", "must be a list or one $( ) expression"},
+		},
+		"whitespace around one expression leaves it one": {
+			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, " $(steps.list.outputs.items) ")})},
+			expression: true,
+		},
+		"two expressions are not a list": {
+			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.a.list)$(source.b.list)")})},
+			expression: true,
+			want:       []string{"must be a list or one $( ) expression"},
 		},
 		"items expression, allowed": {
 			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.inv.clusters)")})},

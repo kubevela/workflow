@@ -25,10 +25,14 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/workflow/api/v1alpha1"
+	"github.com/kubevela/workflow/pkg/features"
 	wfTypes "github.com/kubevela/workflow/pkg/types"
 )
 
@@ -1330,4 +1334,57 @@ func TestRestartFromStepWorkflowRefInSystemNamespace(t *testing.T) {
 	r.False(got.Status.Terminated)
 	r.False(got.Status.Finished)
 	r.True(got.Status.EndTime.IsZero())
+}
+
+func TestRestartFromStepResetsAStepThatReadsIt(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnableCelExpressions, true)
+	ctx := context.Background()
+	r := require.New(t)
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "wr-restart-reads-context", Namespace: "default"}}
+	r.NoError(cli.Create(ctx, cm))
+	defer func() { r.NoError(cli.Delete(ctx, cm)) }()
+
+	step := func(name, props string, outputs ...string) oamv1alpha1.WorkflowStep {
+		s := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: name, Type: "echo"}}
+		if props != "" {
+			s.Properties = &runtime.RawExtension{Raw: []byte(props)}
+		}
+		for _, o := range outputs {
+			s.Outputs = append(s.Outputs, oamv1alpha1.OutputItem{Name: o, ValueFrom: "value"})
+		}
+		return s
+	}
+	status := func(name string, phase v1alpha1.WorkflowStepPhase) v1alpha1.WorkflowStepStatus {
+		return v1alpha1.WorkflowStepStatus{StepStatus: v1alpha1.StepStatus{Name: name, Phase: phase}}
+	}
+	run := &v1alpha1.WorkflowRun{
+		ObjectMeta: metav1.ObjectMeta{Name: "wr-restart-reads", Namespace: "default",
+			Annotations: map[string]string{wfTypes.AnnotationCelExpressions: "true"}},
+		Spec: v1alpha1.WorkflowRunSpec{WorkflowSpec: &oamv1alpha1.WorkflowSpec{Steps: []oamv1alpha1.WorkflowStep{
+			step("build", "", "image"),
+			step("deploy", `{"msg":"$(steps.build.outputs.image)"}`),
+			step("lint", ""),
+		}}},
+		Status: v1alpha1.WorkflowRunStatus{
+			Mode:           oamv1alpha1.WorkflowExecuteMode{Steps: v1alpha1.WorkflowModeDAG, SubSteps: v1alpha1.WorkflowModeDAG},
+			Terminated:     true,
+			ContextBackend: &corev1.ObjectReference{Name: cm.Name, Namespace: "default"},
+			Steps: []v1alpha1.WorkflowStepStatus{
+				status("build", v1alpha1.WorkflowStepPhaseFailed),
+				status("deploy", v1alpha1.WorkflowStepPhaseSkipped),
+				status("lint", v1alpha1.WorkflowStepPhaseSucceeded),
+			},
+		},
+	}
+	r.NoError(cli.Create(ctx, run))
+	defer func() { r.NoError(cli.Delete(ctx, run)) }()
+
+	r.NoError(RestartFromStep(ctx, cli, run, "build"))
+	got := &v1alpha1.WorkflowRun{}
+	r.NoError(cli.Get(ctx, client.ObjectKey{Name: run.Name, Namespace: run.Namespace}, got))
+	var kept []string
+	for _, s := range got.Status.Steps {
+		kept = append(kept, s.Name)
+	}
+	r.Equal([]string{"lint"}, kept, "deploy reads build, so it runs again with it")
 }

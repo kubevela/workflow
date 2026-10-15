@@ -45,6 +45,7 @@ import (
 	wfconfig "github.com/kubevela/workflow/pkg/config"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/executor"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/generator"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
@@ -131,7 +132,11 @@ func (r *WorkflowRunReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	isUpdate := instance.Status.Message != ""
 
-	runners, err := generator.GenerateRunners(logCtx, instance, types.StepGeneratorOptions{})
+	var stepOptions types.StepGeneratorOptions
+	if expressions.EnabledFor(run.Annotations) {
+		stepOptions.Expressions = &types.ExpressionOptions{}
+	}
+	runners, err := generator.GenerateRunners(logCtx, instance, stepOptions)
 	if err != nil {
 		logCtx.Error(err, "[generate runners]")
 		r.Recorder.Event(run, event.Warning(v1alpha1.ReasonGenerate, errors.WithMessage(err, v1alpha1.MessageFailedGenerate)))

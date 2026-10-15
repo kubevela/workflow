@@ -24,14 +24,17 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"github.com/kubevela/pkg/cel"
 	"github.com/kubevela/pkg/util/slices"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -61,6 +64,7 @@ func ForEach(step oamv1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (ty
 		bodyMode: opt.SubStepExecuteMode,
 		pCtx:     opt.ProcessContext,
 		generate: opt.SubTaskGenerator,
+		exprs:    opt.Expressions,
 	}, nil
 }
 
@@ -72,6 +76,7 @@ type forEachTaskRunner struct {
 	bodyMode oamv1alpha1.WorkflowMode
 	pCtx     process.Context
 	generate func(step oamv1alpha1.WorkflowStepBase, id string) (types.TaskRunner, error)
+	exprs    types.PropertyEvaluator
 }
 
 // Name return the step name.
@@ -158,7 +163,13 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 		return status, &types.Operation{Terminated: true}, nil
 	}
 
-	items, err := tr.resolveItems(ctx)
+	items, err := tr.resolveItems(tracer.GetContext(), ctx, options.StepStatus)
+	if errors.Is(err, cel.ErrNotReady) {
+		status.Phase = v1alpha1.WorkflowStepPhaseRunning
+		status.Reason = types.StatusReasonWait
+		status.Message = err.Error()
+		return status, &types.Operation{Waiting: true}, nil
+	}
 	if err != nil {
 		return failed(status, types.StatusReasonParameter, err), &types.Operation{Terminated: true}, nil
 	}
@@ -335,8 +346,10 @@ func countSteps(iterations []iteration) int {
 }
 
 // resolveItems returns the pinned items, or reads forEach.items or forEach.from and
-// pins the result.
-func (tr *forEachTaskRunner) resolveItems(ctx wfContext.Context) ([]any, error) {
+// pins the result. An items expression is resolved here, once, when the loop
+// starts.
+func (tr *forEachTaskRunner) resolveItems(goCtx context.Context, ctx wfContext.Context,
+	stepStatus map[string]v1alpha1.StepStatus) ([]any, error) {
 	var items []any
 	if pinned := ctx.GetMutableValue(PinnedItemsKey(tr.id)); pinned != "" {
 		if err := json.Unmarshal([]byte(pinned), &items); err != nil {
@@ -352,9 +365,26 @@ func (tr *forEachTaskRunner) resolveItems(ctx wfContext.Context) ([]any, error) 
 		return nil, errors.New("forEach needs exactly one of items and from")
 	case forEach.Items != nil:
 		raw = forEach.Items.Raw
+		// Items may be one expression or a list holding some. Without expressions
+		// turned on a list is items as written, but a lone expression has none.
 		var expr string
-		if json.Unmarshal(raw, &expr) == nil && strings.Contains(expr, "$(") {
-			return nil, errors.Errorf("forEach.items %q was not resolved; $( ) expressions need KubeVela with EnableCelExpressions", expr)
+		if tr.exprs == nil && json.Unmarshal(raw, &expr) == nil && strings.Contains(expr, "$(") {
+			return nil, errors.Errorf("forEach.items %q was not resolved; $( ) expressions are not turned on for this workflow", expr)
+		}
+		if tr.exprs != nil && expressions.MayHoldExpression(raw) {
+			wrapped := &runtime.RawExtension{Raw: append(append([]byte(`{"items":`), raw...), '}')}
+			resolved, err := tr.exprs.Properties(goCtx, types.ExpressionStep{Name: tr.name, Type: tr.step.Type},
+				wrapped, ctx, tr.pCtx, stepStatus)
+			if err != nil {
+				return nil, err
+			}
+			var out struct {
+				Items json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(resolved.Raw, &out); err != nil {
+				return nil, err
+			}
+			raw = out.Items
 		}
 	default:
 		v, err := ctx.GetVar(strings.Split(forEach.From, ".")...)
@@ -431,7 +461,7 @@ func expandIterations(step oamv1alpha1.WorkflowStep, items []any) ([]iteration, 
 
 	iterations := make([]iteration, 0, len(items))
 	for i, item := range items {
-		scope := func(name string) string { return iterationName(step.Name, i, name) }
+		scope := func(name string) string { return types.IterationName(step.Name, i, name) }
 		stepName := scope
 		if !group {
 			stepName = func(string) string { return fmt.Sprintf("%s-%d", step.Name, i) }
@@ -462,10 +492,6 @@ func expandIterations(step oamv1alpha1.WorkflowStep, items []any) ([]iteration, 
 		iterations = append(iterations, iteration{index: i, item: item, loopVar: scope(eachRoot), steps: steps})
 	}
 	return iterations, nil
-}
-
-func iterationName(loop string, index int, name string) string {
-	return fmt.Sprintf("%s-%d-%s", loop, index, name)
 }
 
 // IterationTemplate returns the body step that the iteration step called name was
@@ -517,7 +543,7 @@ func cutIndex(loop, name string) (int, string, bool) {
 
 // IterationVarName is the name a body output, or the loop variable, has in pass index.
 func IterationVarName(step oamv1alpha1.WorkflowStep, index int, name string) string {
-	return iterationName(step.Name, index, name)
+	return types.IterationName(step.Name, index, name)
 }
 
 // IterationVarIndex returns the index of the pass a workflow variable belongs to: the
@@ -559,7 +585,7 @@ func collectOutputs(ctx wfContext.Context, cueCtx *cue.Context, step oamv1alpha1
 			values := make([]string, count)
 			for i := range values {
 				values[i] = "null"
-				if v, err := ctx.GetVar(iterationName(step.Name, i, o.Name)); err == nil {
+				if v, err := ctx.GetVar(types.IterationName(step.Name, i, o.Name)); err == nil {
 					b, err := v.MarshalJSON()
 					if err != nil {
 						return errors.WithMessagef(err, "read output %s of iteration %d", o.Name, i)

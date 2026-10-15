@@ -313,6 +313,27 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              dependencies:
+                description: |-
+                  Dependencies is what each step and sub-step waits on before it starts,
+                  whether named in its dependsOn or read by its expressions.
+                items:
+                  description: StepDependency is one step a step waits on before it
+                    starts, and why.
+                  properties:
+                    dependsOn:
+                      type: string
+                    source:
+                      description: StepDependencySource is why a step depends on another.
+                      type: string
+                    step:
+                      type: string
+                  required:
+                  - dependsOn
+                  - source
+                  - step
+                  type: object
+                type: array
               endTime:
                 format: date-time
                 type: string

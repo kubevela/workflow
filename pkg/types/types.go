@@ -18,12 +18,15 @@ package types
 
 import (
 	"context"
+	"fmt"
 
 	"cuelang.org/go/cue"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/feature"
 
+	"github.com/kubevela/pkg/cel"
 	"github.com/kubevela/pkg/cue/cuex"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
 
@@ -43,7 +46,11 @@ type WorkflowInstance struct {
 	Context   map[string]interface{}
 	Mode      *oamv1alpha1.WorkflowExecuteMode
 	Steps     []oamv1alpha1.WorkflowStep
-	Status    v1alpha1.WorkflowRunStatus
+	// InferredDependsOn is, by step name, the steps each step's expressions read
+	// that it waits on: the entries of its dependsOn the reads added, and the
+	// earlier steps a workflow run in order puts first without one.
+	InferredDependsOn map[string][]string
+	Status            v1alpha1.WorkflowRunStatus
 }
 
 // WorkflowMeta is the meta information for workflow instance
@@ -144,6 +151,38 @@ type TaskGeneratorOptions struct {
 	// SubTaskGenerator builds a runner for a sub-step that only exists at run time,
 	// such as one iteration of a for-each body.
 	SubTaskGenerator func(step oamv1alpha1.WorkflowStepBase, id string) (TaskRunner, error)
+	// Expressions resolves the $( ) expressions in the step's properties when it
+	// runs; nil leaves them as written.
+	Expressions PropertyEvaluator
+}
+
+// IterationName is what iteration index of a forEach loop over a step-group calls
+// its body step, or a body output, name: <loop>-<index>-<name>. A loop over one
+// step names its pass <loop>-<index>.
+func IterationName(loop string, index int, name string) string {
+	return fmt.Sprintf("%s-%d-%s", loop, index, name)
+}
+
+// PropertyEvaluator resolves the $( ) expressions in a step's properties. An
+// error that is cel.ErrNotReady means the step waits and tries again.
+type PropertyEvaluator interface {
+	Properties(ctx context.Context, step ExpressionStep, properties *runtime.RawExtension, wfCtx wfContext.Context,
+		pCtx process.Context, status map[string]v1alpha1.StepStatus) (*runtime.RawExtension, error)
+}
+
+// ExpressionStep is the step whose expressions are resolved: its name as it runs,
+// so an iteration's step has its own, and its type.
+type ExpressionStep struct {
+	Name string
+	Type string
+}
+
+// ExpressionOptions turns on $( ) expressions in step properties. The workflow
+// answers context, steps and each; a host adds roots of its own with a resolver
+// for each.
+type ExpressionOptions struct {
+	Roots     []cel.Root
+	Resolvers map[string]cel.Resolver
 }
 
 // StepGeneratorOptions is the options for generate step.
@@ -153,6 +192,9 @@ type StepGeneratorOptions struct {
 	StepConvertor  map[string]func(step oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error)
 	LogLevel       int
 	Compiler       *cuex.Compiler
+	// Expressions turns on $( ) expressions in step properties; nil leaves them
+	// as written.
+	Expressions *ExpressionOptions
 }
 
 // Action is that workflow provider can do.
@@ -279,6 +321,9 @@ const (
 const (
 	// AnnotationWorkflowRunDebug is the annotation for debug
 	AnnotationWorkflowRunDebug = "workflowrun.oam.dev/debug"
+	// AnnotationCelExpressions set to "true" opts a WorkflowRun in to $( )
+	// expressions, where the EnableCelExpressions feature gate is on.
+	AnnotationCelExpressions = "workflowrun.oam.dev/cel-expressions"
 	// AnnotationControllerRequirement indicates the controller version that can process the workflow run
 	AnnotationControllerRequirement = "workflowrun.oam.dev/controller-version-require"
 )

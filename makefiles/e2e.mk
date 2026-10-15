@@ -11,6 +11,7 @@ e2e-setup-controller:
 		--set image.repository=oamdev/vela-workflow \
 		--set image.tag=latest      								\
 		--set image.pullPolicy=IfNotPresent         \
+		--set workflow.enableCelExpressions=true    \
 		--wait vela-workflow                        \
 		./charts/vela-workflow											\
 		--debug

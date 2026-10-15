@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/kubevela/pkg/cel"
 	"github.com/kubevela/pkg/cue/cuex"
 	"github.com/kubevela/pkg/cue/util"
 	monitorContext "github.com/kubevela/pkg/monitor/context"
@@ -38,6 +39,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/hooks"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/types"
@@ -102,13 +104,26 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			stepStatus: initialStatus,
 		}
 
-		var err error
-
+		// written is the step before conversion. Its expressions are resolved from
+		// it, and the result converted again, because a convertor may add text that
+		// belongs to something else, such as a component's properties.
+		// A copy, so a convertor editing the step in place does not edit it too.
+		written := *wfStep.DeepCopy()
+		var convert func(oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error)
+		var propertyEvaluator types.PropertyEvaluator
 		if genOpt != nil {
 			exec.wfStatus.ID = genOpt.ID
-			if genOpt.StepConvertor != nil {
-				wfStep, err = genOpt.StepConvertor(wfStep)
-				if err != nil {
+			convert = genOpt.StepConvertor
+			propertyEvaluator = genOpt.Expressions
+			if convert != nil {
+				converted, err := convert(*wfStep.DeepCopy())
+				switch {
+				case err == nil:
+					wfStep = converted
+				// A convertor reading a property an expression gives fails until
+				// the expression is resolved; the run converts it then.
+				case propertyEvaluator != nil && wfStep.Properties != nil && expressions.MayHoldExpression(wfStep.Properties.Raw):
+				default:
 					return nil, errors.WithMessage(err, "convert step")
 				}
 			}
@@ -169,7 +184,8 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				Action:          exec,
 			})
 
-			basicVal, err := MakeBasicValue(tracer, options.Compiler, wfStep.Properties, options.PCtx)
+			step, exprErr := resolveProperties(tracer.GetContext(), propertyEvaluator, written, wfStep, convert, wfCtx, options)
+			basicVal, err := MakeBasicValue(tracer, options.Compiler, step.Properties, options.PCtx)
 			if err != nil {
 				tracer.Error(err, "make context parameter")
 				return v1alpha1.StepStatus{}, nil, errors.WithMessage(err, "make context parameter")
@@ -192,7 +208,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 					}
 				}
 				for _, hook := range options.PostStopHooks {
-					if err := hook(wfCtx, taskv, wfStep, exec.status(), options.StepStatus); err != nil {
+					if err := hook(wfCtx, taskv, step, exec.status(), options.StepStatus); err != nil {
 						exec.wfStatus.Message = err.Error()
 						stepStatus = exec.status()
 						operations = exec.operation()
@@ -202,7 +218,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			}()
 
 			for _, hook := range options.PreCheckHooks {
-				result, err := hook(wfStep, &types.PreCheckOptions{BasicValue: basicVal})
+				result, err := hook(step, &types.PreCheckOptions{BasicValue: basicVal})
 				if err != nil {
 					tracer.Error(err, "do preCheckHook")
 					exec.Skip(fmt.Sprintf("pre check error: %s", err.Error()))
@@ -217,8 +233,19 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				}
 			}
 
+			// A step its checks skip never needed its reads answered.
+			if exprErr != nil {
+				if errors.Is(exprErr, cel.ErrNotReady) {
+					exec.Wait(exprErr.Error())
+					return exec.status(), exec.operation(), nil
+				}
+				tracer.Error(exprErr, "resolve expressions")
+				exec.err(wfCtx, false, exprErr, types.StatusReasonRendering)
+				return exec.status(), exec.operation(), nil
+			}
+
 			for _, hook := range options.PreStartHooks {
-				if basicVal, err = hook(wfCtx, basicVal, wfStep); err != nil {
+				if basicVal, err = hook(wfCtx, basicVal, step); err != nil {
 					tracer.Error(err, "do preStartHook")
 					exec.err(wfCtx, false, err, types.StatusReasonInput)
 					return exec.status(), exec.operation(), nil
@@ -262,6 +289,32 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 		}
 		return tRunner, nil
 	}, nil
+}
+
+// resolveProperties is the step to run: written with its properties' expressions
+// resolved, then converted. Without an evaluator, or on an error, it is
+// converted, the step as generated, so the step's checks can still run.
+func resolveProperties(ctx context.Context, evaluator types.PropertyEvaluator, written, converted oamv1alpha1.WorkflowStep,
+	convert func(oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error), wfCtx wfContext.Context,
+	options *types.TaskRunOptions) (oamv1alpha1.WorkflowStep, error) {
+	if evaluator == nil {
+		return converted, nil
+	}
+	props, err := evaluator.Properties(ctx, types.ExpressionStep{Name: written.Name, Type: written.Type}, written.Properties,
+		wfCtx, options.PCtx, options.StepStatus)
+	if err != nil {
+		return converted, err
+	}
+	step := written
+	step.Properties = props
+	if convert == nil {
+		return step, nil
+	}
+	step, err = convert(step)
+	if err != nil {
+		return converted, errors.WithMessage(err, "convert step")
+	}
+	return step, nil
 }
 
 // ValidateIfValue validates the if value
