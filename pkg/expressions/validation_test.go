@@ -154,3 +154,31 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+// In order, a read of an earlier step that itself waits for the reader through
+// dependsOn could never be answered.
+func TestValidateRefusesAnInOrderReadOfAStepWaitingForTheReader(t *testing.T) {
+	steps := []v1alpha1.WorkflowStep{
+		{WorkflowStepBase: v1alpha1.WorkflowStepBase{Name: "build", Type: "build", DependsOn: []string{"notify"},
+			Outputs: v1alpha1.StepOutputs{{Name: "image", ValueFrom: "value"}}}},
+		{WorkflowStepBase: v1alpha1.WorkflowStepBase{Name: "notify", Type: "notify",
+			Properties: &runtime.RawExtension{Raw: []byte(`{"m":"$(steps.build.outputs.image)"}`)}}},
+	}
+	errs := Validate(field.NewPath("steps"), steps, nil)
+	require.Len(t, errs, 1, "errors: %v", errs)
+	require.Equal(t, "steps[1].properties", errs[0].Field)
+	require.Contains(t, errs[0].Detail, "reading build closes a cycle through dependsOn")
+}
+
+func TestMayHoldExpression(t *testing.T) {
+	for raw, want := range map[string]bool{
+		`{"x":"$(context.name)"}`:           true,
+		`{"x":"\u0024(context.name)"}`:      true,
+		`{"x":"$\u0028context.name)"}`:      true,
+		`{"x":"\u0024\u0028context.name)"}`: true,
+		`{"x":"plain"}`:                     false,
+		`{"x":"\u003cb\u003e"}`:             false,
+	} {
+		require.Equal(t, want, MayHoldExpression([]byte(raw)), raw)
+	}
+}

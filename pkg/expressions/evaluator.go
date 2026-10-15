@@ -32,9 +32,10 @@ import (
 )
 
 // MayHoldExpression reports whether a JSON document may hold a $( ) expression:
-// it holds the marker, as written or as a JSON escape of its $.
+// it holds the marker, as written or with either character as a JSON escape.
 func MayHoldExpression(raw []byte) bool {
-	return bytes.Contains(raw, []byte("$(")) || bytes.Contains(raw, []byte(`\u0024`))
+	return bytes.Contains(raw, []byte("$(")) || bytes.Contains(raw, []byte(`\u0024`)) ||
+		bytes.Contains(raw, []byte(`\u0028`))
 }
 
 // Evaluator resolves the expressions in one workflow's step properties.

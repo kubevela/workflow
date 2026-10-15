@@ -157,8 +157,8 @@ func (e *Evaluator) readEdges(steps []v1alpha1.WorkflowStep, mode *v1alpha1.Work
 				// only change when the reader is skipped: with one, a failure of any
 				// other earlier step no longer skips it.
 				if inOrder {
-					if !slices.Contains(inferred[reader.Name], name) && !slices.Contains(reader.DependsOn, name) {
-						inferred[reader.Name] = append(inferred[reader.Name], name)
+					if !recordInOrder(steps, reader, name, inferred) {
+						unanswerable(from, r.field, producer, fmt.Sprintf("reading %s closes a cycle through dependsOn", name))
 					}
 					continue
 				}
@@ -172,6 +172,20 @@ func (e *Evaluator) readEdges(steps []v1alpha1.WorkflowStep, mode *v1alpha1.Work
 		}
 	}
 	return steps, inferred
+}
+
+// recordInOrder records a read the order answers, as reader waiting on the step
+// named name, unless that step itself waits for the reader through dependsOn,
+// which no order can answer. It reports whether the read can be answered.
+func recordInOrder(steps []v1alpha1.WorkflowStep, reader *v1alpha1.WorkflowStepBase, name string,
+	inferred map[string][]string) bool {
+	if waitsFor(steps, name, reader.Name) {
+		return false
+	}
+	if !slices.Contains(inferred[reader.Name], name) && !slices.Contains(reader.DependsOn, name) {
+		inferred[reader.Name] = append(inferred[reader.Name], name)
+	}
+	return true
 }
 
 // producerOf is the step a read of steps.<producer> from the step at from waits
