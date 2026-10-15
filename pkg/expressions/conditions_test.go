@@ -153,7 +153,7 @@ func TestEvaluatorCondition(t *testing.T) {
 	}, steps(t), "run-1")
 	require.NoError(t, err)
 	pCtx := process.NewContext(process.ContextData{Name: "onboard"})
-	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{process.WithName("notify"), process.WithLoop("eu", 2)})
+	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{process.WithName("notify"), process.WithLoop("eu", 2, "2")})
 	status := map[string]wfv1alpha1.StepStatus{
 		"build":        {Phase: wfv1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonFailedAfterRetries},
 		"list-tenants": {Phase: wfv1alpha1.WorkflowStepPhaseSucceeded},

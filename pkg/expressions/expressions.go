@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -44,7 +43,7 @@ const (
 	RootContext = "context"
 	// RootSteps is the outputs earlier steps declare, as steps.<name>.outputs.<output>.
 	RootSteps = "steps"
-	// RootEach is the current forEach iteration, as each.item and each.index: the
+	// RootEach is the current forEach iteration, as each.item, each.index and each.key: the
 	// names inputs[].from reads it by.
 	RootEach = model.ContextEach
 )
@@ -163,12 +162,12 @@ func newWorkflowSteps(steps []v1alpha1.WorkflowStep) workflowSteps {
 }
 
 // reader is the step whose properties are being resolved: its name as it runs
-// and as written, and the loop and iteration it is in, if any.
+// and as written, and the loop it is in and the key of its pass, if any.
 type reader struct {
 	name    string
 	written string
 	loop    string
-	index   int
+	key     string
 }
 
 func (ws workflowSteps) readerOf(pCtx process.Context) reader {
@@ -176,20 +175,20 @@ func (ws workflowSteps) readerOf(pCtx process.Context) reader {
 	r.name, _ = pCtx.GetData(model.ContextStepName).(string)
 	r.written = r.name
 	each, _ := pCtx.GetData(model.ContextEach).(map[string]interface{})
-	index, ok := each["index"].(int)
+	key, ok := each["key"].(string)
 	if !ok {
 		return r
 	}
 	// The longest match wins, so a loop named like another's passes cannot take
 	// its readers; admission refuses such names anyway.
 	for loop := range ws.loops {
-		prefix := types.IterationName(loop, strconv.Itoa(index), "")
+		prefix := types.IterationName(loop, key, "")
 		switch {
 		case len(loop) <= len(r.loop):
-		case r.name == fmt.Sprintf("%s-%d", loop, index):
-			r.loop, r.index, r.written = loop, index, loop
+		case r.name == loop+"-"+key:
+			r.loop, r.key, r.written = loop, key, loop
 		case strings.HasPrefix(r.name, prefix):
-			r.loop, r.index, r.written = loop, index, strings.TrimPrefix(r.name, prefix)
+			r.loop, r.key, r.written = loop, key, strings.TrimPrefix(r.name, prefix)
 		}
 	}
 	return r
@@ -296,7 +295,7 @@ func (ws workflowSteps) located(step, name string, r reader, what string) (statu
 	if loop, ok := ws.loopOf[step]; ok {
 		statusOf = loop
 		if loop == r.loop {
-			statusOf, varOf = types.IterationName(loop, strconv.Itoa(r.index), step), types.IterationName(loop, strconv.Itoa(r.index), name)
+			statusOf, varOf = types.IterationName(loop, r.key, step), types.IterationName(loop, r.key, name)
 		}
 	}
 	if (r.name != "" && statusOf == r.name) || (r.loop != "" && step == r.loop) {

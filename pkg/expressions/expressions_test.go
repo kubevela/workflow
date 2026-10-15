@@ -189,12 +189,12 @@ func TestContextReadsTheStepsContext(t *testing.T) {
 func TestEachReadsTheIteration(t *testing.T) {
 	pCtx := process.NewContext(process.ContextData{Name: "onboard"})
 	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{
-		process.WithLoop(map[string]interface{}{"name": "acme"}, 2)})
+		process.WithLoop(map[string]interface{}{"name": "acme"}, 2, "acme")})
 	resolvers := map[string]cel.Resolver{RootEach: EachResolver(pCtx), RootContext: ContextResolver(pCtx)}
 
-	out, err := eval(t, `{"m":"$(each.item.name) #$(each.index)","whole":"$(each.item)"}`, resolvers)
+	out, err := eval(t, `{"m":"$(each.item.name) #$(each.index)","whole":"$(each.item)","key":"$(each.key)"}`, resolvers)
 	require.NoError(t, err)
-	require.Equal(t, map[string]interface{}{"m": "acme #2", "whole": map[string]interface{}{"name": "acme"}}, out,
+	require.Equal(t, map[string]interface{}{"m": "acme #2", "whole": map[string]interface{}{"name": "acme"}, "key": "acme"}, out,
 		"each reads as inputs[].from does")
 
 	out, err = eval(t, `{"m":"$(context.each.item.name)"}`, resolvers)

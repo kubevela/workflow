@@ -337,8 +337,8 @@ func TestForEachLiteralItems(t *testing.T) {
 	r.Equal([]string{"scale-0", "scale-1"}, f.names())
 
 	r.Equal([]any{
-		map[string]any{"item": "a", "index": 0},
-		map[string]any{"item": "b", "index": 1},
+		map[string]any{"item": "a", "index": 0, "key": "0"},
+		map[string]any{"item": "b", "index": 1, "key": "1"},
 	}, f.seen)
 	r.Nil(f.pCtx.GetData(model.ContextEach), "loop context is removed after the iteration runs")
 
@@ -346,7 +346,7 @@ func TestForEachLiteralItems(t *testing.T) {
 	r.NoError(err)
 	got, err := loopVar.MarshalJSON()
 	r.NoError(err)
-	r.JSONEq(`{"item": "b", "index": 1}`, string(got))
+	r.JSONEq(`{"item": "b", "index": 1, "key": "1"}`, string(got))
 
 	collected, err := wfCtx.GetVar("endpoint")
 	r.NoError(err)
@@ -909,10 +909,10 @@ func TestIterationRunnerPendingSeesTheLoop(t *testing.T) {
 	r := require.New(t)
 	f := newFixture()
 	inner := &fakeRunner{step: oamv1alpha1.WorkflowStepBase{Name: "scale-1"}, pCtx: f.pCtx, seen: &f.seen}
-	runner := &iterationRunner{TaskRunner: inner, pCtx: f.pCtx, item: "b", index: 1}
+	runner := &iterationRunner{TaskRunner: inner, pCtx: f.pCtx, item: "b", index: 1, key: "1"}
 	pending, _ := runner.Pending(monitorContext.NewTraceContext(context.Background(), ""), nil, nil)
 	r.False(pending)
-	r.Equal([]any{map[string]any{"item": "b", "index": 1}}, f.seen)
+	r.Equal([]any{map[string]any{"item": "b", "index": 1, "key": "1"}}, f.seen)
 	r.Nil(f.pCtx.GetData(model.ContextEach), "loop context is removed once the check returns")
 }
 

@@ -41,7 +41,7 @@ const (
 	ContextStepName = "stepName"
 	// ContextStepGroupName  is the name of the stepGroup
 	ContextStepGroupName = "stepGroupName"
-	// ContextEach holds the item and index of the current for-each iteration.
+	// ContextEach holds the item, index and key of the current for-each iteration.
 	ContextEach = "each"
 	// ContextSpanID is name for span id.
 	ContextSpanID = "spanID"

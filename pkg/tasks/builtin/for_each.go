@@ -320,7 +320,7 @@ func describeItem(item any) string {
 // record a skip instead of running, as the engine does for later steps in step mode.
 func (tr *forEachTaskRunner) iterationRunners(ctx wfContext.Context, cueCtx *cue.Context, e types.Engine, it iteration, ids map[string]string, skip bool) ([]types.TaskRunner, error) {
 	if _, err := ctx.GetVar(it.loopVar); err != nil {
-		b, err := json.Marshal(map[string]any{"item": it.item, "index": it.index})
+		b, err := json.Marshal(map[string]any{"item": it.item, "index": it.index, "key": it.key})
 		if err != nil {
 			return nil, err
 		}
@@ -339,7 +339,7 @@ func (tr *forEachTaskRunner) iterationRunners(ctx wfContext.Context, cueCtx *cue
 		if err != nil {
 			return nil, errors.WithMessagef(err, "generate iteration %d of forEach step %s", it.index, tr.name)
 		}
-		runners = append(runners, &iterationRunner{TaskRunner: runner, pCtx: tr.pCtx, item: it.item, index: it.index})
+		runners = append(runners, &iterationRunner{TaskRunner: runner, pCtx: tr.pCtx, item: it.item, index: it.index, key: it.key})
 	}
 	return runners, nil
 }
@@ -444,7 +444,9 @@ func failed(status v1alpha1.StepStatus, reason string, err error) v1alpha1.StepS
 type iteration struct {
 	index int
 	item  any
-	// loopVar is the workflow variable holding {item, index} for this pass.
+	// key is what names this pass's steps: the item's key, or its index.
+	key string
+	// loopVar is the workflow variable holding {item, index, key} for this pass.
 	loopVar string
 	steps   []oamv1alpha1.WorkflowStepBase
 }
@@ -515,7 +517,7 @@ func expandIterations(step oamv1alpha1.WorkflowStep, items []any, labels []strin
 			}
 			steps = append(steps, s)
 		}
-		iterations = append(iterations, iteration{index: i, item: item, loopVar: scope(eachRoot), steps: steps})
+		iterations = append(iterations, iteration{index: i, item: item, key: label, loopVar: scope(eachRoot), steps: steps})
 	}
 	return iterations, nil
 }
@@ -705,10 +707,11 @@ type iterationRunner struct {
 	pCtx  process.Context
 	item  any
 	index int
+	key   string
 }
 
 func (r *iterationRunner) withLoop() func() {
-	meta := process.WithLoop(r.item, r.index)
+	meta := process.WithLoop(r.item, r.index, r.key)
 	manager := process.NewStepRunTimeMeta()
 	manager.Fill(r.pCtx, []process.StepMetaKV{meta})
 	return func() { manager.Remove(r.pCtx, []string{meta.Key}) }

@@ -27,10 +27,10 @@ import (
 func TestWithLoop(t *testing.T) {
 	r := require.New(t)
 	ctx := NewContext(ContextData{})
-	meta := WithLoop("b", 1)
+	meta := WithLoop("b", 1, "1")
 	manager := NewStepRunTimeMeta()
 	manager.Fill(ctx, []StepMetaKV{meta})
-	r.Equal(map[string]interface{}{"item": "b", "index": 1}, ctx.GetData(model.ContextEach))
+	r.Equal(map[string]interface{}{"item": "b", "index": 1, "key": "1"}, ctx.GetData(model.ContextEach))
 	manager.Remove(ctx, []string{meta.Key})
 	r.Nil(ctx.GetData(model.ContextEach))
 }

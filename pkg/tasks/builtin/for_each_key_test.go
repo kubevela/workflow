@@ -140,7 +140,7 @@ func TestForEachKeyNamesTheItems(t *testing.T) {
 	r.NoError(err)
 	got, err := loopVar.MarshalJSON()
 	r.NoError(err)
-	r.JSONEq(`{"item": {"cluster": "prod-eu", "namespace": "shop"}, "index": 1}`, string(got))
+	r.JSONEq(`{"item": {"cluster": "prod-eu", "namespace": "shop"}, "index": 1, "key": "prod-eu-shop"}`, string(got))
 	_, err = wfCtx.GetVar("scale-prod-us-shop-endpoint")
 	r.NoError(err, "outputs are scoped by key")
 	collected, err := wfCtx.GetVar("endpoint")
