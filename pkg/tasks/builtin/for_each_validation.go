@@ -173,9 +173,10 @@ func validateGeneratedNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, 
 	return errs
 }
 
-// soleExpression reports whether a value is exactly one $( ) expression.
+// soleExpression reports whether a value is exactly one $( ) expression, as the
+// engine reads it: whitespace around one is not text.
 func soleExpression(v string) bool {
-	parsed, err := template.Parse(strings.TrimSpace(v))
+	parsed, err := template.Parse(v)
 	if err != nil {
 		return false
 	}

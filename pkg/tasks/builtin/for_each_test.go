@@ -1010,3 +1010,21 @@ func TestForEachFailureNamesTheItem(t *testing.T) {
 		})
 	}
 }
+
+// The loop resolves items as the engine reads a value: whitespace around one
+// expression leaves it one, so the items are the list it reads, not text.
+func TestItemsWithWhitespaceAroundTheirExpressionAreTheList(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	f := newFixture()
+	f.pCtx = process.NewContext(process.ContextData{Name: "app", CustomData: map[string]interface{}{"names": []interface{}{"a", "b"}}})
+	ev, err := expressions.NewEvaluator(types.ExpressionOptions{}, nil, "run")
+	require.NoError(t, err)
+	opts := f.options("loop-id", "")
+	opts.Expressions = ev
+	runner, err := ForEach(singleStep("scale-component", oamv1alpha1.ForEach{Items: itemsJSON(t, " $(context.names) ")}), opts)
+	require.NoError(t, err)
+	status, _, err := runner.Run(wfCtx, runOptions(&runningEngine{wfCtx: wfCtx}))
+	require.NoError(t, err)
+	require.NotEqual(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase, status.Message)
+	require.Len(t, f.generated, 2, "one pass per item")
+}

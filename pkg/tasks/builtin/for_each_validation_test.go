@@ -67,6 +67,10 @@ func TestValidateForEachSteps(t *testing.T) {
 			expression: true,
 			want:       []string{"steps[0].forEach.items", "must be a list or one $( ) expression"},
 		},
+		"whitespace around one expression leaves it one": {
+			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, " $(steps.list.outputs.items) ")})},
+			expression: true,
+		},
 		"two expressions are not a list": {
 			steps:      []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{Items: itemsJSON(t, "$(source.a.list)$(source.b.list)")})},
 			expression: true,
