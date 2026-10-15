@@ -41,6 +41,7 @@ const topLevel = -1
 const (
 	fieldProperties = "properties"
 	fieldItems      = "forEach.items"
+	fieldIf         = "if"
 )
 
 // WithReadDependencies returns a copy of steps in which each step dependsOn the
@@ -120,13 +121,15 @@ func (e *Evaluator) readEdges(steps []v1alpha1.WorkflowStep, mode *v1alpha1.Work
 			field string
 			reads []string
 		}
-		readers := []reader{{stepRef{i, topLevel}, fieldProperties, e.stepsRead(step.Properties)}}
+		readers := []reader{{stepRef{i, topLevel}, fieldProperties, e.stepsRead(step.Properties)},
+			{stepRef{i, topLevel}, fieldIf, e.conditionReads(step.If)}}
 		if step.ForEach != nil && step.ForEach.Items != nil {
 			readers = append(readers, reader{stepRef{i, topLevel}, fieldItems,
 				e.stepsRead(&runtime.RawExtension{Raw: step.ForEach.Items.Raw})})
 		}
 		for j, sub := range step.SubSteps {
-			readers = append(readers, reader{stepRef{i, j}, fieldProperties, e.stepsRead(sub.Properties)})
+			readers = append(readers, reader{stepRef{i, j}, fieldProperties, e.stepsRead(sub.Properties)},
+				reader{stepRef{i, j}, fieldIf, e.conditionReads(sub.If)})
 		}
 
 		for _, r := range readers {
@@ -201,6 +204,18 @@ func (e *Evaluator) producerOf(producer string, from stepRef, steps []v1alpha1.W
 		return stepRef{to.Top, topLevel}, true
 	}
 	return to, true
+}
+
+// conditionReads is the steps a $( ) if reads; a CUE if reads none this way.
+func (e *Evaluator) conditionReads(cond string) []string {
+	if !IsCondition(cond) {
+		return nil
+	}
+	raw, err := conditionTree(cond)
+	if err != nil {
+		return nil
+	}
+	return e.stepsRead(&runtime.RawExtension{Raw: raw})
 }
 
 // stepsRead is the steps an expression in properties reads.
