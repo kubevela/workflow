@@ -217,11 +217,22 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 				}
 			}()
 
+			preCheck := &types.PreCheckOptions{BasicValue: basicVal}
+			if propertyEvaluator != nil && expressions.IsCondition(written.If) {
+				preCheck.Condition = func() (bool, error) {
+					return propertyEvaluator.Condition(tracer.GetContext(), types.ExpressionStep{Name: written.Name, Type: written.Type},
+						written.If, wfCtx, options.PCtx, options.StepStatus)
+				}
+			}
 			for _, hook := range options.PreCheckHooks {
-				result, err := hook(step, &types.PreCheckOptions{BasicValue: basicVal})
+				result, err := hook(step, preCheck)
 				if err != nil {
 					tracer.Error(err, "do preCheckHook")
 					exec.Skip(fmt.Sprintf("pre check error: %s", err.Error()))
+					return exec.status(), exec.operation(), nil
+				}
+				if result.Wait {
+					exec.Wait(result.Message)
 					return exec.status(), exec.operation(), nil
 				}
 				if result.Skip {

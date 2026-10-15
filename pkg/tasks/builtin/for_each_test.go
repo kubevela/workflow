@@ -457,6 +457,11 @@ type itemsEvaluator struct {
 
 type stepCtxKey struct{}
 
+func (e itemsEvaluator) Condition(context.Context, types.ExpressionStep, string, wfContext.Context,
+	process.Context, map[string]v1alpha1.StepStatus) (bool, error) {
+	return false, errors.New("itemsEvaluator answers no conditions")
+}
+
 func (e itemsEvaluator) Properties(ctx context.Context, _ types.ExpressionStep, _ *runtime.RawExtension, _ wfContext.Context,
 	_ process.Context, _ map[string]v1alpha1.StepStatus) (*runtime.RawExtension, error) {
 	if e.ctx != nil {

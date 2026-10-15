@@ -152,8 +152,8 @@ type StepDependencySource string
 const (
 	// StepDependencySourceDependsOn is a step named in dependsOn.
 	StepDependencySourceDependsOn StepDependencySource = "dependsOn"
-	// StepDependencySourceExpression is a step whose outputs an expression in the
-	// step's properties reads.
+	// StepDependencySourceExpression is a step an expression in the step's
+	// properties, forEach items or if condition reads.
 	StepDependencySourceExpression StepDependencySource = "expression"
 )
 

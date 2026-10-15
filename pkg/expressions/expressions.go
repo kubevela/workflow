@@ -204,16 +204,30 @@ func stepsResolver(ws workflowSteps, status map[string]wfv1alpha1.StepStatus, va
 					return nil, fmt.Errorf("%s: %s", read.String(), reason)
 				}
 			}
-			v, found, err := stepOutput(read, ws, status, vars, r)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", read.String(), err)
+			if len(read.Path) < 2 {
+				return nil, fmt.Errorf("%s: %w", read.String(), readHint(read))
 			}
-			step, output := read.Path[0], read.Path[2]
+			step := read.Path[0]
 			// A guarded read of a missing output still finds its step, so has() can
 			// answer false rather than fail one level up.
 			if _, ok := out[step]; !ok {
 				out[step] = map[string]interface{}{"outputs": map[string]interface{}{}}
 			}
+			if isStatusField(read.Path[1]) {
+				st, err := stepStatus(read, ws, status, r)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %w", read.String(), err)
+				}
+				for k, v := range st {
+					out[step].(map[string]interface{})[k] = v
+				}
+				continue
+			}
+			v, found, err := stepOutput(read, ws, status, vars, r)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", read.String(), err)
+			}
+			output := read.Path[2]
 			if found {
 				out[step].(map[string]interface{})["outputs"].(map[string]interface{})[output] = v
 			}
@@ -225,31 +239,15 @@ func stepsResolver(ws workflowSteps, status map[string]wfv1alpha1.StepStatus, va
 func stepOutput(read cel.Read, ws workflowSteps, status map[string]wfv1alpha1.StepStatus, vars Vars,
 	r reader) (interface{}, bool, error) {
 	if len(read.Path) < 3 || read.Path[1] != "outputs" {
-		name := "<step>"
-		if len(read.Path) > 0 {
-			name = read.Path[0]
-		}
-		return nil, false, fmt.Errorf("read steps.%s.outputs.<name>", name)
+		return nil, false, readHint(read)
 	}
 	step, output := read.Path[0], read.Path[2]
-
-	// statusOf and varOf are where the step's progress and the output live.
-	statusOf, varOf := step, output
-	if loop, ok := ws.loopOf[step]; ok {
-		statusOf = loop
-		if loop == r.loop {
-			statusOf, varOf = types.IterationName(loop, r.index, step), types.IterationName(loop, r.index, output)
-		}
-	}
-	if (r.name != "" && statusOf == r.name) || (r.loop != "" && step == r.loop) {
-		return nil, false, fmt.Errorf("step %s cannot read its own outputs", step)
+	statusOf, varOf, err := ws.located(step, output, r, "outputs")
+	if err != nil {
+		return nil, false, err
 	}
 
-	outputs, ok := ws.declared[step]
-	if !ok {
-		return nil, false, fmt.Errorf("no step %q", step)
-	}
-	if !declaresOutput(outputs, output) {
+	if !declaresOutput(ws.declared[step], output) {
 		return nil, false, fmt.Errorf("step %s declares no output %q", step, output)
 	}
 
@@ -284,6 +282,75 @@ func stepOutput(read cel.Read, ws workflowSteps, status map[string]wfv1alpha1.St
 		return nil, false, err
 	}
 	return decoded, true, nil
+}
+
+// located is where a read of step's what (its outputs or its status) is answered
+// from: the step's own status and the variable named name, or, for a body step of
+// a loop, the loop's as a whole from outside it and this pass's from inside.
+func (ws workflowSteps) located(step, name string, r reader, what string) (statusOf, varOf string, err error) {
+	if _, ok := ws.declared[step]; !ok {
+		return "", "", fmt.Errorf("no step %q", step)
+	}
+	statusOf, varOf = step, name
+	if loop, ok := ws.loopOf[step]; ok {
+		statusOf = loop
+		if loop == r.loop {
+			statusOf, varOf = types.IterationName(loop, r.index, step), types.IterationName(loop, r.index, name)
+		}
+	}
+	if (r.name != "" && statusOf == r.name) || (r.loop != "" && step == r.loop) {
+		return "", "", fmt.Errorf("step %s cannot read its own %s", step, what)
+	}
+	return statusOf, varOf, nil
+}
+
+// statusFields are what steps.<name> offers beside outputs: the step's status once
+// it has finished, in any phase.
+var statusFields = []string{"phase", "message", "reason", "succeeded", "failed", "skipped", "timeout",
+	"failedAfterRetries", "terminate"}
+
+func isStatusField(name string) bool {
+	for _, f := range statusFields {
+		if f == name {
+			return true
+		}
+	}
+	return false
+}
+
+// readHint is the error for a read of steps.<name> that is neither an output nor
+// a status field.
+func readHint(read cel.Read) error {
+	name := "<step>"
+	if len(read.Path) > 0 {
+		name = read.Path[0]
+	}
+	return fmt.Errorf("read steps.%s.outputs.<name>, or steps.%s.<%s>", name, name, strings.Join(statusFields, "|"))
+}
+
+// stepStatus is a finished step's status as steps.<name> reads it. A read waits
+// while the step has still to finish.
+func stepStatus(read cel.Read, ws workflowSteps, status map[string]wfv1alpha1.StepStatus, r reader) (map[string]interface{}, error) {
+	statusOf, _, err := ws.located(read.Path[0], "", r, "status")
+	if err != nil {
+		return nil, err
+	}
+	// A skipped step never runs, whatever EnableSuspendOnFailure makes of a failed one.
+	s, ok := status[statusOf]
+	if !ok || (s.Phase != wfv1alpha1.WorkflowStepPhaseSkipped && !types.IsStepFinish(s.Phase, s.Reason)) {
+		return nil, waiting("waiting for step %s", statusOf)
+	}
+	return map[string]interface{}{
+		"phase":              string(s.Phase),
+		"message":            s.Message,
+		"reason":             s.Reason,
+		"succeeded":          s.Phase == wfv1alpha1.WorkflowStepPhaseSucceeded,
+		"failed":             s.Phase == wfv1alpha1.WorkflowStepPhaseFailed,
+		"skipped":            s.Phase == wfv1alpha1.WorkflowStepPhaseSkipped,
+		"timeout":            s.Reason == types.StatusReasonTimeout,
+		"failedAfterRetries": s.Reason == types.StatusReasonFailedAfterRetries,
+		"terminate":          s.Reason == types.StatusReasonTerminate,
+	}, nil
 }
 
 func declaresOutput(outputs v1alpha1.StepOutputs, name string) bool {

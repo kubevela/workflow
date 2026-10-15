@@ -37,7 +37,7 @@ const (
 	BlockPrivateHTTPAddresses featuregate.Feature = "BlockPrivateHTTPAddresses"
 	// EnableCelExpressions lets a WorkflowRun that opts in with the
 	// workflowrun.oam.dev/cel-expressions annotation use $( ) expressions in its
-	// step properties and forEach items.
+	// step properties, forEach items and if conditions.
 	EnableCelExpressions featuregate.Feature = "EnableCelExpressions"
 )
 

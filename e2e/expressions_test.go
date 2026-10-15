@@ -81,4 +81,48 @@ var _ = Describe("Test a workflow run with $( ) expressions", func() {
 			{Step: "summary", DependsOn: "list", Source: v1alpha1.StepDependencySourceExpression},
 		}))
 	})
+
+	It("decides a step by a $( ) condition, and a CUE if beside it as before", func() {
+		wr := applyWorkflowRunFromYAML(ctx, "./test-data/conditions-workflow-run.yaml", namespace)
+		DeferCleanup(func() {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &wr))).Should(Succeed())
+			for _, name := range []string{"cond-tenants", "cond-when-true", "cond-when-false", "cond-a", "cond-b", "cond-cue"} {
+				secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, secret))).Should(Succeed())
+			}
+		})
+		var run v1alpha1.WorkflowRun
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: wr.Name}, &run)).Should(Succeed())
+			g.Expect(run.Status.Phase).Should(Equal(v1alpha1.WorkflowStateSucceeded), "%+v", run.Status.Steps)
+		}, time.Second*60, time.Second*2).Should(Succeed())
+
+		By("each step ran or was skipped as its condition said")
+		phases := map[string]v1alpha1.WorkflowStepPhase{}
+		for _, s := range run.Status.Steps {
+			phases[s.Name] = s.Phase
+			for _, sub := range s.SubStepsStatus {
+				phases[sub.Name] = sub.Phase
+			}
+		}
+		Expect(phases).Should(HaveKeyWithValue("when-true", v1alpha1.WorkflowStepPhaseSucceeded))
+		Expect(phases).Should(HaveKeyWithValue("when-false", v1alpha1.WorkflowStepPhaseSkipped))
+		Expect(phases).Should(HaveKeyWithValue("cue-if", v1alpha1.WorkflowStepPhaseSucceeded))
+		exists := func(name string) bool {
+			return k8sClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, &corev1.Secret{}) == nil
+		}
+		Expect(exists("cond-when-true")).Should(BeTrue())
+		Expect(exists("cond-when-false")).Should(BeFalse())
+		Expect(exists("cond-cue")).Should(BeTrue(), "a CUE if is unchanged")
+
+		By("a sub-step's condition is decided each pass, with that pass's each")
+		Expect(exists("cond-a")).Should(BeFalse())
+		Expect(exists("cond-b")).Should(BeTrue())
+
+		By("a condition's reads are dependencies, as a property's are")
+		Expect(run.Status.Dependencies).Should(ContainElements(
+			v1alpha1.StepDependency{Step: "when-true", DependsOn: "check", Source: v1alpha1.StepDependencySourceExpression},
+			v1alpha1.StepDependency{Step: "when-false", DependsOn: "check", Source: v1alpha1.StepDependencySourceExpression},
+		))
+	})
 })

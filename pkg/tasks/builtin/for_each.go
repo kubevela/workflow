@@ -154,7 +154,9 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 		return status, nil, err
 	}
 
-	runPreChecks(tr.step, options, basicVal, &status)
+	if runPreChecks(tr.step, options, basicVal, &status, condition(tracer, ctx, tr.exprs, tr.step, tr.pCtx, options)) {
+		return status, &types.Operation{Waiting: true}, nil
+	}
 	switch {
 	case status.Phase == v1alpha1.WorkflowStepPhaseSkipped:
 		return status, &types.Operation{Skip: true}, nil

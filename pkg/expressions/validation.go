@@ -60,6 +60,8 @@ func Validate(base *field.Path, steps []v1alpha1.WorkflowStep, mode *v1alpha1.Wo
 	for i, step := range steps {
 		loopBody := step.ForEach != nil && len(step.SubSteps) == 0
 		errs = append(errs, ev.check(pathOf(stepRef{i, topLevel}).Child("properties"), step.Properties, loopBody, nil, declarers)...)
+		// A step's own if is decided once, before any pass of its loop.
+		errs = append(errs, ev.checkCondition(pathOf(stepRef{i, topLevel}).Child(fieldIf), step.If, false, nil, declarers)...)
 		if step.ForEach != nil && step.ForEach.Items != nil {
 			errs = append(errs, ev.check(pathOf(stepRef{i, topLevel}).Child("forEach", "items"),
 				&runtime.RawExtension{Raw: step.ForEach.Items.Raw}, false, nil, declarers)...)
@@ -75,15 +77,38 @@ func Validate(base *field.Path, steps []v1alpha1.WorkflowStep, mode *v1alpha1.Wo
 		for j, sub := range step.SubSteps {
 			errs = append(errs, ev.check(pathOf(stepRef{i, j}).Child("properties"), sub.Properties, step.ForEach != nil,
 				siblings, declarers)...)
+			errs = append(errs, ev.checkCondition(pathOf(stepRef{i, j}).Child(fieldIf), sub.If, step.ForEach != nil,
+				siblings, declarers)...)
 		}
 	}
 	ev.readEdges(steps, mode, func(reader stepRef, in, _, reason string) {
 		path := pathOf(reader).Child(fieldProperties)
-		if in == fieldItems {
+		switch in {
+		case fieldItems:
 			path = pathOf(reader).Child("forEach", "items")
+		case fieldIf:
+			path = pathOf(reader).Child(fieldIf)
 		}
 		errs = append(errs, field.Invalid(path, nil, reason))
 	})
+	return errs
+}
+
+// checkCondition validates a $( ) if as check does a property; a CUE if is not
+// read.
+func (e *Evaluator) checkCondition(path *field.Path, cond string, loopBody bool,
+	siblings map[string]bool, declarers map[string][]string) field.ErrorList {
+	if !IsCondition(cond) {
+		return nil
+	}
+	raw, err := conditionTree(cond)
+	if err != nil {
+		return field.ErrorList{field.Invalid(path, cond, err.Error())}
+	}
+	errs := e.check(path, &runtime.RawExtension{Raw: raw}, loopBody, siblings, declarers)
+	for _, err := range errs {
+		err.BadValue = cond
+	}
 	return errs
 }
 
@@ -114,12 +139,17 @@ func (e *Evaluator) check(path *field.Path, properties *runtime.RawExtension, lo
 }
 
 func (e *Evaluator) checkStepRead(r cel.Read, siblings map[string]bool, declarers map[string][]string) string {
-	if len(r.Path) < 3 || r.Path[1] != "outputs" {
-		name := "<step>"
-		if len(r.Path) > 0 {
-			name = r.Path[0]
+	if len(r.Path) >= 2 && isStatusField(r.Path[1]) {
+		if _, ok := e.steps.declared[r.Path[0]]; !ok {
+			return fmt.Sprintf("no step %q", r.Path[0])
 		}
-		return fmt.Sprintf("read steps.%s.outputs.<name>", name)
+		if len(r.Path) > 2 {
+			return fmt.Sprintf("steps.%s.%s is a value; read nothing below it", r.Path[0], r.Path[1])
+		}
+		return ""
+	}
+	if len(r.Path) < 3 || r.Path[1] != "outputs" {
+		return readHint(r).Error()
 	}
 	step, output := r.Path[0], r.Path[2]
 	outputs, ok := e.steps.declared[step]

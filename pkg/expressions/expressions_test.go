@@ -163,7 +163,7 @@ func TestStepsRefusesWhatNoStepDeclares(t *testing.T) {
 	for props, want := range map[string]string{
 		`{"x":"$(steps.nope.outputs.image)"}`:    `no step "nope"`,
 		`{"x":"$(steps.build.outputs.tag)"}`:     `step build declares no output "tag"`,
-		`{"x":"$(steps.build.phase)"}`:           `read steps.build.outputs.<name>`,
+		`{"x":"$(steps.build.colour)"}`:          `read steps.build.outputs.<name>, or steps.build.<phase|`,
 		`{"x":"$(steps.build)"}`:                 `read steps.build.outputs.<name>`,
 		`{"x":"$(steps[\"notify\"].outputs.y)"}`: `step notify declares no output "y"`,
 	} {

@@ -27,6 +27,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -43,6 +44,7 @@ func StepGroup(step oamv1alpha1.WorkflowStep, opt *types.TaskGeneratorOptions) (
 		subTaskRunners: opt.SubTaskRunners,
 		mode:           opt.SubStepExecuteMode,
 		pCtx:           opt.ProcessContext,
+		exprs:          opt.Expressions,
 	}, nil
 }
 
@@ -53,6 +55,7 @@ type stepGroupTaskRunner struct {
 	subTaskRunners []types.TaskRunner
 	pCtx           process.Context
 	mode           oamv1alpha1.WorkflowMode
+	exprs          types.PropertyEvaluator
 }
 
 // Name return suspend step name.
@@ -92,7 +95,9 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	}
 	defer handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, basicVal)
 
-	runPreChecks(tr.step, options, basicVal, pStatus)
+	if runPreChecks(tr.step, options, basicVal, pStatus, condition(tracer, ctx, tr.exprs, tr.step, tr.pCtx, options)) {
+		return status, &types.Operation{Waiting: true}, nil
+	}
 	// step-group has no properties so there is no need to fill in the properties with the input values
 	// skip input handle here
 	e := options.Engine
@@ -137,18 +142,42 @@ func (tr *stepGroupTaskRunner) FillContextData(ctx monitorContext.Context, proce
 	}
 }
 
+// condition evaluates a step's $( ) if for its pre-checks, when the run resolves
+// expressions; nil otherwise.
+func condition(tracer monitorContext.Context, wfCtx wfContext.Context, exprs types.PropertyEvaluator,
+	step oamv1alpha1.WorkflowStep, pCtx process.Context, options *types.TaskRunOptions) func() (bool, error) {
+	if exprs == nil || !expressions.IsCondition(step.If) {
+		return nil
+	}
+	return func() (bool, error) {
+		return exprs.Condition(tracer.GetContext(), types.ExpressionStep{Name: step.Name, Type: step.Type}, step.If,
+			wfCtx, pCtx, options.StepStatus)
+	}
+}
+
 // runPreChecks applies the if/timeout pre-check hooks to a step that holds sub-steps,
-// recording a skip or timeout in status.
-func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, basicVal cue.Value, status *v1alpha1.StepStatus) {
+// recording a skip or timeout in status. It reports a step its $( ) if holds back,
+// left running and waiting.
+func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, basicVal cue.Value, status *v1alpha1.StepStatus,
+	cond func() (bool, error)) (wait bool) {
 	for _, hook := range options.PreCheckHooks {
 		result, err := hook(step, &types.PreCheckOptions{
 			BasicValue: basicVal,
+			Condition:  cond,
 		})
 		if err != nil {
+			// Recorded, so the step's sub-steps see it skipped and skip too.
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
 			status.Reason = types.StatusReasonSkip
 			status.Message = fmt.Sprintf("pre check error: %s", err.Error())
-			continue
+			options.StepStatus[step.Name] = *status
+			break
+		}
+		if result.Wait {
+			status.Phase = v1alpha1.WorkflowStepPhaseRunning
+			status.Reason = types.StatusReasonWait
+			status.Message = result.Message
+			return true
 		}
 		if result.Skip {
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
@@ -162,6 +191,7 @@ func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, 
 			options.StepStatus[step.Name] = *status
 		}
 	}
+	return false
 }
 
 func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.WorkflowStepStatus, operation *types.Operation, subTaskRunners int) (v1alpha1.StepStatus, *types.Operation) {
