@@ -166,10 +166,12 @@ func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, 
 			Condition:  cond,
 		})
 		if err != nil {
+			// Recorded, so the step's sub-steps see it skipped and skip too.
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
 			status.Reason = types.StatusReasonSkip
 			status.Message = fmt.Sprintf("pre check error: %s", err.Error())
-			continue
+			options.StepStatus[step.Name] = *status
+			break
 		}
 		if result.Wait {
 			status.Phase = v1alpha1.WorkflowStepPhaseRunning

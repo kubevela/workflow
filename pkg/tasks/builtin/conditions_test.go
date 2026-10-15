@@ -132,3 +132,51 @@ func TestALoopsConditionDecidesItOnce(t *testing.T) {
 	require.True(t, op.Skip)
 	require.Equal(t, []string{`per-region: $(context.name == "prod")`}, asked, "once, for the loop as a whole")
 }
+
+func TestATrueLoopConditionIsDecidedOnceAcrossItsPasses(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	f := newFixture()
+	var asked []string
+	loop := singleStep("scale-component", oamv1alpha1.ForEach{Items: itemsJSON(t, []string{"a", "b"})})
+	loop.If = `$(context.name == "prod")`
+	opts := f.options("loop-id", "")
+	opts.Expressions = conditionEvaluator{run: true, asked: &asked}
+	runner, err := ForEach(loop, opts)
+	require.NoError(t, err)
+	run := runOptions(&runningEngine{wfCtx: wfCtx})
+	run.PreCheckHooks = []types.TaskPreCheckHook{conditionHook}
+	_, _, err = runner.Run(wfCtx, run)
+	require.NoError(t, err)
+	require.Len(t, f.generated, 2, "both passes run")
+	require.Equal(t, []string{`scale: $(context.name == "prod")`}, asked, "decided once, for the loop")
+	for _, pass := range f.generated {
+		require.Empty(t, pass.If, "a pass carries no condition of its own")
+	}
+}
+
+func TestAGroupWhoseConditionErrsRunsNoSubSteps(t *testing.T) {
+	ctx := newWorkflowContextForTest(t)
+	group := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+		Name: "deploy", Type: types.WorkflowStepTypeStepGroup, If: "$(steps.build.phase)"}}
+	var asked []string
+	runner, err := StepGroup(group, &types.TaskGeneratorOptions{ID: "1",
+		Expressions:    conditionEvaluator{err: fmt.Errorf("steps.build.phase is string, but a step's if must be a bool"), asked: &asked},
+		ProcessContext: process.NewContext(process.ContextData{})})
+	require.NoError(t, err)
+	stepStatus := map[string]v1alpha1.StepStatus{}
+	failing := func(_ oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+		_, err := options.Condition()
+		return &types.PreCheckResult{Skip: true}, err
+	}
+	status, op, err := runner.Run(ctx, &types.TaskRunOptions{
+		PreCheckHooks: []types.TaskPreCheckHook{failing},
+		StepStatus:    stepStatus,
+		Engine:        &testEngine{stepStatus: v1alpha1.WorkflowStepStatus{}, operation: &types.Operation{}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseSkipped, status.Phase)
+	require.Contains(t, status.Message, "must be a bool")
+	require.True(t, op.Skip)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseSkipped, stepStatus["deploy"].Phase,
+		"the skip is recorded where the group's sub-steps look for it")
+}
