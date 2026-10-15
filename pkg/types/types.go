@@ -187,9 +187,9 @@ type ExpressionStep struct {
 	Type string
 }
 
-// ExpressionOptions turns on $( ) expressions in step properties. The workflow
-// answers context, steps and each; a host adds roots of its own with a resolver
-// for each.
+// ExpressionOptions turns on $( ) expressions in step properties, forEach items
+// and if conditions. The workflow answers context, steps and each; a host adds
+// roots of its own with a resolver for each.
 type ExpressionOptions struct {
 	Roots     []cel.Root
 	Resolvers map[string]cel.Resolver
