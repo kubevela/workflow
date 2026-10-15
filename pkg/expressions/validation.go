@@ -143,6 +143,9 @@ func (e *Evaluator) checkStepRead(r cel.Read, siblings map[string]bool, declarer
 		if _, ok := e.steps.declared[r.Path[0]]; !ok {
 			return fmt.Sprintf("no step %q", r.Path[0])
 		}
+		if len(r.Path) > 2 {
+			return fmt.Sprintf("steps.%s.%s is a value; read nothing below it", r.Path[0], r.Path[1])
+		}
 		return ""
 	}
 	if len(r.Path) < 3 || r.Path[1] != "outputs" {
