@@ -17,6 +17,7 @@ limitations under the License.
 package builtin
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -180,6 +181,12 @@ func TestValidateForEachSteps(t *testing.T) {
 		"a step named like a keyed loop's items": {
 			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}}), plain("scale-prod")},
 			want:  []string{"steps[1].name", "scale-prod", "clashes with the names forEach step scale generates"},
+		},
+		"names a keyed loop's key cannot produce": {
+			steps: []oamv1alpha1.WorkflowStep{
+				loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}}),
+				plain("scale-a.b"), plain("scale-x-"), plain("scale-" + strings.Repeat("a", 64)),
+			},
 		},
 		"an output named like a keyed loop's variables": {
 			steps: []oamv1alpha1.WorkflowStep{loop(oamv1alpha1.ForEach{From: "r", Key: []string{"cluster"}}), outputting("scale-prod-each")},

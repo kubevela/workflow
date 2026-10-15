@@ -32,9 +32,12 @@ import (
 // maxKeyLength bounds a joined key, which becomes part of step and variable names.
 const maxKeyLength = 63
 
-// keyPattern is what a joined key may hold. No '.', since inputs[].from splits a
-// variable path on it, so a key holding one would read a different variable.
-var keyPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_-]*[A-Za-z0-9])?$`)
+// keySyntax is what a joined key may hold, in at most maxKeyLength characters. No '.',
+// since inputs[].from splits a variable path on it, so a key holding one would read a
+// different variable.
+const keySyntax = `[A-Za-z0-9]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?`
+
+var keyPattern = regexp.MustCompile(`^` + keySyntax + `$`)
 
 // itemLabels returns each item's key, its forEach.key values joined with "-", or nil
 // when the loop has no key and is named by index. A key must be valid in a step name,

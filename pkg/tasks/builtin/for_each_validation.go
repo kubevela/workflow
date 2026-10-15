@@ -152,7 +152,7 @@ func validateGeneratedNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, 
 	step := steps[loop]
 	label := `(0|[1-9][0-9]*)`
 	if len(step.ForEach.Key) > 0 {
-		label = `.+`
+		label = `(` + keySyntax + `)`
 	}
 	prefix := regexp.QuoteMeta(step.Name) + `-` + label
 	vars := []string{eachRoot}
