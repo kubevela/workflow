@@ -121,13 +121,14 @@ func lookupItem(item any, path string) (any, bool) {
 	return v, true
 }
 
-// keyPart renders a key value: a string as it is, an integer in decimal.
+// keyPart renders a key value: a string as it is, an integer in decimal. A number
+// decoded from JSON is a float64, which holds an integer exactly only below 2^53.
 func keyPart(v any) (string, bool) {
 	switch n := v.(type) {
 	case string:
 		return n, true
 	case float64:
-		if n != math.Trunc(n) || math.Abs(n) > 1<<53 {
+		if n != math.Trunc(n) || math.Abs(n) >= 1<<53 {
 			return "", false
 		}
 		return strconv.FormatInt(int64(n), 10), true

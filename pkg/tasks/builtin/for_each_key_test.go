@@ -78,6 +78,9 @@ func TestItemLabels(t *testing.T) {
 		"an object part": {
 			step: keyedStep("t", "spec"), items: []any{map[string]any{"spec": map[string]any{"zone": "a"}}}, err: `item 0: key spec must be a string or an integer`,
 		},
+		"an integer past float64's precision": {
+			step: keyedStep("t", "wave"), items: []any{map[string]any{"wave": float64(9007199254740993)}}, err: `item 0: key wave must be a string or an integer`,
+		},
 		"a fraction": {
 			step: keyedStep("t", "wave"), items: []any{map[string]any{"wave": 1.5}}, err: `item 0: key wave must be a string or an integer`,
 		},
