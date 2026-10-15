@@ -23,9 +23,12 @@ import (
 
 	"github.com/kubevela/pkg/cel"
 	"github.com/stretchr/testify/require"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	wfv1alpha1 "github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/types"
 )
 
@@ -186,4 +189,16 @@ func TestEvaluatorCondition(t *testing.T) {
 		_, err := cond("status.build.failed")
 		require.ErrorContains(t, err, "not a $( ) condition")
 	})
+}
+
+func TestASkippedStepsStatusIsReadUnderSuspendOnFailure(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnableSuspendOnFailure, true)
+	out, err := eval(t, `{"v":"$(steps.build.skipped)"}`, map[string]cel.Resolver{RootSteps: StepsResolver(steps(t),
+		map[string]wfv1alpha1.StepStatus{"build": {Phase: wfv1alpha1.WorkflowStepPhaseSkipped}}, vars{})})
+	require.NoError(t, err, "a skipped step will never run, whatever the gate")
+	require.Equal(t, map[string]interface{}{"v": true}, out)
+
+	_, err = eval(t, `{"v":"$(steps.build.failed)"}`, map[string]cel.Resolver{RootSteps: StepsResolver(steps(t),
+		map[string]wfv1alpha1.StepStatus{"build": {Phase: wfv1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonFailedAfterRetries}}, vars{})})
+	require.ErrorIs(t, err, cel.ErrNotReady, "a failed step may still be resumed under the gate")
 }

@@ -335,8 +335,9 @@ func stepStatus(read cel.Read, ws workflowSteps, status map[string]wfv1alpha1.St
 	if err != nil {
 		return nil, err
 	}
+	// A skipped step never runs, whatever EnableSuspendOnFailure makes of a failed one.
 	s, ok := status[statusOf]
-	if !ok || !types.IsStepFinish(s.Phase, s.Reason) {
+	if !ok || (s.Phase != wfv1alpha1.WorkflowStepPhaseSkipped && !types.IsStepFinish(s.Phase, s.Reason)) {
 		return nil, waiting("waiting for step %s", statusOf)
 	}
 	return map[string]interface{}{
