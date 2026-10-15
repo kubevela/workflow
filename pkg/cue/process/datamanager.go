@@ -41,11 +41,12 @@ func WithGroupName(name string) StepMetaKV {
 	}
 }
 
-// WithLoop return the for-each item and index of the step
-func WithLoop(item interface{}, index int) StepMetaKV {
+// WithLoop returns the forEach pass a step runs in: its item, its index, and its key,
+// which names the pass's steps (the item's key, or its index when the loop has none).
+func WithLoop(item interface{}, index int, key string) StepMetaKV {
 	return StepMetaKV{
 		Key:   model.ContextEach,
-		Value: map[string]interface{}{"item": item, "index": index},
+		Value: map[string]interface{}{"item": item, "index": index, "key": key},
 	}
 }
 

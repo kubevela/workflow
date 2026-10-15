@@ -72,7 +72,7 @@ func TestExpandSingleStep(t *testing.T) {
 		ForEach: &oamv1alpha1.ForEach{},
 	}
 
-	iterations, err := expandIterations(step, []any{map[string]any{"cluster": "c1"}, map[string]any{"cluster": "c2"}})
+	iterations, err := expandIterations(step, []any{map[string]any{"cluster": "c1"}, map[string]any{"cluster": "c2"}}, nil)
 	r.NoError(err)
 	r.Len(iterations, 2)
 	r.Len(iterations[1].steps, 1)
@@ -117,7 +117,7 @@ func TestExpandGroup(t *testing.T) {
 		},
 	}
 
-	iterations, err := expandIterations(step, []any{"east", "west"})
+	iterations, err := expandIterations(step, []any{"east", "west"}, nil)
 	r.NoError(err)
 	deploy, verify := iterations[1].steps[0], iterations[1].steps[1]
 	r.Equal("rollout-1-deploy", deploy.Name)
@@ -143,7 +143,7 @@ func TestExpandRejectsOutputNamedLoop(t *testing.T) {
 		},
 		ForEach: &oamv1alpha1.ForEach{},
 	}
-	_, err := expandIterations(step, []any{1})
+	_, err := expandIterations(step, []any{1}, nil)
 	require.ErrorContains(t, err, "each")
 }
 
@@ -212,7 +212,8 @@ func (e *runningEngine) SetDependsOn(name string, dependsOn []string) {
 
 // fakeRunner runs, terminates or errors as its type says, records the loop context it
 // saw, and sets each of its outputs to the current loop item, or to an incomplete value
-// for the type "open". The type "fail-on-b" fails for the item "b", "fail-unless-a" for
+// for the type "open". The type "fail-on-b" fails for the item "b" (or an object whose
+// cluster is "b"), "fail-unless-a" for
 // every item but "a", and "fail-quietly" fails every item with no message.
 type fakeRunner struct {
 	step oamv1alpha1.WorkflowStepBase
@@ -253,7 +254,7 @@ func (r *fakeRunner) Run(ctx wfContext.Context, _ *types.TaskRunOptions) (v1alph
 	}
 	switch r.step.Type {
 	case "fail-on-b":
-		if item == "b" {
+		if m, ok := item.(map[string]any); item == "b" || ok && m["cluster"] == "b" {
 			unreachable()
 		}
 	case "fail-unless-a":
@@ -336,8 +337,8 @@ func TestForEachLiteralItems(t *testing.T) {
 	r.Equal([]string{"scale-0", "scale-1"}, f.names())
 
 	r.Equal([]any{
-		map[string]any{"item": "a", "index": 0},
-		map[string]any{"item": "b", "index": 1},
+		map[string]any{"item": "a", "index": 0, "key": "0"},
+		map[string]any{"item": "b", "index": 1, "key": "1"},
 	}, f.seen)
 	r.Nil(f.pCtx.GetData(model.ContextEach), "loop context is removed after the iteration runs")
 
@@ -345,7 +346,7 @@ func TestForEachLiteralItems(t *testing.T) {
 	r.NoError(err)
 	got, err := loopVar.MarshalJSON()
 	r.NoError(err)
-	r.JSONEq(`{"item": "b", "index": 1}`, string(got))
+	r.JSONEq(`{"item": "b", "index": 1, "key": "1"}`, string(got))
 
 	collected, err := wfCtx.GetVar("endpoint")
 	r.NoError(err)
@@ -681,7 +682,7 @@ func TestIterationTemplate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, ok := IterationTemplate(tc.step, tc.name)
+			got, ok := IterationTemplate(tc.step, nil, tc.name)
 			require.Equal(t, tc.want != "", ok)
 			require.Equal(t, tc.want, got.Name)
 			require.Equal(t, tc.timeout, got.Timeout, "a single step's timeout belongs to the loop")
@@ -908,10 +909,10 @@ func TestIterationRunnerPendingSeesTheLoop(t *testing.T) {
 	r := require.New(t)
 	f := newFixture()
 	inner := &fakeRunner{step: oamv1alpha1.WorkflowStepBase{Name: "scale-1"}, pCtx: f.pCtx, seen: &f.seen}
-	runner := &iterationRunner{TaskRunner: inner, pCtx: f.pCtx, item: "b", index: 1}
+	runner := &iterationRunner{TaskRunner: inner, pCtx: f.pCtx, item: "b", index: 1, key: "1"}
 	pending, _ := runner.Pending(monitorContext.NewTraceContext(context.Background(), ""), nil, nil)
 	r.False(pending)
-	r.Equal([]any{map[string]any{"item": "b", "index": 1}}, f.seen)
+	r.Equal([]any{map[string]any{"item": "b", "index": 1, "key": "1"}}, f.seen)
 	r.Nil(f.pCtx.GetData(model.ContextEach), "loop context is removed once the check returns")
 }
 
@@ -941,31 +942,31 @@ func TestIterationNames(t *testing.T) {
 	}
 
 	for name, want := range map[string]int{"scale-0": 0, "scale-12": 12} {
-		index, ok := IterationIndex(single, name)
+		index, ok := IterationIndex(single, nil, name)
 		r.True(ok, name)
 		r.Equal(want, index, name)
 	}
 	for _, name := range []string{"scale", "scaler-0", "scale-01", "scale-x", "scale-0-deploy"} {
-		_, ok := IterationIndex(single, name)
+		_, ok := IterationIndex(single, nil, name)
 		r.False(ok, name)
 	}
-	index, ok := IterationIndex(group, "rollout-3-verify")
+	index, ok := IterationIndex(group, nil, "rollout-3-verify")
 	r.True(ok)
 	r.Equal(3, index)
-	_, ok = IterationIndex(group, "rollout-3-other")
+	_, ok = IterationIndex(group, nil, "rollout-3-other")
 	r.False(ok, "a name the body does not hold")
 
-	index, ok = IterationVarIndex(single, "scale-2-endpoint")
+	index, ok = IterationVarIndex(single, nil, "scale-2-endpoint")
 	r.True(ok)
 	r.Equal(2, index)
-	_, ok = IterationVarIndex(single, "scale-2")
+	_, ok = IterationVarIndex(single, nil, "scale-2")
 	r.False(ok, "a step's own name is not one of its variables")
 
 	r.Equal([]string{"endpoint"}, CollectedOutputs(single))
 	r.Equal([]string{"health"}, CollectedOutputs(group))
 
-	r.True(IsPinnedItemsKey(PinnedItemsKey("id")))
-	r.False(IsPinnedItemsKey("id.other"))
+	r.True(IsForEachContextKey(PinnedItemsKey("id")))
+	r.False(IsForEachContextKey("id.other"))
 }
 
 func TestForEachFailureNamesTheItem(t *testing.T) {

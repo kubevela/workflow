@@ -49,16 +49,18 @@ func ValidateForEachSteps(base *field.Path, steps []oamv1alpha1.WorkflowStep, al
 	return errs
 }
 
-// validateLoopNames rejects a forEach step named <other>-<index>... after another
-// forEach step. Only then can the two loops generate the same step names, or the other
-// loop's restart clear this one's variables.
+// validateLoopNames rejects a forEach step named <other>-<index>..., or <other>-...
+// for a keyed loop, after another forEach step. Only then can the two loops generate the
+// same step names, or the other loop's restart clear this one's variables.
 func validateLoopNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, loop int) field.ErrorList {
 	var errs field.ErrorList
 	for i, other := range steps {
 		if i == loop || other.ForEach == nil {
 			continue
 		}
-		if _, _, ok := cutIndex(other.Name, steps[loop].Name); ok {
+		_, _, indexed := cutIndex(other.Name, steps[loop].Name)
+		keyed := len(other.ForEach.Key) > 0 && strings.HasPrefix(steps[loop].Name, other.Name+"-")
+		if indexed || keyed {
 			errs = append(errs, field.Invalid(base.Index(loop).Child("name"), steps[loop].Name,
 				fmt.Sprintf("is named like the passes of forEach step %s", other.Name)))
 		}
@@ -77,6 +79,18 @@ func validateForEach(path *field.Path, step oamv1alpha1.WorkflowStep, allowExpre
 	default:
 		errs = append(errs, field.NotSupported(path.Child("mode"), forEach.Mode,
 			[]string{string(v1alpha1.WorkflowModeStep), string(v1alpha1.WorkflowModeDAG)}))
+	}
+	seenKeys := map[string]bool{}
+	for j, key := range forEach.Key {
+		keyPath := path.Child("key").Index(j)
+		if key == "" || strings.HasPrefix(key, ".") || strings.HasSuffix(key, ".") || strings.Contains(key, "..") {
+			errs = append(errs, field.Invalid(keyPath, key, "is not a path into the item"))
+			continue
+		}
+		if seenKeys[key] {
+			errs = append(errs, field.Duplicate(keyPath, key))
+		}
+		seenKeys[key] = true
 	}
 	if forEach.Items == nil {
 		return errs
@@ -132,10 +146,20 @@ func validateBodyOutputs(path *field.Path, step oamv1alpha1.WorkflowStep) field.
 
 // validateGeneratedNames rejects any other step whose name one of loop's iterations
 // could take, since step status is keyed by name, and any output named like a variable
-// its iterations keep.
+// its iterations keep. A keyed loop's names are known only once its list resolves, so
+// every name it could generate is reserved.
 func validateGeneratedNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, loop int) field.ErrorList {
 	step := steps[loop]
-	prefix := regexp.QuoteMeta(step.Name) + `-(0|[1-9][0-9]*)`
+	label := `(0|[1-9][0-9]*)`
+	if len(step.ForEach.Key) > 0 {
+		label = `(` + keySyntax + `)`
+	}
+	prefix := regexp.QuoteMeta(step.Name) + `-` + label
+	vars := []string{eachRoot}
+	for _, name := range CollectedOutputs(step) {
+		vars = append(vars, regexp.QuoteMeta(name))
+	}
+	varPattern := regexp.MustCompile("^" + prefix + "-(" + strings.Join(vars, "|") + ")$")
 	pattern := regexp.MustCompile("^" + prefix + "$")
 	if _, group := body(step); group {
 		subs := make([]string, 0, len(step.SubSteps))
@@ -153,7 +177,7 @@ func validateGeneratedNames(base *field.Path, steps []oamv1alpha1.WorkflowStep, 
 	// A restart of the loop clears every variable its passes could have written.
 	clashVar := func(p *field.Path, outputs oamv1alpha1.StepOutputs) {
 		for j, o := range outputs {
-			if _, ok := IterationVarIndex(step, o.Name); ok {
+			if varPattern.MatchString(o.Name) {
 				errs = append(errs, field.Invalid(p.Child("outputs").Index(j).Child("name"), o.Name,
 					fmt.Sprintf("clashes with the variables forEach step %s keeps for its passes", step.Name)))
 			}

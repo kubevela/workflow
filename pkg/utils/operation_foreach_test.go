@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"encoding/json"
 	"sort"
 	"testing"
 
@@ -303,5 +304,84 @@ func TestCleanStatusFromForEachIteration(t *testing.T) {
 	t.Run("an item that did not fail", func(t *testing.T) {
 		_, _, err := CleanStatusFromStep(single(""), singleStatus(), stepMode, forEachContext(singleVars), "scale-0")
 		require.ErrorContains(t, err, "can not restart from a non-failed step")
+	})
+}
+
+func TestCleanStatusFromKeyedForEach(t *testing.T) {
+	stepMode := oamv1alpha1.WorkflowExecuteMode{Steps: v1alpha1.WorkflowModeStep, SubSteps: v1alpha1.WorkflowModeDAG}
+	keyedContext := func(vars string, labels ...string) *corev1.ConfigMap {
+		b, err := json.Marshal(labels)
+		require.NoError(t, err)
+		return &corev1.ConfigMap{Data: map[string]string{
+			wfContext.ConfigMapKeyVars:   vars,
+			builtin.PinnedItemsKey("id"): `[{},{},{}]`,
+			builtin.ItemLabelsKey("id"):  string(b),
+		}}
+	}
+
+	t.Run("a keyed item and every later one", func(t *testing.T) {
+		r := require.New(t)
+		steps := []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "scale", Type: "t", Outputs: oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "v"}}},
+			ForEach:          &oamv1alpha1.ForEach{From: "targets", Key: []string{"cluster"}},
+		}}
+		status := []v1alpha1.WorkflowStepStatus{{
+			StepStatus: v1alpha1.StepStatus{ID: "id", Name: "scale", Phase: v1alpha1.WorkflowStepPhaseFailed},
+			SubStepsStatus: []v1alpha1.StepStatus{
+				{Name: "scale-prod-us", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+				{Name: "scale-prod-eu", Phase: v1alpha1.WorkflowStepPhaseFailed},
+				{Name: "scale-ap", Phase: v1alpha1.WorkflowStepPhaseSkipped},
+			},
+		}}
+		vars := `{"scale-prod-us-each": {}, "scale-prod-us-endpoint": 1, "scale-prod-eu-each": {}, "scale-prod-eu-endpoint": 2, "scale-ap-each": {}}`
+		status, cm, err := CleanStatusFromStep(steps, status, stepMode, keyedContext(vars, "prod-us", "prod-eu", "ap"), "scale-prod-eu")
+		r.NoError(err)
+		r.Equal([]string{"scale-prod-us"}, subNames(status, "scale"))
+		r.Equal([]string{"scale-prod-us-each", "scale-prod-us-endpoint"}, varNames(t, cm))
+		r.Contains(cm.Data, builtin.ItemLabelsKey("id"), "the loop keeps its keys, as it keeps its list")
+	})
+
+	t.Run("a keyed group whose keys share a prefix", func(t *testing.T) {
+		r := require.New(t)
+		steps := []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: "step-group"},
+			ForEach:          &oamv1alpha1.ForEach{From: "targets", Key: []string{"cluster"}},
+			SubSteps: []oamv1alpha1.WorkflowStepBase{
+				{Name: "deploy", Type: "t", Outputs: oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "v"}}},
+				{Name: "verify", Type: "t"},
+			},
+		}}
+		status := []v1alpha1.WorkflowStepStatus{{
+			StepStatus: v1alpha1.StepStatus{ID: "id", Name: "rollout", Phase: v1alpha1.WorkflowStepPhaseFailed},
+			SubStepsStatus: []v1alpha1.StepStatus{
+				{Name: "rollout-prod-us-deploy", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+				{Name: "rollout-prod-us-verify", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+				{Name: "rollout-prod-us-shop-deploy", Phase: v1alpha1.WorkflowStepPhaseSucceeded},
+				{Name: "rollout-prod-us-shop-verify", Phase: v1alpha1.WorkflowStepPhaseFailed},
+			},
+		}}
+		vars := `{"rollout-prod-us-each": {}, "rollout-prod-us-endpoint": 1, "rollout-prod-us-shop-each": {}, "rollout-prod-us-shop-endpoint": 2, endpoint: [1, 2]}`
+		status, cm, err := CleanStatusFromStep(steps, status, stepMode, keyedContext(vars, "prod-us", "prod-us-shop"), "rollout-prod-us-shop-verify")
+		r.NoError(err)
+		r.Equal([]string{"rollout-prod-us-deploy", "rollout-prod-us-verify", "rollout-prod-us-shop-deploy"}, subNames(status, "rollout"),
+			"only the prod-us-shop item's verify reruns; prod-us is a different item, not a prefix of it")
+		r.Equal([]string{"rollout-prod-us-each", "rollout-prod-us-endpoint", "rollout-prod-us-shop-each", "rollout-prod-us-shop-endpoint"}, varNames(t, cm))
+	})
+
+	t.Run("the keyed loop itself drops its keys with its list", func(t *testing.T) {
+		r := require.New(t)
+		steps := []oamv1alpha1.WorkflowStep{{
+			WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "scale", Type: "t"},
+			ForEach:          &oamv1alpha1.ForEach{From: "targets", Key: []string{"cluster"}},
+		}}
+		status := []v1alpha1.WorkflowStepStatus{{
+			StepStatus:     v1alpha1.StepStatus{ID: "id", Name: "scale", Phase: v1alpha1.WorkflowStepPhaseFailed},
+			SubStepsStatus: []v1alpha1.StepStatus{{Name: "scale-prod-us", Phase: v1alpha1.WorkflowStepPhaseFailed}},
+		}}
+		_, cm, err := CleanStatusFromStep(steps, status, stepMode, keyedContext(`{"scale-prod-us-each": {}}`, "prod-us"), "scale")
+		r.NoError(err)
+		r.Empty(varNames(t, cm))
+		r.NotContains(cm.Data, builtin.PinnedItemsKey("id"))
+		r.NotContains(cm.Data, builtin.ItemLabelsKey("id"), "the list is read again, and so are its keys")
 	})
 }

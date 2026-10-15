@@ -310,7 +310,7 @@ func forEachSuspendBackoffTime(wfCtx wfContext.Context, step oamv1alpha1.Workflo
 			continue
 		}
 		for _, sub := range ss.SubStepsStatus {
-			template, ok := builtin.IterationTemplate(step, sub.Name)
+			template, ok := builtin.IterationTemplate(step, builtin.ItemLabels(wfCtx.GetMutableValue, ss.ID), sub.Name)
 			if !ok {
 				continue
 			}
@@ -408,9 +408,9 @@ func (w *workflowExecutor) makeContext(ctx context.Context, name string) (wfCont
 		return nil, errors.WithMessage(err, "new context")
 	}
 	// A new run reuses the context ConfigMap but gives every step a new ID, so a list a
-	// forEach pinned under an earlier run's ID can never be read again.
+	// forEach pinned under an earlier run's ID, or its item keys, can never be read again.
 	for key := range wfCtx.GetStore().Data {
-		if builtin.IsPinnedItemsKey(key) {
+		if builtin.IsForEachContextKey(key) {
 			wfCtx.DeleteMutableValue(key)
 		}
 	}
@@ -906,16 +906,17 @@ func (e *engine) readOnly(step, dep string) bool {
 		if loop.ForEach == nil {
 			continue
 		}
-		reader, ok := builtin.IterationTemplate(loop, step)
+		labels := builtin.ItemLabels(e.wfCtx.GetMutableValue, e.stepStatus[loop.Name].ID)
+		reader, ok := builtin.IterationTemplate(loop, labels, step)
 		if !ok {
 			continue
 		}
-		read, ok := builtin.IterationTemplate(loop, dep)
+		read, ok := builtin.IterationTemplate(loop, labels, dep)
 		if !ok {
 			continue
 		}
-		i, _ := builtin.IterationIndex(loop, step)
-		j, _ := builtin.IterationIndex(loop, dep)
+		i, _ := builtin.IterationIndex(loop, labels, step)
+		j, _ := builtin.IterationIndex(loop, labels, dep)
 		return i == j && slices.Contains(e.instance.InferredDependsOn[reader.Name], read.Name)
 	}
 	return false

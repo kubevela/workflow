@@ -122,7 +122,7 @@ func TestStepsReadsAFinishedStepsStatus(t *testing.T) {
 func TestStepsReadsALoopsStatus(t *testing.T) {
 	status := map[string]wfv1alpha1.StepStatus{
 		"per-tenant": {Phase: wfv1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonFailedAfterRetries},
-		types.IterationName("per-tenant", 0, "fetch"): {Phase: wfv1alpha1.WorkflowStepPhaseSucceeded},
+		types.IterationName("per-tenant", "0", "fetch"): {Phase: wfv1alpha1.WorkflowStepPhaseSucceeded},
 	}
 	t.Run("outside the loop, a body step reads as the loop", func(t *testing.T) {
 		out, err := resolve(t, `{"v":"$(steps.fetch.failed)"}`, running("summary"), status, vars{})
@@ -131,7 +131,7 @@ func TestStepsReadsALoopsStatus(t *testing.T) {
 	})
 	t.Run("inside the loop, a fellow body step reads as this pass", func(t *testing.T) {
 		out, err := resolve(t, `{"v":"$(steps.fetch.succeeded)"}`,
-			running(types.IterationName("per-tenant", 0, "greet"), 0), status, vars{})
+			running(types.IterationName("per-tenant", "0", "greet"), 0), status, vars{})
 		require.NoError(t, err)
 		require.JSONEq(t, `{"v":true}`, out.(string))
 	})
@@ -153,7 +153,7 @@ func TestEvaluatorCondition(t *testing.T) {
 	}, steps(t), "run-1")
 	require.NoError(t, err)
 	pCtx := process.NewContext(process.ContextData{Name: "onboard"})
-	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{process.WithName("notify"), process.WithLoop("eu", 2)})
+	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{process.WithName("notify"), process.WithLoop("eu", 2, "2")})
 	status := map[string]wfv1alpha1.StepStatus{
 		"build":        {Phase: wfv1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonFailedAfterRetries},
 		"list-tenants": {Phase: wfv1alpha1.WorkflowStepPhaseSucceeded},

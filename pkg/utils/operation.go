@@ -387,8 +387,9 @@ func CleanStatusFromStep(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1
 		if step.ForEach == nil {
 			continue
 		}
-		if index, ok := builtin.IterationIndex(step, stepName); ok {
-			return cleanStatusFromIteration(steps, stepStatus, mode, contextCM, step, index, stepName)
+		labels := loopLabels(contextCM, stepStatus, step.Name)
+		if index, ok := builtin.IterationIndex(step, labels, stepName); ok {
+			return cleanStatusFromIteration(steps, stepStatus, mode, contextCM, step, labels, index, stepName)
 		}
 	}
 	originalStatus := append([]v1alpha1.WorkflowStepStatus(nil), stepStatus...)
@@ -438,24 +439,24 @@ func CleanStatusFromStep(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1
 // pass it reruns what a plain step-group would: the failed sub-step and the sub-steps
 // depending on it. In StepByStep order every later pass reruns in full. The loop keeps
 // its ID and so its pinned list, and reruns the same items.
-func cleanStatusFromIteration(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode oamv1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, loop oamv1alpha1.WorkflowStep, index int, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
+func cleanStatusFromIteration(steps []oamv1alpha1.WorkflowStep, stepStatus []v1alpha1.WorkflowStepStatus, mode oamv1alpha1.WorkflowExecuteMode, contextCM *corev1.ConfigMap, loop oamv1alpha1.WorkflowStep, labels []string, index int, stepName string) ([]v1alpha1.WorkflowStepStatus, *corev1.ConfigMap, error) {
 	rerun := func(i int) bool {
 		if loop.ForEach.Mode == v1alpha1.WorkflowModeDAG {
 			return i == index
 		}
 		return i >= index
 	}
-	rerunInPass := passRerun(loop, mode, stepName)
+	rerunInPass := passRerun(loop, labels, mode, stepName)
 	// rerunStep reports whether the item step called name reruns.
 	rerunStep := func(name string) bool {
-		k, ok := builtin.IterationIndex(loop, name)
+		k, ok := builtin.IterationIndex(loop, labels, name)
 		if !ok || !rerun(k) {
 			return false
 		}
 		if k != index {
 			return true
 		}
-		template, _ := builtin.IterationTemplate(loop, name)
+		template, _ := builtin.IterationTemplate(loop, labels, name)
 		return rerunInPass(template.Name)
 	}
 	found := false
@@ -490,8 +491,8 @@ func cleanStatusFromIteration(steps []oamv1alpha1.WorkflowStep, stepStatus []v1a
 	if contextCM != nil && contextCM.Data != nil {
 		// Later steps rerun from scratch; a later loop among them gets a new ID too.
 		drop := either(either(outputsOf(steps, dependency), dropLoops(steps, dependency, originalStatus, contextCM)), func(label string) bool {
-			if k, ok := builtin.IterationVarIndex(loop, label); ok {
-				return rerunVar(loop, k, index, label, rerun(k), rerunInPass)
+			if k, ok := builtin.IterationVarIndex(loop, labels, label); ok {
+				return rerunVar(loop, labels, k, index, label, rerun(k), rerunInPass)
 			}
 			return stringsContain(builtin.CollectedOutputs(loop), label)
 		})
@@ -506,11 +507,11 @@ func cleanStatusFromIteration(steps []oamv1alpha1.WorkflowStep, stepStatus []v1a
 // them for a single step, and for a group the failed sub-step and its dependents, in
 // the mode the body ran in (the group's own, else the workflow's sub-step mode, else
 // DAG, as the step generator picks it).
-func passRerun(loop oamv1alpha1.WorkflowStep, mode oamv1alpha1.WorkflowExecuteMode, stepName string) func(string) bool {
+func passRerun(loop oamv1alpha1.WorkflowStep, labels []string, mode oamv1alpha1.WorkflowExecuteMode, stepName string) func(string) bool {
 	if loop.Type != wfTypes.WorkflowStepTypeStepGroup {
 		return func(string) bool { return true }
 	}
-	template, _ := builtin.IterationTemplate(loop, stepName)
+	template, _ := builtin.IterationTemplate(loop, labels, stepName)
 	bodyMode := loop.Mode
 	if bodyMode == "" {
 		bodyMode = mode.SubSteps
@@ -523,7 +524,7 @@ func passRerun(loop oamv1alpha1.WorkflowStep, mode oamv1alpha1.WorkflowExecuteMo
 // rerunVar reports whether a pass's variable is dropped. A pass rerunning in full loses
 // them all; the pass a restart starts from keeps its {item, index} and the outputs of
 // the sub-steps it keeps.
-func rerunVar(loop oamv1alpha1.WorkflowStep, k, index int, label string, rerun bool, rerunInPass func(string) bool) bool {
+func rerunVar(loop oamv1alpha1.WorkflowStep, labels []string, k, index int, label string, rerun bool, rerunInPass func(string) bool) bool {
 	if !rerun {
 		return false
 	}
@@ -535,7 +536,7 @@ func rerunVar(loop oamv1alpha1.WorkflowStep, k, index int, label string, rerun b
 	}
 	for _, sub := range loop.SubSteps {
 		for _, o := range sub.Outputs {
-			if label == builtin.IterationVarName(loop, k, o.Name) {
+			if label == builtin.IterationVarName(loop, labels, k, o.Name) {
 				return rerunInPass(sub.Name)
 			}
 		}
@@ -544,27 +545,42 @@ func rerunVar(loop oamv1alpha1.WorkflowStep, k, index int, label string, rerun b
 }
 
 // dropLoops matches every variable the named forEach steps keep for their passes, and
-// removes their pinned lists from the context: each reruns under a new ID, so its list
-// is resolved again and nothing its last run wrote may be read.
+// removes their pinned lists and item keys from the context: each reruns under a new
+// ID, so its list is resolved again and nothing its last run wrote may be read.
 func dropLoops(steps []oamv1alpha1.WorkflowStep, names []string, status []v1alpha1.WorkflowStepStatus, contextCM *corev1.ConfigMap) func(string) bool {
-	var loops []oamv1alpha1.WorkflowStep
+	type loop struct {
+		step   oamv1alpha1.WorkflowStep
+		labels []string
+	}
+	var loops []loop
 	for _, step := range steps {
 		if step.ForEach == nil || !stringsContain(names, step.Name) {
 			continue
 		}
-		loops = append(loops, step)
+		loops = append(loops, loop{step: step, labels: loopLabels(contextCM, status, step.Name)})
 		if id := stepStatusID(status, step.Name); id != "" {
 			delete(contextCM.Data, builtin.PinnedItemsKey(id))
+			delete(contextCM.Data, builtin.ItemLabelsKey(id))
 		}
 	}
 	return func(label string) bool {
-		for _, loop := range loops {
-			if _, ok := builtin.IterationVarIndex(loop, label); ok || stringsContain(builtin.CollectedOutputs(loop), label) {
+		for _, l := range loops {
+			if _, ok := builtin.IterationVarIndex(l.step, l.labels, label); ok || stringsContain(builtin.CollectedOutputs(l.step), label) {
 				return true
 			}
 		}
 		return false
 	}
+}
+
+// loopLabels returns the item keys a keyed forEach step's current run named its items
+// by, or nil for an index-named loop or one that has not run.
+func loopLabels(contextCM *corev1.ConfigMap, status []v1alpha1.WorkflowStepStatus, name string) []string {
+	id := stepStatusID(status, name)
+	if contextCM == nil || id == "" {
+		return nil
+	}
+	return builtin.ItemLabels(func(paths ...string) string { return contextCM.Data[strings.Join(paths, ".")] }, id)
 }
 
 func stepStatusID(status []v1alpha1.WorkflowStepStatus, name string) string {

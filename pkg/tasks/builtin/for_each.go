@@ -175,7 +175,20 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	if err != nil {
 		return failed(status, types.StatusReasonParameter, err), &types.Operation{Terminated: true}, nil
 	}
-	iterations, err := expandIterations(tr.step, items)
+	labels, err := itemLabels(tr.step, items)
+	if err != nil {
+		return failed(status, types.StatusReasonParameter, err), &types.Operation{Terminated: true}, nil
+	}
+	if labels != nil {
+		b, err := json.Marshal(labels)
+		if err != nil {
+			return status, nil, err
+		}
+		if ctx.GetMutableValue(ItemLabelsKey(tr.id)) != string(b) {
+			ctx.SetMutableValue(string(b), ItemLabelsKey(tr.id))
+		}
+	}
+	iterations, err := expandIterations(tr.step, items, labels)
 	if err != nil {
 		return failed(status, types.StatusReasonParameter, err), &types.Operation{Terminated: true}, nil
 	}
@@ -221,14 +234,14 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	// as running unless it has timed out or a pass is suspended.
 	status, operation := getStepGroupStatus(status, e.GetStepStatus(tr.name), e.GetOperation(), countSteps(iterations))
 	if status.Phase == v1alpha1.WorkflowStepPhaseFailed {
-		if message := tr.failureMessage(e.GetStepStatus(tr.name), items); message != "" {
+		if message := tr.failureMessage(e.GetStepStatus(tr.name), items, labels); message != "" {
 			status.Message = message
 		}
 	}
 	if status.Phase != v1alpha1.WorkflowStepPhaseSucceeded {
 		return status, operation, nil
 	}
-	if err := collectOutputs(ctx, basicVal.Context(), tr.step, len(items)); err != nil {
+	if err := collectOutputs(ctx, basicVal.Context(), tr.step, len(items), labels); err != nil {
 		return failed(status, types.StatusReasonOutput, err), &types.Operation{Terminated: true}, nil
 	}
 	return status, operation, nil
@@ -240,27 +253,36 @@ const maxItemInMessage = 60
 
 // failureMessage names the lowest-indexed item that failed, the sub-step it failed at
 // for a group, and that step's message, with a count of the other items that failed.
-// The item steps' names give only an index, so this is where the item itself is seen.
-func (tr *forEachTaskRunner) failureMessage(status v1alpha1.WorkflowStepStatus, items []any) string {
+// Index-named item steps give only an index, so this is where the item itself is seen;
+// a keyed loop shows the key.
+func (tr *forEachTaskRunner) failureMessage(status v1alpha1.WorkflowStepStatus, items []any, labels []string) string {
+	_, group := body(tr.step)
 	first, sub, message := -1, "", ""
 	failedItems := map[int]bool{}
 	for _, s := range status.SubStepsStatus {
 		if s.Phase != v1alpha1.WorkflowStepPhaseFailed {
 			continue
 		}
-		index, rest, ok := cutIndex(tr.name, s.Name)
+		index, template, ok := parseIteration(tr.step, labels, s.Name)
 		if !ok || index >= len(items) {
 			continue
 		}
 		failedItems[index] = true
 		if first == -1 || index < first {
-			first, sub, message = index, rest, s.Message
+			first, sub, message = index, "", s.Message
+			if group {
+				sub = template.Name
+			}
 		}
 	}
 	if first == -1 {
 		return ""
 	}
-	out := fmt.Sprintf("item %d (%s) failed", first, describeItem(items[first]))
+	item := describeItem(items[first])
+	if labels != nil {
+		item = labels[first]
+	}
+	out := fmt.Sprintf("item %d (%s) failed", first, item)
 	if sub != "" {
 		out += " at " + sub
 	}
@@ -297,8 +319,9 @@ func describeItem(item any) string {
 // with the engine. Once an earlier iteration has failed in step mode, the runners
 // record a skip instead of running, as the engine does for later steps in step mode.
 func (tr *forEachTaskRunner) iterationRunners(ctx wfContext.Context, cueCtx *cue.Context, e types.Engine, it iteration, ids map[string]string, skip bool) ([]types.TaskRunner, error) {
-	if _, err := ctx.GetVar(it.loopVar); err != nil {
-		b, err := json.Marshal(map[string]any{"item": it.item, "index": it.index})
+	// A pass begun before each.key existed keeps {item, index}, so key is filled in on resume.
+	if v, err := ctx.GetVar(it.loopVar); err != nil || !v.LookupPath(cue.ParsePath("key")).Exists() {
+		b, err := json.Marshal(map[string]any{"item": it.item, "index": it.index, "key": it.key})
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +340,7 @@ func (tr *forEachTaskRunner) iterationRunners(ctx wfContext.Context, cueCtx *cue
 		if err != nil {
 			return nil, errors.WithMessagef(err, "generate iteration %d of forEach step %s", it.index, tr.name)
 		}
-		runners = append(runners, &iterationRunner{TaskRunner: runner, pCtx: tr.pCtx, item: it.item, index: it.index})
+		runners = append(runners, &iterationRunner{TaskRunner: runner, pCtx: tr.pCtx, item: it.item, index: it.index, key: it.key})
 	}
 	return runners, nil
 }
@@ -422,7 +445,9 @@ func failed(status v1alpha1.StepStatus, reason string, err error) v1alpha1.StepS
 type iteration struct {
 	index int
 	item  any
-	// loopVar is the workflow variable holding {item, index} for this pass.
+	// key is what names this pass's steps: the item's key, or its index.
+	key string
+	// loopVar is the workflow variable holding {item, index, key} for this pass.
 	loopVar string
 	steps   []oamv1alpha1.WorkflowStepBase
 }
@@ -446,8 +471,9 @@ func body(step oamv1alpha1.WorkflowStep) (steps []oamv1alpha1.WorkflowStepBase, 
 // expandIterations repeats the body once per item. Step names, dependsOn entries naming
 // body steps, body outputs, and inputs reading a body output or the loop are all scoped
 // to the iteration, so iterations never share names or vars. A group's sub-step is
-// named <loop>-<index>-<sub>; a single step is named <loop>-<index>.
-func expandIterations(step oamv1alpha1.WorkflowStep, items []any) ([]iteration, error) {
+// named <loop>-<label>-<sub>; a single step is named <loop>-<label>. The label is the
+// item's index, or its key when the loop has one.
+func expandIterations(step oamv1alpha1.WorkflowStep, items []any, labels []string) ([]iteration, error) {
 	template, group := body(step)
 	bodySteps := map[string]bool{}
 	bodyOutputs := map[string]bool{}
@@ -463,10 +489,11 @@ func expandIterations(step oamv1alpha1.WorkflowStep, items []any) ([]iteration, 
 
 	iterations := make([]iteration, 0, len(items))
 	for i, item := range items {
-		scope := func(name string) string { return types.IterationName(step.Name, i, name) }
+		label := itemLabel(labels, i)
+		scope := func(name string) string { return types.IterationName(step.Name, label, name) }
 		stepName := scope
 		if !group {
-			stepName = func(string) string { return fmt.Sprintf("%s-%d", step.Name, i) }
+			stepName = func(string) string { return step.Name + "-" + label }
 		}
 		steps := make([]oamv1alpha1.WorkflowStepBase, 0, len(template))
 		for _, sub := range template {
@@ -491,42 +518,79 @@ func expandIterations(step oamv1alpha1.WorkflowStep, items []any) ([]iteration, 
 			}
 			steps = append(steps, s)
 		}
-		iterations = append(iterations, iteration{index: i, item: item, loopVar: scope(eachRoot), steps: steps})
+		iterations = append(iterations, iteration{index: i, item: item, key: label, loopVar: scope(eachRoot), steps: steps})
 	}
 	return iterations, nil
 }
 
+// itemLabel is what names item i's steps: its key, or its index when labels is nil.
+func itemLabel(labels []string, i int) string {
+	if labels == nil {
+		return strconv.Itoa(i)
+	}
+	return labels[i]
+}
+
 // IterationTemplate returns the body step that the iteration step called name was
 // expanded from, for a caller that holds only the status of a forEach step's passes.
-func IterationTemplate(step oamv1alpha1.WorkflowStep, name string) (oamv1alpha1.WorkflowStepBase, bool) {
-	_, template, ok := parseIteration(step, name)
+// labels are the loop's stored keys (ItemLabels), nil for an index-named loop.
+func IterationTemplate(step oamv1alpha1.WorkflowStep, labels []string, name string) (oamv1alpha1.WorkflowStepBase, bool) {
+	_, template, ok := parseIteration(step, labels, name)
 	return template, ok
 }
 
 // IterationIndex returns the index of the pass the iteration step called name belongs to.
-func IterationIndex(step oamv1alpha1.WorkflowStep, name string) (int, bool) {
-	index, _, ok := parseIteration(step, name)
+func IterationIndex(step oamv1alpha1.WorkflowStep, labels []string, name string) (int, bool) {
+	index, _, ok := parseIteration(step, labels, name)
 	return index, ok
 }
 
-func parseIteration(step oamv1alpha1.WorkflowStep, name string) (int, oamv1alpha1.WorkflowStepBase, bool) {
+func parseIteration(step oamv1alpha1.WorkflowStep, labels []string, name string) (int, oamv1alpha1.WorkflowStepBase, bool) {
 	template, group := body(step)
-	index, sub, ok := cutIndex(step.Name, name)
-	if !ok {
-		return 0, oamv1alpha1.WorkflowStepBase{}, false
-	}
-	if !group {
-		if sub != "" {
-			return 0, oamv1alpha1.WorkflowStepBase{}, false
+	for _, c := range cutLabels(step.Name, labels, name) {
+		if !group {
+			if c.rest == "" {
+				return c.index, template[0], true
+			}
+			continue
 		}
-		return index, template[0], true
-	}
-	for _, t := range template {
-		if t.Name == sub {
-			return index, t, true
+		for _, t := range template {
+			if t.Name == c.rest {
+				return c.index, t, true
+			}
 		}
 	}
 	return 0, oamv1alpha1.WorkflowStepBase{}, false
+}
+
+// labelCut is one way of reading a name as <loop>-<label>[-<rest>].
+type labelCut struct {
+	index int
+	rest  string
+}
+
+// cutLabels returns every way name reads as <loop>-<label>[-<rest>] for the loop's
+// labels, or by index when labels is nil. A key may itself hold '-', so a name can read
+// several ways; a caller keeps the one whose rest it recognises, and itemLabels makes
+// sure at most one is a name the loop generates.
+func cutLabels(loop string, labels []string, name string) []labelCut {
+	if labels == nil {
+		if index, rest, ok := cutIndex(loop, name); ok {
+			return []labelCut{{index: index, rest: rest}}
+		}
+		return nil
+	}
+	var cuts []labelCut
+	for i, label := range labels {
+		prefix := loop + "-" + label
+		switch {
+		case name == prefix:
+			cuts = append(cuts, labelCut{index: i})
+		case strings.HasPrefix(name, prefix+"-"):
+			cuts = append(cuts, labelCut{index: i, rest: name[len(prefix)+1:]})
+		}
+	}
+	return cuts
 }
 
 // cutIndex splits <loop>-<index>[-<rest>] into the index and rest.
@@ -544,15 +608,23 @@ func cutIndex(loop, name string) (int, string, bool) {
 }
 
 // IterationVarName is the name a body output, or the loop variable, has in pass index.
-func IterationVarName(step oamv1alpha1.WorkflowStep, index int, name string) string {
-	return types.IterationName(step.Name, index, name)
+func IterationVarName(step oamv1alpha1.WorkflowStep, labels []string, index int, name string) string {
+	return types.IterationName(step.Name, itemLabel(labels, index), name)
 }
 
 // IterationVarIndex returns the index of the pass a workflow variable belongs to: the
 // {item, index} one, or an output scoped to that pass.
-func IterationVarIndex(step oamv1alpha1.WorkflowStep, label string) (int, bool) {
-	index, rest, ok := cutIndex(step.Name, label)
-	return index, ok && rest != ""
+func IterationVarIndex(step oamv1alpha1.WorkflowStep, labels []string, label string) (int, bool) {
+	vars := map[string]bool{eachRoot: true}
+	for _, name := range CollectedOutputs(step) {
+		vars[name] = true
+	}
+	for _, c := range cutLabels(step.Name, labels, label) {
+		if vars[c.rest] {
+			return c.index, true
+		}
+	}
+	return 0, false
 }
 
 // CollectedOutputs names the variables a forEach step writes as lists once it succeeds.
@@ -573,21 +645,47 @@ func PinnedItemsKey(stepID string) string {
 	return stepID + "." + forEachItemsKey
 }
 
-// IsPinnedItemsKey reports whether a workflow context key holds a pinned forEach list.
-func IsPinnedItemsKey(key string) bool {
-	return strings.HasSuffix(key, "."+forEachItemsKey)
+// forEachLabelsKey is where a keyed forEach step's item keys are kept, beside its
+// pinned list, for callers that must match its item steps' names to items.
+const forEachLabelsKey = "for-each-keys"
+
+// ItemLabelsKey is where a keyed forEach step's item keys are kept in the workflow
+// context, under the ID of the step's current run.
+func ItemLabelsKey(stepID string) string {
+	return stepID + "." + forEachLabelsKey
+}
+
+// ItemLabels returns the keys a forEach step's items were named by, read with get
+// (a workflow context's GetMutableValue, or a lookup in its ConfigMap), or nil when the
+// loop is index-named or has not run.
+func ItemLabels(get func(paths ...string) string, stepID string) []string {
+	raw := get(ItemLabelsKey(stepID))
+	if raw == "" {
+		return nil
+	}
+	var labels []string
+	if err := json.Unmarshal([]byte(raw), &labels); err != nil {
+		return nil
+	}
+	return labels
+}
+
+// IsForEachContextKey reports whether a workflow context key holds a forEach step's
+// pinned list or its item keys.
+func IsForEachContextKey(key string) bool {
+	return strings.HasSuffix(key, "."+forEachItemsKey) || strings.HasSuffix(key, "."+forEachLabelsKey)
 }
 
 // collectOutputs writes each body output as a list, one entry per iteration and null
 // where an iteration did not produce it.
-func collectOutputs(ctx wfContext.Context, cueCtx *cue.Context, step oamv1alpha1.WorkflowStep, count int) error {
+func collectOutputs(ctx wfContext.Context, cueCtx *cue.Context, step oamv1alpha1.WorkflowStep, count int, labels []string) error {
 	template, _ := body(step)
 	for _, sub := range template {
 		for _, o := range sub.Outputs {
 			values := make([]string, count)
 			for i := range values {
 				values[i] = "null"
-				if v, err := ctx.GetVar(types.IterationName(step.Name, i, o.Name)); err == nil {
+				if v, err := ctx.GetVar(types.IterationName(step.Name, itemLabel(labels, i), o.Name)); err == nil {
 					b, err := v.MarshalJSON()
 					if err != nil {
 						return errors.WithMessagef(err, "read output %s of iteration %d", o.Name, i)
@@ -610,10 +708,11 @@ type iterationRunner struct {
 	pCtx  process.Context
 	item  any
 	index int
+	key   string
 }
 
 func (r *iterationRunner) withLoop() func() {
-	meta := process.WithLoop(r.item, r.index)
+	meta := process.WithLoop(r.item, r.index, r.key)
 	manager := process.NewStepRunTimeMeta()
 	manager.Fill(r.pCtx, []process.StepMetaKV{meta})
 	return func() { manager.Remove(r.pCtx, []string{meta.Key}) }

@@ -19,6 +19,7 @@ package expressions
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -63,9 +64,16 @@ func running(step string, index ...int) process.Context {
 	pCtx := process.NewContext(process.ContextData{Name: "wr"})
 	metas := []process.StepMetaKV{process.WithName(step)}
 	if len(index) > 0 {
-		metas = append(metas, process.WithLoop("a", index[0]))
+		metas = append(metas, process.WithLoop("a", index[0], strconv.Itoa(index[0])))
 	}
 	process.NewStepRunTimeMeta().Fill(pCtx, metas)
+	return pCtx
+}
+
+// runningKeyed is the process context of a pass of a loop that names its items by key.
+func runningKeyed(step string, index int, key string) process.Context {
+	pCtx := process.NewContext(process.ContextData{Name: "wr"})
+	process.NewStepRunTimeMeta().Fill(pCtx, []process.StepMetaKV{process.WithName(step), process.WithLoop("a", index, key)})
 	return pCtx
 }
 
@@ -95,6 +103,18 @@ func TestInsideAnIterationStepsReadsThatIteration(t *testing.T) {
 	require.ErrorIs(t, err, cel.ErrNotReady, "another iteration finishing does not answer this one")
 }
 
+func TestInsideAKeyedIterationStepsReadsThatIteration(t *testing.T) {
+	out, err := resolve(t, `{"x":"$(steps.fetch.outputs.data)"}`, runningKeyed("per-tenant-acme-greet", 1, "acme"),
+		map[string]wfv1alpha1.StepStatus{"per-tenant-zeta-fetch": succeeded, "per-tenant-acme-fetch": succeeded},
+		vars{"per-tenant-zeta-data": `"zeta"`, "per-tenant-acme-data": `"acme"`})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"x":"acme"}`, out.(string), "the pass is found by its key, not its index")
+
+	_, err = resolve(t, `{"x":"$(steps.fetch.outputs.data)"}`, runningKeyed("per-tenant-acme-greet", 1, "acme"),
+		map[string]wfv1alpha1.StepStatus{"per-tenant-1-fetch": succeeded}, vars{"per-tenant-1-data": `"one"`})
+	require.ErrorIs(t, err, cel.ErrNotReady, "an index-named pass is not this keyed one")
+}
+
 func TestOutsideTheLoopStepsReadsWhatTheLoopCollected(t *testing.T) {
 	collected := vars{"msg": `["hi a","hi b"]`, "pong": `[1,2]`}
 	out, err := resolve(t, `{"x":"$(steps.greet.outputs.msg.join(\", \"))","n":"$(steps.ping.outputs.pong.size())"}`,
@@ -111,15 +131,17 @@ func TestOutsideTheLoopStepsReadsWhatTheLoopCollected(t *testing.T) {
 
 func TestAStepCannotReadItsOwnOutputs(t *testing.T) {
 	for name, pCtx := range map[string]process.Context{
-		"a plain step":        running("summary"),
-		"a single-step loop":  running("ping-0", 0),
-		"a group's body step": running("per-tenant-0-greet", 0),
+		"a plain step":             running("summary"),
+		"a single-step loop":       running("ping-0", 0),
+		"a group's body step":      running("per-tenant-0-greet", 0),
+		"a keyed single-step loop": runningKeyed("ping-us", 0, "us"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			props := map[string]string{
-				"a plain step":        `{"x":"$(steps.summary.outputs.y)"}`,
-				"a single-step loop":  `{"x":"$(steps.ping.outputs.pong)"}`,
-				"a group's body step": `{"x":"$(steps.greet.outputs.msg)"}`,
+				"a plain step":             `{"x":"$(steps.summary.outputs.y)"}`,
+				"a single-step loop":       `{"x":"$(steps.ping.outputs.pong)"}`,
+				"a group's body step":      `{"x":"$(steps.greet.outputs.msg)"}`,
+				"a keyed single-step loop": `{"x":"$(steps.ping.outputs.pong)"}`,
 			}[name]
 			_, err := resolve(t, props, pCtx, nil, vars{})
 			require.Error(t, err)
@@ -140,6 +162,6 @@ func TestTheReadersLoopIsTheLongestMatch(t *testing.T) {
 	})
 	for i := 0; i < 20; i++ {
 		r := ws.readerOf(running("a-0-x-0-sub", 0))
-		require.Equal(t, reader{name: "a-0-x-0-sub", written: "sub", loop: "a-0-x", index: 0}, r)
+		require.Equal(t, reader{name: "a-0-x-0-sub", written: "sub", loop: "a-0-x", key: "0"}, r)
 	}
 }

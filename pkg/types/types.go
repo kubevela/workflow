@@ -18,7 +18,6 @@ package types
 
 import (
 	"context"
-	"fmt"
 
 	"cuelang.org/go/cue"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,11 +162,12 @@ type TaskGeneratorOptions struct {
 	Expressions PropertyEvaluator
 }
 
-// IterationName is what iteration index of a forEach loop over a step-group calls
-// its body step, or a body output, name: <loop>-<index>-<name>. A loop over one
-// step names its pass <loop>-<index>.
-func IterationName(loop string, index int, name string) string {
-	return fmt.Sprintf("%s-%d-%s", loop, index, name)
+// IterationName is what the pass of a forEach loop over a step-group for the item
+// labelled label calls its body step, or a body output, name: <loop>-<label>-<name>.
+// A loop over one step names its pass <loop>-<label>. The label is the item's key,
+// or its index when the loop has none.
+func IterationName(loop, label, name string) string {
+	return loop + "-" + label + "-" + name
 }
 
 // PropertyEvaluator resolves the $( ) expressions in a step's properties. An
