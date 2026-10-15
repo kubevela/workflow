@@ -1,0 +1,62 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: conditions
+  annotations:
+    workflowrun.oam.dev/cel-expressions: "true"
+spec:
+  # DAG, so only dependsOn orders the steps: each condition's reads imply one.
+  mode:
+    steps: DAG
+  workflowSpec:
+    steps:
+      - name: when-true
+        type: create-config
+        if: '$(steps.check.succeeded && steps.check.outputs.tenants.size() == 2 && context.name == "conditions")'
+        properties:
+          name: cond-when-true
+          config:
+            ran: "yes"
+      - name: when-false
+        type: create-config
+        if: '$(steps.check.failed)'
+        properties:
+          name: cond-when-false
+          config:
+            ran: "yes"
+      - name: per-tenant
+        type: step-group
+        forEach:
+          items: '$(steps.check.outputs.tenants)'
+        subSteps:
+          - name: save
+            type: create-config
+            if: '$(each.index == 1 && steps.check.phase == "succeeded")'
+            properties:
+              name: 'cond-$(each.item.name)'
+              config:
+                ran: "yes"
+      - name: cue-if
+        type: create-config
+        dependsOn: [check]
+        if: status.check.succeeded
+        properties:
+          name: cond-cue
+          config:
+            ran: "yes"
+      - name: check
+        type: read-config
+        dependsOn: [create]
+        properties:
+          name: cond-tenants
+        outputs:
+          - name: tenants
+            valueFrom: output.config.tenants
+      - name: create
+        type: create-config
+        properties:
+          name: cond-tenants
+          config:
+            tenants:
+              - name: a
+              - name: b
