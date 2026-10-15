@@ -76,34 +76,45 @@ func itemLabels(step oamv1alpha1.WorkflowStep, items []any) ([]string, error) {
 		}
 		seen[label] = i
 	}
-	owner := map[string]int{}
-	for i, label := range labels {
-		for _, name := range generatedNames(step, label) {
+	// Step status and variables are separate stores, so a name is owned within each.
+	claim := func(owner map[string]int, i int, kind string, names []string) error {
+		for _, name := range names {
 			if j, ok := owner[name]; ok {
-				return nil, errors.Errorf("items %d and %d both name a step %s; pick key fields that tell them apart", j, i, name)
+				return errors.Errorf("items %d and %d both name a %s %s; pick key fields that tell them apart", j, i, kind, name)
 			}
 			owner[name] = i
+		}
+		return nil
+	}
+	stepOwner, varOwner := map[string]int{}, map[string]int{}
+	for i, label := range labels {
+		steps, vars := generatedNames(step, label)
+		if err := claim(stepOwner, i, "step", steps); err != nil {
+			return nil, err
+		}
+		if err := claim(varOwner, i, "variable", vars); err != nil {
+			return nil, err
 		}
 	}
 	return labels, nil
 }
 
-// generatedNames is every step and variable name the item labelled label takes.
-func generatedNames(step oamv1alpha1.WorkflowStep, label string) []string {
+// generatedNames is every step name and every variable name the item labelled label takes.
+func generatedNames(step oamv1alpha1.WorkflowStep, label string) (steps, vars []string) {
 	template, group := body(step)
-	names := []string{types.IterationName(step.Name, label, eachRoot)}
+	vars = []string{types.IterationName(step.Name, label, eachRoot)}
 	if !group {
-		names = append(names, step.Name+"-"+label)
+		steps = append(steps, step.Name+"-"+label)
 	}
 	for _, sub := range template {
 		if group {
-			names = append(names, types.IterationName(step.Name, label, sub.Name))
+			steps = append(steps, types.IterationName(step.Name, label, sub.Name))
 		}
 		for _, o := range sub.Outputs {
-			names = append(names, types.IterationName(step.Name, label, o.Name))
+			vars = append(vars, types.IterationName(step.Name, label, o.Name))
 		}
 	}
-	return names
+	return steps, vars
 }
 
 // lookupItem reads the value at a dotted path in an item.

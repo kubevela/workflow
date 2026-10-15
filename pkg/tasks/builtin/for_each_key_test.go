@@ -109,6 +109,18 @@ func TestItemLabels(t *testing.T) {
 			items: []any{map[string]any{"k": "a"}, map[string]any{"k": "a-x"}},
 			err:   `items 0 and 1 both name a step rollout-a-x-y`,
 		},
+		"a step and a variable that share a name across items": {
+			step: oamv1alpha1.WorkflowStep{
+				WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout", Type: types.WorkflowStepTypeStepGroup},
+				ForEach:          &oamv1alpha1.ForEach{From: "targets", Key: []string{"k"}},
+				SubSteps: []oamv1alpha1.WorkflowStepBase{
+					{Name: "deploy-endpoint", Type: "t"},
+					{Name: "probe", Type: "t", Outputs: oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "v"}}},
+				},
+			},
+			items:  []any{map[string]any{"k": "a"}, map[string]any{"k": "a-deploy"}},
+			labels: []string{"a", "a-deploy"},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
