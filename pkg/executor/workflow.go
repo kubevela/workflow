@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"cuelang.org/go/cue"
+	"github.com/kubevela/pkg/cel"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -38,6 +39,7 @@ import (
 	"github.com/kubevela/workflow/api/v1alpha1"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/debug"
+	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/monitor/metrics"
@@ -676,6 +678,9 @@ func (e *engine) generateRunOptions(ctx monitorContext.Context, dependsOnPhase v
 				case "":
 					return &types.PreCheckResult{Skip: skipExecutionOfNextStep(dependsOnPhase, len(step.DependsOn) > 0)}, nil
 				default:
+					if result, ok, err := conditionPreCheck(step, options); ok {
+						return result, err
+					}
 					basicVal := cue.Value{}
 					if options != nil {
 						basicVal = options.BasicValue
@@ -988,4 +993,21 @@ func (e *engine) GetOperation() *types.Operation {
 		Waiting:            e.waiting,
 		FailedAfterRetries: e.failedAfterRetries,
 	}
+}
+
+// conditionPreCheck decides a step whose if is a $( ) condition, when its runner
+// offers one: run on true, skipped on false, and held back while a read in it is
+// still to be answered. It reports false for any other if, which stays CUE.
+func conditionPreCheck(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, bool, error) {
+	if options == nil || options.Condition == nil || !expressions.IsCondition(step.If) {
+		return nil, false, nil
+	}
+	run, err := options.Condition()
+	switch {
+	case errors.Is(err, cel.ErrNotReady):
+		return &types.PreCheckResult{Wait: true, Message: err.Error()}, true, nil
+	case err != nil:
+		return &types.PreCheckResult{Skip: true}, true, err
+	}
+	return &types.PreCheckResult{Skip: !run}, true, nil
 }

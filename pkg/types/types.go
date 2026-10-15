@@ -109,11 +109,18 @@ type TaskRunOptions struct {
 type PreCheckResult struct {
 	Skip    bool
 	Timeout bool
+	// Wait holds the step back, with Message saying why: its $( ) if reads
+	// something still to be answered.
+	Wait    bool
+	Message string
 }
 
 // PreCheckOptions is the options for pre check.
 type PreCheckOptions struct {
 	BasicValue cue.Value
+	// Condition evaluates the step's $( ) if, when its run resolves expressions;
+	// nil otherwise, and an if that is one is then CUE, as it always was.
+	Condition func() (bool, error)
 }
 
 // StatusPatcher is the interface to patch status
@@ -168,6 +175,9 @@ func IterationName(loop string, index int, name string) string {
 type PropertyEvaluator interface {
 	Properties(ctx context.Context, step ExpressionStep, properties *runtime.RawExtension, wfCtx wfContext.Context,
 		pCtx process.Context, status map[string]v1alpha1.StepStatus) (*runtime.RawExtension, error)
+	// Condition evaluates a step's $( ) if.
+	Condition(ctx context.Context, step ExpressionStep, cond string, wfCtx wfContext.Context,
+		pCtx process.Context, status map[string]v1alpha1.StepStatus) (bool, error)
 }
 
 // ExpressionStep is the step whose expressions are resolved: its name as it runs,

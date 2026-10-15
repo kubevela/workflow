@@ -74,15 +74,8 @@ func (e *Evaluator) Properties(ctx context.Context, step types.ExpressionStep, p
 	if err != nil {
 		return nil, err
 	}
-	resolvers := map[string]cel.Resolver{
-		RootContext: ContextResolver(pCtx),
-		RootSteps:   stepsResolver(e.steps, status, wfCtx, e.steps.readerOf(pCtx), e.refused),
-		RootEach:    EachResolver(pCtx),
-	}
-	for root, r := range e.host {
-		resolvers[root] = r
-	}
-	out, err := plan.Eval(withRun(ctx, RunScope{Run: e.run, Step: step.Name, StepType: step.Type, Store: wfCtx}), resolvers, cel.TreeOptions{})
+	out, err := plan.Eval(withRun(ctx, RunScope{Run: e.run, Step: step.Name, StepType: step.Type, Store: wfCtx}),
+		e.resolvers(wfCtx, pCtx, status), cel.TreeOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +84,19 @@ func (e *Evaluator) Properties(ctx context.Context, step types.ExpressionStep, p
 		return nil, err
 	}
 	return &runtime.RawExtension{Raw: raw}, nil
+}
+
+// resolvers answer every root a step's expressions may read: the workflow's
+// and the host's.
+func (e *Evaluator) resolvers(wfCtx wfContext.Context, pCtx process.Context,
+	status map[string]wfv1alpha1.StepStatus) map[string]cel.Resolver {
+	out := map[string]cel.Resolver{
+		RootContext: ContextResolver(pCtx),
+		RootSteps:   stepsResolver(e.steps, status, wfCtx, e.steps.readerOf(pCtx), e.refused),
+		RootEach:    EachResolver(pCtx),
+	}
+	for root, r := range e.host {
+		out[root] = r
+	}
+	return out
 }
