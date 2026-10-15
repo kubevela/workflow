@@ -218,3 +218,42 @@ func TestAStepWhoseConvertorNeedsItsExpressionsResolved(t *testing.T) {
 	require.Equal(t, v1alpha1.WorkflowStepPhaseSucceeded, status.Phase, status.Message)
 	require.Equal(t, "the app component", result)
 }
+
+// embedsComponentInPlace is embedsComponent writing through the step's own
+// properties, as a convertor may.
+func embedsComponentInPlace(step oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error) {
+	converted, err := embedsComponent(step)
+	if err != nil {
+		return step, err
+	}
+	step.Properties.Raw = converted.Properties.Raw
+	return step, nil
+}
+
+func TestAConvertorEditingTheStepInPlaceLeavesItAsWritten(t *testing.T) {
+	step := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+		Name: "notify", Type: "echo", Properties: &runtime.RawExtension{Raw: []byte(`{"msg":"$(context.name)"}`)}}}
+	wfCtx := newWorkflowContextForTest(t)
+	pCtx := process.NewContext(process.ContextData{Name: "app", Namespace: "default"})
+	loader := NewTaskLoader(echoTemplate, 0, pCtx, providers.DefaultCompiler.Get())
+	gen, err := loader.GetTaskGenerator(context.Background(), step.Type)
+	require.NoError(t, err)
+	ev, err := expressions.NewEvaluator(types.ExpressionOptions{}, exprSteps, "")
+	require.NoError(t, err)
+	runner, err := gen(step, &types.TaskGeneratorOptions{Expressions: ev, StepConvertor: embedsComponentInPlace})
+	require.NoError(t, err)
+
+	var result string
+	status, _, err := runner.Run(wfCtx, &types.TaskRunOptions{
+		PostStopHooks: []types.TaskPostStopHook{
+			func(_ wfContext.Context, taskv cue.Value, _ oamv1alpha1.WorkflowStep, _ v1alpha1.StepStatus,
+				_ map[string]v1alpha1.StepStatus) error {
+				result, _ = taskv.LookupPath(cue.ParsePath("result")).String()
+				return nil
+			}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseSucceeded, status.Phase, status.Message)
+	require.Equal(t, "app carries $(component.db.output)", result)
+	require.JSONEq(t, `{"msg":"$(context.name)"}`, string(step.Properties.Raw), "the step given is not changed")
+}

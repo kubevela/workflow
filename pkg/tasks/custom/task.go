@@ -107,7 +107,8 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 		// written is the step before conversion. Its expressions are resolved from
 		// it, and the result converted again, because a convertor may add text that
 		// belongs to something else, such as a component's properties.
-		written := wfStep
+		// A copy, so a convertor editing the step in place does not edit it too.
+		written := *wfStep.DeepCopy()
 		var convert func(oamv1alpha1.WorkflowStep) (oamv1alpha1.WorkflowStep, error)
 		var propertyEvaluator types.PropertyEvaluator
 		if genOpt != nil {
@@ -115,7 +116,7 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 			convert = genOpt.StepConvertor
 			propertyEvaluator = genOpt.Expressions
 			if convert != nil {
-				converted, err := convert(wfStep)
+				converted, err := convert(*wfStep.DeepCopy())
 				switch {
 				case err == nil:
 					wfStep = converted
