@@ -18,6 +18,7 @@ package hooks
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"cuelang.org/go/cue"
@@ -89,6 +90,30 @@ func TestInput(t *testing.T) {
 	s, err := result.String()
 	r.NoError(err)
 	r.Equal(s, "test")
+}
+
+// A skipped step is never rendered, so its post-step hooks get the stand-in the task
+// loader builds: its parameters with the template's source filled over them, which
+// conflicts. Its outputs are recorded as null, not looked up in that value.
+func TestOutputOfASkippedStep(t *testing.T) {
+	r := require.New(t)
+	wfCtx := mockContext(t)
+	cuectx := cuecontext.New()
+	basicVal := cuectx.CompileString(`parameter: message: "hi"`)
+	standIn := basicVal.FillPath(cue.ParsePath(""), "parameter: message: string\nvalue: parameter.message\n")
+	r.Error(standIn.Err(), "the stand-in is a conflict, as a skipped step's hooks get it")
+	stepStatus := make(map[string]v1alpha1.StepStatus)
+	err := Output(wfCtx, standIn, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Name:       "producer",
+			Properties: &runtime.RawExtension{Raw: []byte(`{"message":"hi"}`)},
+			Outputs:    oamv1alpha1.StepOutputs{{Name: "x", ValueFrom: "parameter.message"}},
+		},
+	}, v1alpha1.StepStatus{Name: "producer", Phase: v1alpha1.WorkflowStepPhaseSkipped}, stepStatus)
+	r.NoError(err, "a skipped step's missing output is not an error")
+	x, err := wfCtx.GetVar("x")
+	r.NoError(err)
+	r.Equal("null", fmt.Sprint(x))
 }
 
 func TestOutput(t *testing.T) {
