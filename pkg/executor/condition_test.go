@@ -57,6 +57,10 @@ func TestConditionPreCheck(t *testing.T) {
 		{"no options", "$(steps.build.succeeded)", nil, true,
 			&types.PreCheckResult{Fail: true, Message: conditionWithoutExpressionsMessage}, ""},
 		{"no options, a CUE if is left to CUE", "status.build.succeeded", nil, false, nil, ""},
+		{"two expressions fail the step", "$(steps.build.succeeded) && $(steps.build.failed)", answer(true, nil), true,
+			&types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, ""},
+		{"two expressions fail the step without an evaluator too", "$(steps.build.succeeded) && $(steps.build.failed)", nil, true,
+			&types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, handled, err := conditionPreCheck(step(tc.cond), tc.options)

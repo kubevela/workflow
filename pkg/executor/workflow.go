@@ -996,15 +996,25 @@ func (e *engine) GetOperation() *types.Operation {
 	}
 }
 
-// conditionPreCheck decides a step whose if is a $( ) condition, when its runner
-// offers one: run on true, skipped on false, and held back while a read in it is
-// still to be answered. It reports false for any other if, which stays CUE.
 // conditionWithoutExpressionsMessage fails a step whose $( ) if the run cannot
 // evaluate.
 const conditionWithoutExpressionsMessage = "this step's if is a $( ) condition, which needs expressions, " +
 	"and this run does not read them; turn them on for it, or write the if in CUE"
 
+// misplacedConditionMessage fails a step whose if holds a $( ) that is not the
+// whole of it.
+const misplacedConditionMessage = "this step's if holds a $( ) that is not the whole condition; " +
+	"write one expression, $(a && b), not $(a) && $(b)"
+
+// conditionPreCheck decides a step whose if is a $( ) condition: run on true,
+// skipped on false, and held back while a read in it is still to be answered.
+// It fails the step when the run has no evaluator for the condition, or when the
+// if holds a $( ) that is not the whole of it, since neither is CUE. It reports
+// false for any other if, which stays CUE.
 func conditionPreCheck(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, bool, error) {
+	if expressions.MisplacedCondition(step.If) {
+		return &types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, true, nil
+	}
 	if !expressions.IsCondition(step.If) {
 		return nil, false, nil
 	}

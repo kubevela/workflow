@@ -112,7 +112,8 @@ type PreCheckResult struct {
 	// something still to be answered.
 	Wait bool
 	// Fail fails the step, with Message saying why: its $( ) if cannot be
-	// evaluated in a run that does not read expressions.
+	// evaluated in a run that does not read expressions, or its if holds a
+	// $( ) that is not the whole condition.
 	Fail    bool
 	Message string
 }
