@@ -263,6 +263,12 @@ func (r *fakeRunner) Run(ctx wfContext.Context, _ *types.TaskRunOptions) (v1alph
 		}
 	case "fail-quietly":
 		status.Phase, status.Reason = v1alpha1.WorkflowStepPhaseFailed, types.StatusReasonAction
+	case "fail-on-a-else-running":
+		if item == "a" {
+			unreachable()
+		} else {
+			status.Phase = v1alpha1.WorkflowStepPhaseRunning
+		}
 	case "running":
 		status.Phase = v1alpha1.WorkflowStepPhaseRunning
 	case "terminate":
@@ -611,6 +617,55 @@ func TestForEachDagModeRunsEveryIteration(t *testing.T) {
 	_, _, err = runner.Run(wfCtx, runOptions(e))
 	r.NoError(err)
 	r.Len(e.statuses, 2)
+}
+
+// In DAG an item's failure affects only that item, on this reconcile and on later
+// ones: an item still running when an earlier one has failed keeps running.
+func TestForEachDagModeKeepsRunningAfterAnEarlierFailure(t *testing.T) {
+	r := require.New(t)
+	wfCtx := newWorkflowContextForTest(t)
+	f := newFixture()
+	runner, err := ForEach(singleStep("fail-on-a-else-running", oamv1alpha1.ForEach{
+		Items: itemsJSON(t, []string{"a", "b"}), Mode: v1alpha1.WorkflowModeDAG,
+	}), f.options("loop-id", ""))
+	r.NoError(err)
+	e := &runningEngine{wfCtx: wfCtx}
+	phases := func() map[string]v1alpha1.WorkflowStepPhase {
+		out := map[string]v1alpha1.WorkflowStepPhase{}
+		for _, s := range e.statuses {
+			out[s.Name] = s.Phase
+		}
+		return out
+	}
+
+	_, _, err = runner.Run(wfCtx, runOptions(e))
+	r.NoError(err)
+	r.Equal(map[string]v1alpha1.WorkflowStepPhase{
+		"scale-0": v1alpha1.WorkflowStepPhaseFailed,
+		"scale-1": v1alpha1.WorkflowStepPhaseRunning,
+	}, phases(), "the first reconcile")
+
+	_, _, err = runner.Run(wfCtx, runOptions(e))
+	r.NoError(err)
+	r.Equal(v1alpha1.WorkflowStepPhaseRunning, phases()["scale-1"], "the next reconcile does not skip b for a's failure")
+}
+
+// In StepByStep a failure recorded on an earlier reconcile still skips the items
+// after it: here a reconcile recorded a's failure and ended before b had a status.
+func TestForEachStepModeSkipsAfterAnEarlierReconcilesFailure(t *testing.T) {
+	r := require.New(t)
+	wfCtx := newWorkflowContextForTest(t)
+	f := newFixture()
+	runner, err := ForEach(singleStep("running", oamv1alpha1.ForEach{Items: itemsJSON(t, []string{"a", "b"})}), f.options("loop-id", ""))
+	r.NoError(err)
+	e := &runningEngine{wfCtx: wfCtx, statuses: []v1alpha1.StepStatus{{
+		Name: "scale-0", Phase: v1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonAction,
+	}}}
+	_, _, err = runner.Run(wfCtx, runOptions(e))
+	r.NoError(err)
+	r.Len(e.statuses, 2)
+	r.Equal("scale-1", e.statuses[1].Name)
+	r.Equal(v1alpha1.WorkflowStepPhaseSkipped, e.statuses[1].Phase, "b is skipped for a's failure, not run")
 }
 
 func TestForEachStepModeSkipsAfterAFailure(t *testing.T) {

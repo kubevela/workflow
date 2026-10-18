@@ -206,9 +206,12 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	failedBefore := false
 	for _, it := range iterations {
 		// A finished pass is left alone: rebuilding its runners would load every
-		// template again only for the engine to skip them.
+		// template again only for the engine to skip them. Only in StepByStep does its
+		// failure skip the passes after it; in DAG each pass finishes on its own.
 		if finished, anyFailed := iterationState(e.GetStepStatus(tr.name), it); finished {
-			failedBefore = failedBefore || anyFailed
+			if tr.mode != v1alpha1.WorkflowModeDAG {
+				failedBefore = failedBefore || anyFailed
+			}
 			continue
 		}
 		runners, err := tr.iterationRunners(ctx, basicVal.Context(), e, it, ids, failedBefore)
