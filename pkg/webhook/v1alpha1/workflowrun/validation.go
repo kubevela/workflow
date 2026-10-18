@@ -84,6 +84,7 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 	}
 	enabled := expressions.EnabledFor(wr.Annotations)
 	errs = append(errs, builtin.ValidateForEachSteps(stepsPath, steps, enabled)...)
+	errs = append(errs, expressions.MisplacedConditions(stepsPath, steps)...)
 	if enabled {
 		// No host roots: a WorkflowRun is resolved by the workflow alone, so a root
 		// only a host answers, such as KubeVela's source, is undeclared here. KubeVela

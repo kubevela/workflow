@@ -74,6 +74,17 @@ func TestStepConditionsRefusedWithoutExpressions(t *testing.T) {
 		require.Contains(t, errs.Error(), "spec.workflowSpec.steps[2].subSteps[0].if")
 	})
 
+	t.Run("two expressions are refused, opted in or not", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.EnableCelExpressions, true)
+		for _, annotations := range []map[string]string{nil, {types.AnnotationCelExpressions: "true"}} {
+			run := conditionRun(annotations)
+			run.Spec.WorkflowSpec.Steps[1].If = "$(steps.a.succeeded) && $(steps.a.failed)"
+			errs := h.ValidateWorkflow(context.Background(), run).ToAggregate()
+			require.Error(t, errs)
+			require.Contains(t, errs.Error(), "must be the whole if")
+		}
+	})
+
 	t.Run("opted in, the condition is admitted", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.EnableCelExpressions, true)
 		require.Empty(t, h.ValidateWorkflow(context.Background(), conditionRun(map[string]string{types.AnnotationCelExpressions: "true"})))

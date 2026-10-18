@@ -43,3 +43,36 @@ func TestConditionsWithoutExpressions(t *testing.T) {
 	require.Contains(t, errs[0].Detail, "turn them on")
 	require.Equal(t, "spec.workflowSpec.steps[4].subSteps[0].if", errs[1].Field)
 }
+
+// An if holding a $( ) that is not the whole of it is neither a condition nor CUE,
+// so it is refused, with expressions on or off. A $( ) inside a CUE string is text.
+func TestMisplacedConditions(t *testing.T) {
+	for cond, refused := range map[string]bool{
+		"$(steps.a.succeeded) && $(steps.a.failed)": true,
+		"x $(steps.a.succeeded)":                    true,
+		"$(steps.a.succeeded) == true":              true,
+		"$(steps.a.succeeded)":                      false,
+		"  $(steps.a.succeeded)  ":                  false,
+		`inputs.msg == "cost $(5)"`:                 false,
+		`inputs.msg == 'cost $(5)'`:                 false,
+		`inputs.msg == "say \"$(x)\""`:              false,
+		"status.a.succeeded":                        false,
+		"always":                                    false,
+		"":                                          false,
+		"$$(steps.a.succeeded) && x":                false,
+	} {
+		steps := []v1alpha1.WorkflowStep{condStep("a", ""), condStep("b", cond)}
+		errs := MisplacedConditions(field.NewPath("spec", "workflowSpec", "steps"), steps)
+		if refused {
+			require.Len(t, errs, 1, cond)
+			require.Equal(t, "spec.workflowSpec.steps[1].if", errs[0].Field, cond)
+		} else {
+			require.Empty(t, errs, cond)
+		}
+	}
+	sub := []v1alpha1.WorkflowStep{{WorkflowStepBase: v1alpha1.WorkflowStepBase{Name: "g", Type: "step-group"},
+		SubSteps: []v1alpha1.WorkflowStepBase{{Name: "in", Type: "notify", If: "$(a) && $(b)"}}}}
+	errs := MisplacedConditions(field.NewPath("spec", "workflowSpec", "steps"), sub)
+	require.Len(t, errs, 1)
+	require.Equal(t, "spec.workflowSpec.steps[0].subSteps[0].if", errs[0].Field)
+}
