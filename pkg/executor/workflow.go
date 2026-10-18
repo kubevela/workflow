@@ -999,9 +999,20 @@ func (e *engine) GetOperation() *types.Operation {
 // conditionPreCheck decides a step whose if is a $( ) condition, when its runner
 // offers one: run on true, skipped on false, and held back while a read in it is
 // still to be answered. It reports false for any other if, which stays CUE.
+// conditionWithoutExpressionsMessage fails a step whose $( ) if the run cannot
+// evaluate.
+const conditionWithoutExpressionsMessage = "this step's if is a $( ) condition, which needs expressions, " +
+	"and this run does not read them; turn them on for it, or write the if in CUE"
+
 func conditionPreCheck(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, bool, error) {
-	if options == nil || options.Condition == nil || !expressions.IsCondition(step.If) {
+	if !expressions.IsCondition(step.If) {
 		return nil, false, nil
+	}
+	if options == nil || options.Condition == nil {
+		// A $( ) if is not CUE, so reading it as CUE would skip the step
+		// whatever it says. Admission refuses one in a run without expressions;
+		// this covers a run admitted without that check.
+		return &types.PreCheckResult{Fail: true, Message: conditionWithoutExpressionsMessage}, true, nil
 	}
 	run, err := options.Condition()
 	switch {

@@ -93,10 +93,20 @@ func (tr *stepGroupTaskRunner) Run(ctx wfContext.Context, options *types.TaskRun
 	if err != nil {
 		return status, nil, err
 	}
-	defer handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, basicVal)
+	// A group its pre-checks failed never ran, so it has nothing to export.
+	preCheckFailed := false
+	defer func() {
+		if !preCheckFailed {
+			handleOutput(ctx, pStatus, operations, tr.step, options.PostStopHooks, basicVal)
+		}
+	}()
 
 	if runPreChecks(tr.step, options, basicVal, pStatus, condition(tracer, ctx, tr.exprs, tr.step, tr.pCtx, options)) {
 		return status, &types.Operation{Waiting: true}, nil
+	}
+	if failedByPreCheck(status) {
+		preCheckFailed = true
+		return status, &types.Operation{Terminated: true}, nil
 	}
 	// step-group has no properties so there is no need to fill in the properties with the input values
 	// skip input handle here
@@ -156,8 +166,8 @@ func condition(tracer monitorContext.Context, wfCtx wfContext.Context, exprs typ
 }
 
 // runPreChecks applies the if/timeout pre-check hooks to a step that holds sub-steps,
-// recording a skip or timeout in status. It reports a step its $( ) if holds back,
-// left running and waiting.
+// recording a skip, a failure or a timeout in status. It reports a step its $( ) if
+// holds back, left running and waiting.
 func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, basicVal cue.Value, status *v1alpha1.StepStatus,
 	cond func() (bool, error)) (wait bool) {
 	for _, hook := range options.PreCheckHooks {
@@ -170,6 +180,13 @@ func runPreChecks(step oamv1alpha1.WorkflowStep, options *types.TaskRunOptions, 
 			status.Phase = v1alpha1.WorkflowStepPhaseSkipped
 			status.Reason = types.StatusReasonSkip
 			status.Message = fmt.Sprintf("pre check error: %s", err.Error())
+			options.StepStatus[step.Name] = *status
+			break
+		}
+		if result.Fail {
+			status.Phase = v1alpha1.WorkflowStepPhaseFailed
+			status.Reason = types.StatusReasonAction
+			status.Message = result.Message
 			options.StepStatus[step.Name] = *status
 			break
 		}
@@ -248,4 +265,10 @@ func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operat
 			}
 		}
 	}
+}
+
+// failedByPreCheck reports a step its pre-checks failed: a $( ) if the run
+// cannot evaluate.
+func failedByPreCheck(status v1alpha1.StepStatus) bool {
+	return status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonAction
 }

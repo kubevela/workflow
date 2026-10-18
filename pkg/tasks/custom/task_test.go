@@ -414,6 +414,38 @@ func TestSkip(t *testing.T) {
 	r.Equal(operations.Skip, true)
 }
 
+// A pre-check that fails the step fails it, with its message, and ends the run.
+func TestFailByPreCheck(t *testing.T) {
+	r := require.New(t)
+	step := oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Name: "fail",
+			Type: "ok",
+		},
+	}
+	pCtx := process.NewContext(process.ContextData{
+		Name:      "app",
+		Namespace: "default",
+	})
+	tasksLoader := NewTaskLoader(mockLoadTemplate, 0, pCtx, providers.DefaultCompiler.Get())
+	gen, err := tasksLoader.GetTaskGenerator(context.Background(), step.Type)
+	r.NoError(err)
+	runner, err := gen(step, &types.TaskGeneratorOptions{})
+	r.NoError(err)
+	wfCtx := newWorkflowContextForTest(t)
+	status, operations, err := runner.Run(wfCtx, &types.TaskRunOptions{
+		PreCheckHooks: []types.TaskPreCheckHook{
+			func(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, error) {
+				return &types.PreCheckResult{Fail: true, Message: "cannot evaluate"}, nil
+			},
+		},
+	})
+	r.NoError(err)
+	r.Equal(v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+	r.Equal("cannot evaluate", status.Message)
+	r.True(operations.Terminated)
+}
+
 func TestTimeout(t *testing.T) {
 	r := require.New(t)
 	compiler := cuex.NewCompilerWithInternalPackages(

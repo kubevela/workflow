@@ -160,6 +160,8 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	switch {
 	case status.Phase == v1alpha1.WorkflowStepPhaseSkipped:
 		return status, &types.Operation{Skip: true}, nil
+	case failedByPreCheck(status):
+		return status, &types.Operation{Terminated: true}, nil
 	case status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonTimeout:
 		// Past its timeout, a loop starts no further pass.
 		return status, &types.Operation{Terminated: true}, nil

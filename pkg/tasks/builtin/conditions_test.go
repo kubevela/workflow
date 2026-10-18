@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"cuelang.org/go/cue"
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/pkg/cel"
 	"github.com/stretchr/testify/require"
@@ -179,4 +180,90 @@ func TestAGroupWhoseConditionErrsRunsNoSubSteps(t *testing.T) {
 	require.True(t, op.Skip)
 	require.Equal(t, v1alpha1.WorkflowStepPhaseSkipped, stepStatus["deploy"].Phase,
 		"the skip is recorded where the group's sub-steps look for it")
+}
+
+// A group whose pre-check fails it is failed, records that, and runs no sub-step.
+func TestAGroupFailedByItsPreCheckRunsNoSubSteps(t *testing.T) {
+	ctx := newWorkflowContextForTest(t)
+	sub, err := StepGroup(oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout"}},
+		&types.TaskGeneratorOptions{ID: "2"})
+	require.NoError(t, err)
+	group := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+		Name: "deploy", Type: types.WorkflowStepTypeStepGroup, If: "$(steps.build.succeeded)"}}
+	runner, err := StepGroup(group, &types.TaskGeneratorOptions{ID: "1", SubTaskRunners: []types.TaskRunner{sub},
+		ProcessContext: process.NewContext(process.ContextData{})})
+	require.NoError(t, err)
+	stepStatus := map[string]v1alpha1.StepStatus{}
+	failing := func(_ oamv1alpha1.WorkflowStep, _ *types.PreCheckOptions) (*types.PreCheckResult, error) {
+		return &types.PreCheckResult{Fail: true, Message: "cannot evaluate"}, nil
+	}
+	engine := &testEngine{stepStatus: v1alpha1.WorkflowStepStatus{}, operation: &types.Operation{}}
+	status, op, err := runner.Run(ctx, &types.TaskRunOptions{
+		PreCheckHooks: []types.TaskPreCheckHook{failing},
+		StepStatus:    stepStatus,
+		Engine:        engine,
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+	require.Equal(t, "cannot evaluate", status.Message)
+	require.True(t, op.Terminated)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, stepStatus["deploy"].Phase)
+	require.Empty(t, engine.ran, "no sub-step runs")
+}
+
+// A group with outputs that its pre-check fails keeps the pre-check's message:
+// it never ran, so there is nothing to export.
+func TestAGroupFailedByItsPreCheckKeepsItsMessage(t *testing.T) {
+	ctx := newWorkflowContextForTest(t)
+	group := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+		Name: "deploy", Type: types.WorkflowStepTypeStepGroup, If: "$(steps.build.succeeded)",
+		Outputs: oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "status.endpoint"}}}}
+	runner, err := StepGroup(group, &types.TaskGeneratorOptions{ID: "1", ProcessContext: process.NewContext(process.ContextData{})})
+	require.NoError(t, err)
+	failing := func(_ oamv1alpha1.WorkflowStep, _ *types.PreCheckOptions) (*types.PreCheckResult, error) {
+		return &types.PreCheckResult{Fail: true, Message: "cannot evaluate"}, nil
+	}
+	exportFails := func(wfContext.Context, cue.Value, oamv1alpha1.WorkflowStep, v1alpha1.StepStatus, map[string]v1alpha1.StepStatus) error {
+		return fmt.Errorf("failed to get output endpoint")
+	}
+	status, op, err := runner.Run(ctx, &types.TaskRunOptions{
+		PreCheckHooks: []types.TaskPreCheckHook{failing},
+		PostStopHooks: []types.TaskPostStopHook{exportFails},
+		StepStatus:    map[string]v1alpha1.StepStatus{},
+		Engine:        &testEngine{stepStatus: v1alpha1.WorkflowStepStatus{}, operation: &types.Operation{}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+	require.Equal(t, "cannot evaluate", status.Message)
+	require.True(t, op.Terminated)
+}
+
+// A group whose sub-step failed is failed by the roll-up, not by its pre-check,
+// and still exports its outputs.
+func TestAGroupWhoseSubStepFailedStillExportsItsOutputs(t *testing.T) {
+	ctx := newWorkflowContextForTest(t)
+	sub, err := StepGroup(oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{Name: "rollout"}},
+		&types.TaskGeneratorOptions{ID: "2"})
+	require.NoError(t, err)
+	group := oamv1alpha1.WorkflowStep{WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+		Name: "deploy", Type: types.WorkflowStepTypeStepGroup,
+		Outputs: oamv1alpha1.StepOutputs{{Name: "endpoint", ValueFrom: "status.endpoint"}}}}
+	runner, err := StepGroup(group, &types.TaskGeneratorOptions{ID: "1", SubTaskRunners: []types.TaskRunner{sub},
+		ProcessContext: process.NewContext(process.ContextData{})})
+	require.NoError(t, err)
+	exports := 0
+	export := func(wfContext.Context, cue.Value, oamv1alpha1.WorkflowStep, v1alpha1.StepStatus, map[string]v1alpha1.StepStatus) error {
+		exports++
+		return nil
+	}
+	engine := &testEngine{operation: &types.Operation{}, stepStatus: v1alpha1.WorkflowStepStatus{
+		SubStepsStatus: []v1alpha1.StepStatus{{Name: "rollout", Phase: v1alpha1.WorkflowStepPhaseFailed, Reason: types.StatusReasonAction}}}}
+	status, _, err := runner.Run(ctx, &types.TaskRunOptions{
+		PostStopHooks: []types.TaskPostStopHook{export},
+		StepStatus:    map[string]v1alpha1.StepStatus{},
+		Engine:        engine,
+	})
+	require.NoError(t, err)
+	require.Equal(t, v1alpha1.WorkflowStepPhaseFailed, status.Phase)
+	require.Equal(t, 1, exports, "the outputs are exported")
 }

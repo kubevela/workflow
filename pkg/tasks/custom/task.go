@@ -231,6 +231,10 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 					exec.Skip(fmt.Sprintf("pre check error: %s", err.Error()))
 					return exec.status(), exec.operation(), nil
 				}
+				if result.Fail {
+					exec.Fail(result.Message)
+					return exec.status(), exec.operation(), nil
+				}
 				if result.Wait {
 					exec.Wait(result.Message)
 					return exec.status(), exec.operation(), nil
