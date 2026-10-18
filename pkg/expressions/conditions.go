@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	v1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
 	"github.com/kubevela/pkg/cel"
 	"github.com/kubevela/pkg/cel/template"
 
@@ -98,4 +101,23 @@ func kindName(v interface{}) string {
 		return "null"
 	}
 	return fmt.Sprintf("%T", v)
+}
+
+// ConditionsWithoutExpressions refuses every $( ) if, on a step or a sub-step,
+// of a run that does not read expressions, with why as the reason. Without an
+// evaluator the engine reads such an if as CUE, which it is not, and skips the
+// step.
+func ConditionsWithoutExpressions(stepsPath *field.Path, steps []v1alpha1.WorkflowStep, why string) field.ErrorList {
+	var errs field.ErrorList
+	for i, step := range steps {
+		if IsCondition(step.If) {
+			errs = append(errs, field.Forbidden(stepsPath.Index(i).Child("if"), why))
+		}
+		for j, sub := range step.SubSteps {
+			if IsCondition(sub.If) {
+				errs = append(errs, field.Forbidden(stepsPath.Index(i).Child("subSteps").Index(j).Child("if"), why))
+			}
+		}
+	}
+	return errs
 }

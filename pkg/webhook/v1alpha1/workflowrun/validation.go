@@ -22,11 +22,15 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	feature "k8s.io/apiserver/pkg/util/feature"
 
 	oamv1alpha1 "github.com/kubevela/pkg/apis/oam/v1alpha1"
+
 	"github.com/kubevela/workflow/api/v1alpha1"
 	"github.com/kubevela/workflow/pkg/expressions"
+	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/tasks/builtin"
+	"github.com/kubevela/workflow/pkg/types"
 	"github.com/kubevela/workflow/pkg/utils"
 )
 
@@ -85,8 +89,20 @@ func (h *ValidatingHandler) ValidateWorkflow(ctx context.Context, wr *v1alpha1.W
 		// only a host answers, such as KubeVela's source, is undeclared here. KubeVela
 		// admits its own Applications in its own webhook.
 		errs = append(errs, expressions.Validate(stepsPath, steps, mode)...)
+	} else {
+		errs = append(errs, expressions.ConditionsWithoutExpressions(stepsPath, steps, conditionsDisabledMessage())...)
 	}
 	return errs
+}
+
+// conditionsDisabledMessage says which of the two switches is off.
+func conditionsDisabledMessage() string {
+	if !feature.DefaultMutableFeatureGate.Enabled(features.EnableCelExpressions) {
+		return "a $( ) condition needs expressions, which are not enabled on this cluster; " +
+			"an operator enables them with the EnableCelExpressions feature gate"
+	}
+	return fmt.Sprintf("a $( ) condition needs expressions, and this WorkflowRun has not opted in to them; "+
+		"set the %s annotation to \"true\"", types.AnnotationCelExpressions)
 }
 
 // ValidateTimeout validates the timeout of steps
