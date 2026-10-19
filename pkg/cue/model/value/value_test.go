@@ -28,6 +28,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLookupValueByScriptInAnErrorValue(t *testing.T) {
+	r := require.New(t)
+	conflict := cuecontext.New().CompileString(`parameter: message: "hi"`).FillPath(cue.ParsePath(""), "text")
+	for _, script := range []string{"parameter.message", "parameter.message + \"!\""} {
+		_, err := LookupValueByScript(conflict, script)
+		r.ErrorContains(err, "look up "+script, "an error, not a panic")
+	}
+}
+
 func TestValueFill(t *testing.T) {
 	r := require.New(t)
 	src := `

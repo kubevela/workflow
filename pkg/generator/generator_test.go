@@ -213,6 +213,56 @@ value: strings.Join(parameter.results, ",")
 		Expect(joined.String()).Should(Equal("a-0,b-1"))
 	})
 
+	It("Test a skipped step with a path output records null and the run carries on", func() {
+		wr := &v1alpha1.WorkflowRun{
+			TypeMeta:   metav1.TypeMeta{Kind: "WorkflowRun", APIVersion: "core.oam.dev/v1alpha1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "wr-skipped-output", Namespace: namespaceName, UID: "wr-skipped-output-uid"},
+			Spec: v1alpha1.WorkflowRunSpec{
+				WorkflowSpec: &oamv1alpha1.WorkflowSpec{
+					Steps: []oamv1alpha1.WorkflowStep{
+						{
+							WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+								Name:       "producer",
+								Type:       "echo",
+								If:         "false",
+								Properties: &runtime.RawExtension{Raw: []byte(`{"msg":"hi"}`)},
+								Outputs:    oamv1alpha1.StepOutputs{{Name: "x", ValueFrom: "parameter.msg"}},
+							},
+						},
+						{
+							WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+								Name:       "after",
+								Type:       "echo",
+								Properties: &runtime.RawExtension{Raw: []byte(`{"msg":"done"}`)},
+							},
+						},
+					},
+				},
+			},
+		}
+		loader := staticLoader{"echo": `
+parameter: msg: string
+value: parameter.msg
+`}
+		instance, err := GenerateWorkflowInstance(ctx, k8sClient, wr)
+		Expect(err).Should(BeNil())
+		mCtx := monitorContext.NewTraceContext(ctx, "test-wr")
+		runners, err := GenerateRunners(mCtx, instance, types.StepGeneratorOptions{TemplateLoader: loader})
+		Expect(err).Should(BeNil())
+
+		state, err := executor.New(instance).ExecuteRunners(mCtx, runners)
+		Expect(err).Should(BeNil())
+		Expect(state).Should(BeEquivalentTo(v1alpha1.WorkflowStateSucceeded))
+		Expect(instance.Status.Steps[0].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSkipped))
+		Expect(instance.Status.Steps[1].Phase).Should(BeEquivalentTo(v1alpha1.WorkflowStepPhaseSucceeded))
+
+		wfCtx, err := wfContext.LoadContext(ctx, namespaceName, wr.Name, instance.Status.ContextBackend.Name)
+		Expect(err).Should(BeNil())
+		x, err := wfCtx.GetVar("x")
+		Expect(err).Should(BeNil())
+		Expect(fmt.Sprint(x)).Should(Equal("null"), "a skipped step's output is null")
+	})
+
 	It("Test a sub-step's properties read an earlier step's output when it runs", func() {
 		wr := &v1alpha1.WorkflowRun{
 			TypeMeta:   metav1.TypeMeta{Kind: "WorkflowRun", APIVersion: "core.oam.dev/v1alpha1"},

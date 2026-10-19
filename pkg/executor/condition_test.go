@@ -52,9 +52,15 @@ func TestConditionPreCheck(t *testing.T) {
 			&types.PreCheckResult{Skip: true}, "must be a bool"},
 		{"a CUE if is left to CUE", "status.build.succeeded", answer(true, nil), false, nil, ""},
 		{"a $( ) inside a CUE string is CUE", `inputs.msg == "cost $(5)"`, answer(true, nil), false, nil, ""},
-		{"without a condition, a $( ) if is CUE, as it always was", "$(steps.build.succeeded)",
-			&types.PreCheckOptions{}, false, nil, ""},
-		{"no options", "$(steps.build.succeeded)", nil, false, nil, ""},
+		{"without an evaluator, a $( ) if fails the step rather than being read as CUE", "$(steps.build.succeeded)",
+			&types.PreCheckOptions{}, true, &types.PreCheckResult{Fail: true, Message: conditionWithoutExpressionsMessage}, ""},
+		{"no options", "$(steps.build.succeeded)", nil, true,
+			&types.PreCheckResult{Fail: true, Message: conditionWithoutExpressionsMessage}, ""},
+		{"no options, a CUE if is left to CUE", "status.build.succeeded", nil, false, nil, ""},
+		{"two expressions fail the step", "$(steps.build.succeeded) && $(steps.build.failed)", answer(true, nil), true,
+			&types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, ""},
+		{"two expressions fail the step without an evaluator too", "$(steps.build.succeeded) && $(steps.build.failed)", nil, true,
+			&types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, handled, err := conditionPreCheck(step(tc.cond), tc.options)

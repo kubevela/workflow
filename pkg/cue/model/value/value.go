@@ -160,6 +160,11 @@ func isSelector(node ast.Node) bool {
 
 // LookupValueByScript reports the value by cue script.
 func LookupValueByScript(val cue.Value, script string) (cue.Value, error) {
+	// A path lookup in a value that is already an error panics in CUE rather than
+	// returning one, so the error is returned before any lookup.
+	if err := val.Err(); err != nil {
+		return cue.Value{}, errors.WithMessagef(err, "look up %s", script)
+	}
 	var outputKey = "zz_output__"
 	script = strings.TrimSpace(script)
 	scriptFile, err := parser.ParseFile("-", script, parser.ParseComments)

@@ -160,6 +160,8 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	switch {
 	case status.Phase == v1alpha1.WorkflowStepPhaseSkipped:
 		return status, &types.Operation{Skip: true}, nil
+	case failedByPreCheck(status):
+		return status, &types.Operation{Terminated: true}, nil
 	case status.Phase == v1alpha1.WorkflowStepPhaseFailed && status.Reason == types.StatusReasonTimeout:
 		// Past its timeout, a loop starts no further pass.
 		return status, &types.Operation{Terminated: true}, nil
@@ -206,9 +208,12 @@ func (tr *forEachTaskRunner) Run(ctx wfContext.Context, options *types.TaskRunOp
 	failedBefore := false
 	for _, it := range iterations {
 		// A finished pass is left alone: rebuilding its runners would load every
-		// template again only for the engine to skip them.
+		// template again only for the engine to skip them. Only in StepByStep does its
+		// failure skip the passes after it; in DAG each pass finishes on its own.
 		if finished, anyFailed := iterationState(e.GetStepStatus(tr.name), it); finished {
-			failedBefore = failedBefore || anyFailed
+			if tr.mode != v1alpha1.WorkflowModeDAG {
+				failedBefore = failedBefore || anyFailed
+			}
 			continue
 		}
 		runners, err := tr.iterationRunners(ctx, basicVal.Context(), e, it, ids, failedBefore)

@@ -25,9 +25,13 @@ import (
 type testEngine struct {
 	stepStatus v1alpha1.WorkflowStepStatus
 	operation  *types.Operation
+	ran        []string
 }
 
 func (e *testEngine) Run(ctx monitorContext.Context, taskRunners []types.TaskRunner, dag bool) error {
+	for _, r := range taskRunners {
+		e.ran = append(e.ran, r.Name())
+	}
 	return nil
 }
 
