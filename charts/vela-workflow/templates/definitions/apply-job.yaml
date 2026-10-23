@@ -23,15 +23,27 @@ spec:
         }
 
         // fail the step if the job fails
-        if apply.status.failed > 0 {
-        	fail: op.#Fail & {
-        		message: "Job failed"
+        if apply.value.status.failed != _|_ {
+        	if apply.value.status.failed > 0 {
+        		fail: op.#Fail & {
+        			message: "Job failed"
+        		}
         	}
         }
 
         // wait the job to be ready
         wait: op.#ConditionalWait & {
-        	continue: apply.status.succeeded == apply.spec.completions
+        	if apply.value.status.succeeded != _|_ {
+                if apply.value.spec.completions != _|_ {
+                    continue: apply.value.status.succeeded == apply.value.spec.completions
+                }
+                if apply.value.spec.completions == _|_ {
+                    continue: false
+                }
+        	}
+        	if apply.value.status.succeeded == _|_ {
+        		continue: false
+        	}
         }
 
         parameter: {
