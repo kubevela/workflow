@@ -34,7 +34,12 @@ spec:
         // wait the job to be ready
         wait: op.#ConditionalWait & {
         	if apply.value.status.succeeded != _|_ {
-        		continue: apply.value.status.succeeded == apply.value.spec.completions
+                if apply.value.spec.completions != _|_ {
+                    continue: apply.value.status.succeeded == apply.value.spec.completions
+                }
+                if apply.value.spec.completions == _|_ {
+                    continue: false
+                }
         	}
         	if apply.value.status.succeeded == _|_ {
         		continue: false
