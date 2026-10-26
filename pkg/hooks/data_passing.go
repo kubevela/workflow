@@ -59,9 +59,70 @@ func Input(ctx wfContext.Context, paramValue cue.Value, step oamv1alpha1.Workflo
 	return filledVal, nil
 }
 
+// SensitivePathsField is the field a step template can declare in its rendered
+// value to mark which paths hold sensitive data (e.g. values read from
+// Kubernetes Secrets). Outputs whose valueFrom overlaps a declared path are
+// stored via SetSensitiveVar so they never land in the plaintext context
+// ConfigMap. Example in a step template:
+//
+//	$sensitivePaths: ["password", "output.value.data"]
+const SensitivePathsField = "$sensitivePaths"
+
+// sensitiveValuePaths reads the template-declared sensitive paths, if any.
+func sensitiveValuePaths(taskValue cue.Value) []string {
+	v, err := value.LookupValueByScript(taskValue, SensitivePathsField)
+	if err != nil || !v.Exists() {
+		return nil
+	}
+	var paths []string
+	if err := v.Decode(&paths); err != nil {
+		return nil
+	}
+	return paths
+}
+
+// isSensitiveOutput reports whether an output's valueFrom overlaps any declared
+// sensitive path: either one is a dot-separated prefix of the other (extracting
+// a parent of a sensitive path still includes the sensitive value). When
+// sensitive paths are declared but valueFrom is not a plain dotted path (i.e.
+// an expression we cannot reason about), it is treated as sensitive: failing
+// closed beats leaking a credential to a ConfigMap.
+func isSensitiveOutput(valueFrom string, sensitivePaths []string) bool {
+	if len(sensitivePaths) == 0 {
+		return false
+	}
+	if !isPlainFieldPath(valueFrom) {
+		return true
+	}
+	for _, p := range sensitivePaths {
+		if valueFrom == p || strings.HasPrefix(valueFrom, p+".") || strings.HasPrefix(p, valueFrom+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// isPlainFieldPath reports whether s looks like a simple dotted field path
+// (no expression syntax).
+func isPlainFieldPath(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+			r == '.', r == '_', r == '-', r == '$':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // Output get data from task value.
 func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.WorkflowStep, status v1alpha1.StepStatus, stepStatus map[string]v1alpha1.StepStatus) error {
 	errMsg := ""
+	sensitivePaths := sensitiveValuePaths(taskValue)
 	if wfTypes.IsStepFinish(status.Phase, status.Reason) {
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)
 		for _, output := range step.Outputs {
@@ -87,7 +148,11 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.Workflo
 			if err != nil || v.Err() != nil {
 				v = taskValue.Context().CompileString("null")
 			}
-			if err := ctx.SetVar(v, output.Name); err != nil {
+			setVar := ctx.SetVar
+			if isSensitiveOutput(output.ValueFrom, sensitivePaths) {
+				setVar = ctx.SetSensitiveVar
+			}
+			if err := setVar(v, output.Name); err != nil {
 				errMsg += fmt.Sprintf("failed to set output %s: %s\n", output.Name, err.Error())
 			}
 		}
