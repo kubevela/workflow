@@ -318,3 +318,44 @@ func newMockHttpsServer() *httptest.Server {
 	ts.StartTLS()
 	return ts
 }
+
+func TestGetTransportSecretKey(t *testing.T) {
+	testCases := map[string]struct {
+		secretName string
+		namespace  string
+		expected   client.ObjectKey
+	}{
+		"secret in the given namespace": {
+			secretName: "certs",
+			namespace:  "default",
+			expected:   client.ObjectKey{Namespace: "default", Name: "certs"},
+		},
+		"secret given as namespace/name": {
+			secretName: "vela-system/certs",
+			namespace:  "default",
+			expected:   client.ObjectKey{Namespace: "vela-system", Name: "certs"},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var got client.ObjectKey
+			cli := &test.MockClient{
+				MockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
+					got = key
+					secret := obj.(*v1.Secret)
+					*secret = v1.Secret{
+						Data: map[string][]byte{
+							"ca.crt":     []byte(testdata.MockCerts.Ca),
+							"client.crt": []byte(testdata.MockCerts.ClientCrt),
+							"client.key": []byte(testdata.MockCerts.ClientKey),
+						},
+					}
+					return nil
+				},
+			}
+			_, err := getTransport(context.Background(), cli, tc.secretName, tc.namespace)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
