@@ -239,10 +239,10 @@ func getTransport(ctx context.Context, cli client.Client, secretName, ns string)
 		Namespace: ns,
 		Name:      secretName,
 	}
-	index := strings.Index(secretName, "/")
-	if index > 0 {
-		objectKey.Namespace = secretName[:index-1]
-		objectKey.Name = secretName[index:]
+	// secretName may be given as <namespace>/<name>
+	if namespace, name, found := strings.Cut(secretName, "/"); found && namespace != "" {
+		objectKey.Namespace = namespace
+		objectKey.Name = name
 	}
 	secret := new(v1.Secret)
 	if err := cli.Get(ctx, objectKey, secret); err != nil {
