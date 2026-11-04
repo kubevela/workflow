@@ -69,6 +69,83 @@ func TestProvider_DoVar(t *testing.T) {
 	r.Equal(res.Returns.Value, "1.1.1.1")
 }
 
+func TestProvider_DoVar_Sensitive(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	r := require.New(t)
+	ctx := context.Background()
+
+	// Test Put with sensitive flag - should store in Secret store
+	_, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method:    "Put",
+			Path:      "secretToken",
+			Value:     "super-secret-value",
+			Sensitive: true,
+		},
+		RuntimeParams: providertypes.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
+	r.NoError(err)
+
+	// Verify it's in the sensitive store
+	sensitiveVar, err := wfCtx.GetSensitiveVar("secretToken")
+	r.NoError(err)
+	s, err := sensitiveVar.String()
+	r.NoError(err)
+	r.Equal("super-secret-value", s)
+
+	// Verify it's NOT in the regular store
+	_, err = wfCtx.GetVar("secretToken")
+	r.Error(err)
+
+	// Test Get - should retrieve from sensitive store automatically
+	res, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method: "Get",
+			Path:   "secretToken",
+		},
+		RuntimeParams: providertypes.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
+	r.NoError(err)
+	r.Equal("super-secret-value", res.Returns.Value)
+}
+
+func TestProvider_DoVar_GetFallback(t *testing.T) {
+	wfCtx := newWorkflowContextForTest(t)
+	r := require.New(t)
+	ctx := context.Background()
+
+	// Put a non-sensitive value in regular store
+	_, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method:    "Put",
+			Path:      "regularValue",
+			Value:     "not-secret",
+			Sensitive: false,
+		},
+		RuntimeParams: providertypes.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
+	r.NoError(err)
+
+	// Get should fall back to regular store when not in sensitive store
+	res, err := DoVar(ctx, &VarParams{
+		Params: VarVars{
+			Method: "Get",
+			Path:   "regularValue",
+		},
+		RuntimeParams: providertypes.RuntimeParams{
+			WorkflowContext: wfCtx,
+		},
+	})
+	r.NoError(err)
+	r.Equal("not-secret", res.Returns.Value)
+}
+
 func TestProvider_Wait(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)
