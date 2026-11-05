@@ -92,7 +92,9 @@ jobs:
         # nolar/setup-k3d-k3s only searches the latest k3s releases and no
         # longer finds v1.26, so pin the k3s image directly.
         run: |
-          curl -sfL https://raw.githubusercontent.com/k3d-io/k3d/v5.6.3/install.sh | TAG=v5.6.3 bash
+          curl -sfL -o /tmp/k3d https://github.com/k3d-io/k3d/releases/download/v5.6.3/k3d-linux-amd64
+          echo "69f434b5a326eddafff6062a1b439d1c7a78a1ee93a91a9f79872cf8e516327d  /tmp/k3d" | sha256sum --check
+          sudo install -m 0755 /tmp/k3d /usr/local/bin/k3d
           k3d cluster create --image rancher/k3s:v1.26.15-k3s1 --wait ${{ env.EGRESS_ARG }}
           kubectl version
 
