@@ -131,7 +131,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*DoReturns, error) {
 		}
 	}
 	defaultClient := &http.Client{
-		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
+		Transport: httpguard.SecureTransport(nil, policy),
 		Timeout:   time.Second * 3,
 		// A custom CheckRedirect replaces the net/http default, so the
 		// redirect limit is enforced here too.

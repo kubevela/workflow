@@ -71,7 +71,9 @@ func parseCIDRLines(text string, out *Policy) error {
 func parseHostLines(text string, out *Policy) error {
 	return forEachEntry(text, func(line string) error {
 		line = strings.ToLower(line)
-		if ip := net.ParseIP(line); ip != nil {
+		// BlockedHost strips a trailing dot before it parses an IP literal, so
+		// "169.254.169.254." has to be stored as an IP too.
+		if ip := net.ParseIP(strings.TrimSuffix(line, ".")); ip != nil {
 			out.ExactIPs = append(out.ExactIPs, ip.To16())
 			return nil
 		}
