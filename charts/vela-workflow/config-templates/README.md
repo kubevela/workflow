@@ -38,7 +38,7 @@ Disable discovery or the shipped default ConfigMap if needed. An empty
 ConfigMap (avoids invalid `config-template-` names):
 
 ```bash
-helm upgrade vela-workflow kubevela/vela-workflow -n vela-system --reuse-values \
+helm upgrade workflow kubevela/vela-workflow -n vela-system --reuse-values \
   --set workflow.httpDeny.configTemplateName="" \
   --set workflow.httpDeny.defaultConfig.enabled=false
 ```
