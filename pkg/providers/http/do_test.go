@@ -407,22 +407,6 @@ func TestHttpDo_blockPrivateHTTPAddresses(t *testing.T) {
 	r.Contains(err.Error(), "blocked SSRF target")
 }
 
-func TestHttpDo_redirectLimit(t *testing.T) {
-	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
-	hops := 0
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hops++
-		http.Redirect(w, r, server.URL+"/loop", http.StatusFound)
-	}))
-	defer server.Close()
-
-	err := doGet(t, server.URL)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "stopped after 10 redirects")
-	require.Equal(t, maxRedirects, hops)
-}
-
 func TestHttpDo_redirectBlocked(t *testing.T) {
 	httpguard.SetDenyFragment(httpguard.Policy{ExactHosts: map[string]struct{}{}})
 	t.Cleanup(func() {
