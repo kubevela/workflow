@@ -94,7 +94,7 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	)
 	policy := requestPolicy()
 	defaultClient := &http.Client{
-		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
+		Transport: httpguard.SecureTransport(nil, policy),
 		Timeout:   time.Second * 3,
 		// A custom CheckRedirect replaces the net/http default, so the
 		// redirect limit is enforced here too.
