@@ -1,9 +1,9 @@
-{{- $tpl := .Values.workflow.httpDeny.configTemplateName }}
+{{- $tpl := .Values.workflow.httpDeny.configTemplateName | default "" | toString }}
 {{- if and .Values.workflow.httpDeny.installConfigTemplate $tpl }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: config-template-{{ $tpl }}
+  name: {{ printf "config-template-%s" $tpl | quote }}
   namespace: {{ .Release.Namespace }}
   labels:
     config.oam.dev/catalog: velacore-config
@@ -27,7 +27,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     config.oam.dev/catalog: velacore-config
-    config.oam.dev/type: {{ $tpl }}
+    config.oam.dev/type: {{ $tpl | quote }}
     config.oam.dev/scope: system
 data:
   denyHosts: |-
