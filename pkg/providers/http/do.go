@@ -57,6 +57,9 @@ func init() {
 	rateLimiter = ratelimiter.NewRateLimiter(128)
 }
 
+// maxRedirects matches the redirect limit of net/http.
+const maxRedirects = 10
+
 func requestPolicy() httpguard.Policy {
 	policy := httpguard.Current()
 	if utilfeature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses) {
@@ -93,7 +96,12 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 	defaultClient := &http.Client{
 		Transport: httpguard.SecureTransport(http.DefaultTransport.(*http.Transport).Clone(), policy),
 		Timeout:   time.Second * 3,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+		// A custom CheckRedirect replaces the net/http default, so the
+		// redirect limit is enforced here too.
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirects {
+				return fmt.Errorf("stopped after %d redirects", maxRedirects)
+			}
 			return policy.BlockedHost(req.URL.Host)
 		},
 	}
@@ -164,6 +172,11 @@ func (h *provider) runHTTP(ctx monitorContext.Context, v *value.Value) (interfac
 		}
 	}
 
+	// The transport is built for this request, so release its idle
+	// connections when the request ends.
+	if t, ok := defaultClient.Transport.(*http.Transport); ok {
+		defer t.CloseIdleConnections()
+	}
 	resp, err := defaultClient.Do(req)
 	if err != nil {
 		return nil, err

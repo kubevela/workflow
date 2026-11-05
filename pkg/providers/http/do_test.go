@@ -375,13 +375,14 @@ func TestHttpDo_blocksMetadata(t *testing.T) {
 
 func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
 	r := require.New(t)
+	previous := utilfeature.DefaultMutableFeatureGate.Enabled(features.DisableWorkflowHTTP)
 	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
 		string(features.DisableWorkflowHTTP): true,
 	}))
 	t.Cleanup(func() {
-		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-			string(features.DisableWorkflowHTTP): false,
-		})
+		r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.DisableWorkflowHTTP): previous,
+		}))
 	})
 
 	err := doGet(t, "http://127.0.0.1:1229/hello")
@@ -391,13 +392,14 @@ func TestHttpDo_disableWorkflowHTTP(t *testing.T) {
 
 func TestHttpDo_blockPrivateHTTPAddresses(t *testing.T) {
 	r := require.New(t)
+	previous := utilfeature.DefaultMutableFeatureGate.Enabled(features.BlockPrivateHTTPAddresses)
 	r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
 		string(features.BlockPrivateHTTPAddresses): true,
 	}))
 	t.Cleanup(func() {
-		_ = utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
-			string(features.BlockPrivateHTTPAddresses): false,
-		})
+		r.NoError(utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+			string(features.BlockPrivateHTTPAddresses): previous,
+		}))
 	})
 
 	err := doGet(t, "http://10.0.0.1/path")
