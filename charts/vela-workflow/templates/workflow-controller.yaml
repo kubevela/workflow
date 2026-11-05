@@ -145,7 +145,7 @@ spec:
             - "--feature-gates=DisableWorkflowHTTP={{- .Values.workflow.disableWorkflowHTTP | toString -}}"
             - "--feature-gates=BlockPrivateHTTPAddresses={{- .Values.workflow.blockPrivateHTTPAddresses | toString -}}"
             - "--feature-gates=EnableCelExpressions={{- .Values.workflow.enableCelExpressions | toString -}}"
-            - "--workflow-http-deny-config-template-name={{ .Values.workflow.httpDeny.configTemplateName }}"
+            - "--workflow-http-deny-config-template-name={{ .Values.workflow.httpDeny.configTemplateName | default "" }}"
             - "--group-by-label={{ .Values.workflow.groupByLabel }}"
             - "--enable-external-package-for-default-compiler={{- .Values.workflow.enableExternalPackageForDefaultCompiler | toString -}}"
             - "--enable-external-package-watch-for-default-compiler={{- .Values.workflow.enableExternalPackageWatchForDefaultCompiler | toString -}}"

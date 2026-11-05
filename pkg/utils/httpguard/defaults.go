@@ -18,7 +18,6 @@ package httpguard
 
 import (
 	"fmt"
-	"net"
 	"sync"
 )
 
@@ -49,28 +48,7 @@ func BuiltinDeny() Policy {
 		}
 		builtinDeny = policy
 	})
-	return clonePolicy(builtinDeny)
-}
-
-func clonePolicy(p Policy) Policy {
-	out := Policy{
-		BlockPrivate:  p.BlockPrivate,
-		BlockLoopback: p.BlockLoopback,
-		ExactHosts:    map[string]struct{}{},
-	}
-	for host := range p.ExactHosts {
-		out.ExactHosts[host] = struct{}{}
-	}
-	if len(p.ExactIPs) > 0 {
-		out.ExactIPs = append([]net.IP(nil), p.ExactIPs...)
-	}
-	if len(p.DenyCIDRs) > 0 {
-		out.DenyCIDRs = append([]*net.IPNet(nil), p.DenyCIDRs...)
-	}
-	if len(p.WildcardSuffixes) > 0 {
-		out.WildcardSuffixes = append([]string(nil), p.WildcardSuffixes...)
-	}
-	return out
+	return builtinDeny.clone()
 }
 
 func builtinDenyLoadError() error {
