@@ -56,7 +56,7 @@ jobs:
     env:
       HELM_CHART: charts/vela-workflow
       LOCAL_OSS_DIRECTORY: .oss/
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@master
       - name: Get the vars
