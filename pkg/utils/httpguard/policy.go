@@ -41,6 +41,32 @@ type Policy struct {
 	WildcardSuffixes []string
 }
 
+// clone returns a deep copy, so a stored policy cannot change when the caller
+// later mutates its maps, slices or IP values.
+func (p Policy) clone() Policy {
+	out := p
+	out.DenyCIDRs = make([]*net.IPNet, 0, len(p.DenyCIDRs))
+	for _, n := range p.DenyCIDRs {
+		if n == nil {
+			continue
+		}
+		out.DenyCIDRs = append(out.DenyCIDRs, &net.IPNet{
+			IP:   append(net.IP(nil), n.IP...),
+			Mask: append(net.IPMask(nil), n.Mask...),
+		})
+	}
+	out.ExactIPs = make([]net.IP, 0, len(p.ExactIPs))
+	for _, ip := range p.ExactIPs {
+		out.ExactIPs = append(out.ExactIPs, append(net.IP(nil), ip...))
+	}
+	out.ExactHosts = make(map[string]struct{}, len(p.ExactHosts))
+	for host := range p.ExactHosts {
+		out.ExactHosts[host] = struct{}{}
+	}
+	out.WildcardSuffixes = append([]string(nil), p.WildcardSuffixes...)
+	return out
+}
+
 // DefaultPolicy returns the base outbound HTTP policy. Destination deny rules
 // are supplied by discovered workflow HTTP deny ConfigMaps.
 func DefaultPolicy() Policy {

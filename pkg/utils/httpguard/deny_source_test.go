@@ -28,8 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	toolscache "k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -143,6 +143,11 @@ func TestSetEnhancer_nilUsesIdentity(t *testing.T) {
 	t.Cleanup(func() {
 		SetEnhancer(nil)
 	})
+	SetEnhancer(func(p Policy) Policy {
+		p.BlockPrivate = true
+		return p
+	})
+	require.True(t, Current().BlockPrivate)
 	SetEnhancer(nil)
 	cur := Current()
 	require.False(t, cur.BlockPrivate)
@@ -169,7 +174,7 @@ type stubManager struct {
 	manager.Manager
 	addErr   error
 	runnable manager.Runnable
-	cache    cache.Cache
+	config   *rest.Config
 	client   client.Client
 }
 
@@ -178,32 +183,23 @@ func (s *stubManager) Add(r manager.Runnable) error {
 	return s.addErr
 }
 
-func (s *stubManager) GetCache() cache.Cache { return s.cache }
+func (s *stubManager) GetConfig() *rest.Config { return s.config }
 
 func (s *stubManager) GetClient() client.Client { return s.client }
-
-type errCache struct {
-	cache.Cache
-	err error
-}
-
-func (e *errCache) GetInformer(ctx context.Context, obj client.Object, opts ...cache.InformerGetOption) (cache.Informer, error) {
-	return nil, e.err
-}
 
 func TestSetupWatcher_registersRunnable(t *testing.T) {
 	scheme := testScheme(t)
 	cli := fake.NewClientBuilder().WithScheme(scheme).Build()
 	mgr := &stubManager{
 		client: cli,
-		cache:  &errCache{err: fmt.Errorf("no informer")},
+		config: &rest.Config{Host: "http://[::1"},
 	}
 	require.NoError(t, SetupWatcher(mgr, WorkflowHTTPDenyConfigTemplate, "vela-system"))
 	require.NotNil(t, mgr.runnable)
 
 	err := mgr.runnable.Start(context.Background())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "get ConfigMap informer")
+	require.Contains(t, err.Error(), "create client for HTTP deny watch")
 }
 
 func TestSetupWatcher_addError(t *testing.T) {
