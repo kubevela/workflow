@@ -21,7 +21,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.enableExternalPackageWatchForDefaultCompiler Enable external package watch for default compiler
 ## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
 ## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
-## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. The chart templates the controller flag, the ConfigTemplate and the CUE labels from this one value. Discovery only reads ConfigMaps in the controller namespace. Empty disables discovery and skips installing the template/default ConfigMap.
+## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. The chart templates the controller flag, the ConfigTemplate and the CUE labels from this one value. Discovery only reads ConfigMaps in the controller namespace. Must be a quoted string. Empty disables discovery and skips installing the template/default ConfigMap.
 ## @param workflow.httpDeny.installConfigTemplate Install the workflow HTTP deny ConfigTemplate
 ## @param workflow.httpDeny.defaultConfig.enabled Install the default metadata and link-local deny ConfigMap
 ## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap (unique per chart)
