@@ -385,17 +385,16 @@ func TestClonePolicy_copiesWildcards(t *testing.T) {
 	require.Error(t, out.BlockedHost("a.example"))
 }
 
-func TestSecureTransport_dialTLSAllowsSafeTarget(t *testing.T) {
-	called := false
+func TestSecureTransport_dropsCustomTLSDialers(t *testing.T) {
 	base := &http.Transport{}
 	base.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		called = true
-		require.Equal(t, "8.8.8.8:443", addr)
-		return nil, fmt.Errorf("dial-ok-sentinel")
+		return nil, fmt.Errorf("custom TLS dialer must not run")
+	}
+	base.DialTLS = func(network, addr string) (net.Conn, error) { //nolint:staticcheck // the hook under test
+		return nil, fmt.Errorf("custom TLS dialer must not run")
 	}
 	transport := SecureTransport(base, shippedDefaultDeny(t))
-	_, err := transport.DialTLSContext(context.Background(), "tcp", "8.8.8.8:443")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "dial-ok-sentinel")
-	assert.True(t, called)
+	assert.Nil(t, transport.DialTLSContext)
+	assert.Nil(t, transport.DialTLS) //nolint:staticcheck // the hook under test
+	assert.NotNil(t, transport.DialContext)
 }
