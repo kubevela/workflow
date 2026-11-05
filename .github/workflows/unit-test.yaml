@@ -68,8 +68,17 @@ jobs:
           kubebuilderOnly: false
           kubernetesVersion: v1.21.2
 
+      - name: Install envtest binaries
+        # setup-envtest on this branch downloads from the retired GCS bucket,
+        # so fetch the same Kubernetes version from the GitHub release.
+        run: |
+          curl -sfL -o /tmp/envtest.tar.gz https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v1.24.1/envtest-v1.24.1-linux-amd64.tar.gz
+          echo "bf99a87747430c7369fcfe63638f9a10c3b6a4581cfe93dec5fdd58036e270360b48bcceba1dc57b2439ba9c9d50dc330128737136893a0ed9b67babd82f3090  /tmp/envtest.tar.gz" | sha512sum --check
+          mkdir -p /tmp/envtest && tar -xzf /tmp/envtest.tar.gz -C /tmp/envtest --strip-components=2
+          ls /tmp/envtest
+
       - name: Run Make test
-        run: make test
+        run: make test ENVTEST_ASSETS=/tmp/envtest
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
