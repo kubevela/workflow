@@ -25,7 +25,9 @@ import (
 )
 
 // SecureTransport returns a copy of base with dial-time SSRF validation applied.
-// Every connection, including redirect follows, re-enters the dial hook.
+// Every connection, including redirect follows, re-enters the dial hook. Proxy
+// settings and any DialTLS or DialTLSContext hook on base are dropped: the TLS
+// handshake runs over the guarded DialContext.
 func SecureTransport(base *http.Transport, policy Policy) *http.Transport {
 	if base == nil {
 		base = defaultTransport()

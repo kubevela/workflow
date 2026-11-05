@@ -377,10 +377,10 @@ func TestBlockedAddress_emptyHost(t *testing.T) {
 }
 
 func TestClonePolicy_copiesWildcards(t *testing.T) {
-	out := clonePolicy(Policy{
+	out := (Policy{
 		ExactHosts:       map[string]struct{}{"a.example": {}},
 		WildcardSuffixes: []string{"corp.internal"},
-	})
+	}).clone()
 	require.Equal(t, []string{"corp.internal"}, out.WildcardSuffixes)
 	require.Error(t, out.BlockedHost("a.example"))
 }
