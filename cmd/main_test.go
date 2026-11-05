@@ -45,6 +45,7 @@ func TestResolveControllerNamespace(t *testing.T) {
 }
 
 func TestResolveControllerNamespace_unset(t *testing.T) {
+	t.Setenv("POD_NAMESPACE", "")
 	require.NoError(t, os.Unsetenv("POD_NAMESPACE"))
 	require.Equal(t, "vela-system", resolveControllerNamespace())
 }
