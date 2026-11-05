@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -89,11 +89,12 @@ jobs:
           echo "EGRESS_ARG=${EGRESS_ARG}" >> $GITHUB_ENV 
 
       - name: Setup K3d
-        uses: nolar/setup-k3d-k3s@v1.0.8
-        with:
-          version: ${{ matrix.k8s-version }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: ${{ env.EGRESS_ARG }}
+        # nolar/setup-k3d-k3s only searches the latest k3s releases and no
+        # longer finds v1.26, so pin the k3s image directly.
+        run: |
+          curl -sfL https://raw.githubusercontent.com/k3d-io/k3d/v5.6.3/install.sh | TAG=v5.6.3 bash
+          k3d cluster create --image rancher/k3s:v1.26.15-k3s1 --wait ${{ env.EGRESS_ARG }}
+          kubectl version
 
       - name: Load image to k3d cluster
         run: make image-load
