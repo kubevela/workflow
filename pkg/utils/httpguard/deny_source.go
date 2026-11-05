@@ -23,6 +23,10 @@ import (
 	"sync/atomic"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,10 +67,7 @@ func SetEnhancer(fn PolicyEnhancer) {
 
 // SetDenyFragment atomically replaces the denylist overlay.
 func SetDenyFragment(fragment Policy) {
-	if fragment.ExactHosts == nil {
-		fragment.ExactHosts = map[string]struct{}{}
-	}
-	denyFragment.Store(fragment)
+	denyFragment.Store(fragment.clone())
 }
 
 // Current returns DefaultPolicy, then enhancer, then the immutable builtin
@@ -130,8 +131,10 @@ func mergeDenyConfigMaps(configMaps []corev1.ConfigMap) (Policy, error) {
 	return merged, nil
 }
 
-// SetupWatcher registers a cache-backed ConfigMap watch in the controller
-// namespace. After startup, reload failures keep the last good aggregate.
+// SetupWatcher watches the template's ConfigMaps in the controller namespace
+// with an informer scoped to that namespace and label, so the controller does
+// not cache every ConfigMap in the cluster. Reloads read through the API
+// reader. After startup, reload failures keep the last good aggregate.
 func SetupWatcher(mgr manager.Manager, templateName, namespace string) error {
 	if templateName == "" {
 		return nil
@@ -140,23 +143,29 @@ func SetupWatcher(mgr manager.Manager, templateName, namespace string) error {
 		return nil
 	}
 	return mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		return watchAndReload(ctx, mgr.GetClient(), mgr, templateName, namespace)
+		return watchAndReload(ctx, mgr, templateName, namespace)
 	}))
 }
 
-func watchAndReload(ctx context.Context, cli client.Client, mgr manager.Manager, templateName, namespace string) error {
-	informer, err := mgr.GetCache().GetInformer(ctx, &corev1.ConfigMap{})
+func watchAndReload(ctx context.Context, mgr manager.Manager, templateName, namespace string) error {
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		return fmt.Errorf("get ConfigMap informer for HTTP deny watch: %w", err)
+		return fmt.Errorf("create client for HTTP deny watch: %w", err)
 	}
-	return watchAndReloadInformer(ctx, cli, informer, templateName, namespace)
+	selector := labels.Set{ConfigTemplateLabel: templateName}.String()
+	factory := informers.NewSharedInformerFactoryWithOptions(clientset, 0,
+		informers.WithNamespace(namespace),
+		informers.WithTweakListOptions(func(o *metav1.ListOptions) { o.LabelSelector = selector }))
+	informer := factory.Core().V1().ConfigMaps().Informer()
+	factory.Start(ctx.Done())
+	return watchAndReloadInformer(ctx, mgr.GetAPIReader(), informer, templateName, namespace)
 }
 
 type configMapInformer interface {
 	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
 }
 
-func watchAndReloadInformer(ctx context.Context, cli client.Client, informer configMapInformer, templateName, namespace string) error {
+func watchAndReloadInformer(ctx context.Context, cli client.Reader, informer configMapInformer, templateName, namespace string) error {
 	reload := func() {
 		tryReloadDenyConfigMaps(ctx, cli, templateName, namespace)
 	}
@@ -174,7 +183,7 @@ func watchAndReloadInformer(ctx context.Context, cli client.Client, informer con
 	return nil
 }
 
-func tryReloadDenyConfigMaps(ctx context.Context, cli client.Client, templateName, namespace string) {
+func tryReloadDenyConfigMaps(ctx context.Context, cli client.Reader, templateName, namespace string) {
 	if err := LoadConfigMaps(ctx, cli, templateName, namespace); err != nil {
 		klog.ErrorS(err, "failed to reload workflow HTTP deny ConfigMaps; keeping last good policy",
 			"template", templateName, "namespace", namespace)

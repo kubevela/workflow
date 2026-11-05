@@ -29,7 +29,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.cueUpgradeEvalv3SelfRefGuardEnabled Enable evalv3 self-reference default-guard compatibility rewrite pass
 ## @param workflow.disableWorkflowHTTP Disable outbound HTTP from workflow request/webhook steps
 ## @param workflow.blockPrivateHTTPAddresses Block outbound HTTP to RFC-1918 and ULA destinations
-## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. Keep in sync with the controller flag; the chart rewrites the shipped CUE labels to match. Empty disables discovery and skips installing the template/default ConfigMap.
+## @param workflow.httpDeny.configTemplateName ConfigTemplate name and discovery label value. The chart templates the controller flag, the ConfigTemplate and the CUE labels from this one value. Discovery only reads ConfigMaps in the controller namespace. Must be a string of dot-separated parts made of lowercase letters, digits and -, each starting and ending with a letter or digit, at most 63 characters in total; quote a name that YAML would read as a number, a boolean or null. Empty disables discovery and skips installing the template/default ConfigMap.
 ## @param workflow.httpDeny.installConfigTemplate Install the workflow HTTP deny ConfigTemplate
 ## @param workflow.httpDeny.defaultConfig.enabled Install the default metadata and link-local deny ConfigMap
 ## @param workflow.httpDeny.defaultConfig.name Name of the default workflow HTTP deny ConfigMap (unique per chart)
@@ -58,7 +58,7 @@ workflow:
   blockPrivateHTTPAddresses: false
   httpDeny:
     # Prefixed per chart so dual-install with vela-core owns distinct ConfigTemplates
-    # and default ConfigMaps. Keep in sync with controller flag default.
+    # and default ConfigMaps. The controller flag is templated from this value.
     configTemplateName: vela-workflow-http-deny
     installConfigTemplate: true
     defaultConfig:
