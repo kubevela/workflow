@@ -43,6 +43,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/utils/httpguard"
+	"github.com/kubevela/workflow/pkg/utils/stepsecret"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -363,8 +364,10 @@ func TestHTTPSDo(t *testing.T) {
 	ctx := context.Background()
 	s := newMockHttpsServer()
 	defer s.Close()
+	reads := 0
 	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+			reads++
 			secret := obj.(*v1.Secret)
 			*secret = v1.Secret{
 				Data: map[string][]byte{
@@ -387,10 +390,29 @@ func TestHTTPSDo(t *testing.T) {
 			},
 		},
 		RuntimeParams: types.RuntimeParams{
-			KubeClient: cli,
+			KubeClient:     cli,
+			ProcessContext: process.NewContext(process.ContextData{Namespace: "default"}),
 		},
 	})
 	r.NoError(err)
+
+	// A step with no namespace reads no TLS Secret.
+	reads = 0
+	_, err = Do(ctx, &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    s.URL + "/api/v1/token?val=test-token",
+			TLSConfig: &TLSConfig{
+				Secret:    "certs",
+				Namespace: "default",
+			},
+		},
+		RuntimeParams: types.RuntimeParams{
+			KubeClient: cli,
+		},
+	})
+	r.ErrorContains(err, "the step has no namespace")
+	r.Zero(reads, "no Secret is read")
 }
 
 func TestHttpDo_blocksMetadata(t *testing.T) {
@@ -570,7 +592,7 @@ func TestGetTransportSecretKey(t *testing.T) {
 					return nil
 				},
 			}
-			_, err := getTransport(context.Background(), cli, tc.secretName, tc.namespace)
+			_, err := getTransport(context.Background(), cli, stepsecret.RefKey(tc.secretName, tc.namespace))
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, got)
 		})
