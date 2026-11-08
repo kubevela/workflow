@@ -132,6 +132,8 @@ func main() {
 	flag.BoolVar(&backupCleanOnBackup, "backup-clean-on-backup", false, "Set the auto clean for backup workflow records, default is false")
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
+	flag.DurationVar(&httpguard.MaxRequestTimeout, "max-workflow-http-timeout", httpguard.MaxRequestTimeout, "Set the longest timeout a workflow HTTP request may set; a request holds a reconcile worker for its duration")
+	flag.Int64Var(&httpguard.MaxResponseBytes, "max-workflow-http-response-bytes", httpguard.MaxResponseBytes, "Set the largest response body, in bytes, a workflow HTTP request may read")
 	flag.StringVar(&workflowHTTPDenyConfigTemplateName, "workflow-http-deny-config-template-name", httpguard.WorkflowHTTPDenyConfigTemplate, "Discover and merge ConfigMaps produced by this ConfigTemplate in the controller namespace")
 	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")
 	flag.BoolVar(&providers.EnableExternalPackageWatchForDefaultCompiler, "enable-external-package-watch-for-default-compiler", false, "Enable external package watch for default compiler")
@@ -151,6 +153,10 @@ func main() {
 	klog.InitFlags(nil)
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+	if err := httpguard.CheckBounds(); err != nil {
+		klog.ErrorS(err, "Invalid workflow HTTP bounds")
+		os.Exit(1)
+	}
 	wfupgrade.InitCompatibilityCache(context.Background(), wfupgrade.CompatibilityCacheSize)
 	rootCtx := ctrl.SetupSignalHandler()
 	httpProvider.InitRateLimiter(rootCtx)
