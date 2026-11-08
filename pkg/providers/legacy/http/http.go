@@ -129,7 +129,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}
 	defaultClient := &http.Client{
 		Transport: httpguard.SecureTransport(nil, policy),
-		Timeout:   time.Second * 3,
+		Timeout:   httpguard.DefaultTimeout(),
 		// A custom CheckRedirect replaces the net/http default, so the
 		// redirect limit is enforced here too.
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -142,13 +142,11 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	method := params.Params.Method
 	url := params.Params.URL
 	if request := params.Params.Request; request != nil {
-		if request.Timeout != "" {
-			timeout, err := time.ParseDuration(request.Timeout)
-			if err != nil {
-				return nil, fmt.Errorf("invalid timeout %s: %w", timeout, err)
-			}
-			defaultClient.Timeout = timeout
+		timeout, err := httpguard.RequestTimeout(request.Timeout)
+		if err != nil {
+			return nil, err
 		}
+		defaultClient.Timeout = timeout
 		if request.RateLimiter != nil {
 			period, err := time.ParseDuration(request.RateLimiter.Period)
 			if err != nil {
@@ -167,7 +165,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 		header.Set("Content-Type", "application/json")
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), method, url, reader)
+	req, err := http.NewRequestWithContext(ctx, method, url, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +196,10 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}
 	//nolint:errcheck
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	b, err := httpguard.ReadResponseBody(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 	// parse response body and headers
 	return &ResponseVars{
 		Body:       string(b),

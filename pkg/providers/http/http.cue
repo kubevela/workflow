@@ -11,7 +11,7 @@
 		url: string
 		// +usage=The request config
 		request?: {
-			// +usage=The timeout of this request
+			// +usage=The timeout of this request, greater than 0 and at most the controller's maximum (60s by default); 3s when unset, or the maximum when that is lower
 			timeout?: string
 			// +usage=The request body
 			body?: string
