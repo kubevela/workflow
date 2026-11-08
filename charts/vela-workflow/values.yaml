@@ -40,6 +40,8 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.backoff.maxTime.failedState The max backoff time of workflow in a failed condition
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
 ## @param workflow.step.forEachMaxItems The max number of items a forEach step may iterate
+## @param workflow.http.maxTimeout The longest timeout a workflow HTTP request may set, as a Go duration with a unit (for example 60s)
+## @param workflow.http.maxResponseBytes The largest response body a workflow HTTP request may read, as a whole number of bytes (for example 1048576, not 1Mi)
 ## @param workflow.groupByLabel The label used to group workflow record
 
 workflow:
@@ -82,6 +84,9 @@ workflow:
   step:
     errorRetryTimes: 10
     forEachMaxItems: 50
+  http:
+    maxTimeout: 60s
+    maxResponseBytes: 1048576
   groupByLabel: "pipeline.oam.dev/name"
 
 ## @section KubeVela workflow backup parameters
