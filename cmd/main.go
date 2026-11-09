@@ -273,6 +273,7 @@ func main() {
 	}
 
 	if err = (&controllers.WorkflowRunReconciler{
+		APIReader:         mgr.GetAPIReader(),
 		Client:            kubeClient,
 		Scheme:            mgr.GetScheme(),
 		Recorder:          event.NewAPIRecorder(mgr.GetEventRecorderFor("WorkflowRun")),
