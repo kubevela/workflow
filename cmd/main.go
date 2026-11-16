@@ -134,6 +134,7 @@ func main() {
 	flag.StringVar(&backupConfigSecretName, "backup-config-secret-name", "backup-config", "Set the secret name for backup workflow configs, default is backup-config")
 	flag.StringVar(&backupConfigSecretNamespace, "backup-config-secret-namespace", "vela-system", "Set the secret namespace for backup workflow configs, default is backup-config")
 	flag.DurationVar(&httpguard.MaxRequestTimeout, "max-workflow-http-timeout", httpguard.MaxRequestTimeout, "Set the longest timeout a workflow HTTP request may set; a request holds a reconcile worker for its duration")
+	flag.Func("workflow-http-nat64-prefix", "Add a network-specific NAT64 prefix (RFC 6052: /32, /40, /48, /56, /64 or /96); a workflow HTTP request to an address under it is judged by the IPv4 address it carries. Repeat for more than one", httpguard.AddNAT64Prefix)
 	flag.Int64Var(&httpguard.MaxResponseBytes, "max-workflow-http-response-bytes", httpguard.MaxResponseBytes, "Set the largest response body, in bytes, a workflow HTTP request may read")
 	flag.StringVar(&workflowHTTPDenyConfigTemplateName, "workflow-http-deny-config-template-name", httpguard.WorkflowHTTPDenyConfigTemplate, "Discover and merge ConfigMaps produced by this ConfigTemplate in the controller namespace")
 	flag.BoolVar(&providers.EnableExternalPackageForDefaultCompiler, "enable-external-package-for-default-compiler", true, "Enable external package for default compiler")

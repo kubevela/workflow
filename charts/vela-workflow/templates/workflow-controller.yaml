@@ -154,6 +154,9 @@ spec:
             {{- end }}
             - "--max-workflow-http-timeout={{ .Values.workflow.http.maxTimeout }}"
             - "--max-workflow-http-response-bytes={{ .Values.workflow.http.maxResponseBytes | int64 }}"
+            {{- range .Values.workflow.http.nat64Prefixes }}
+            - "--workflow-http-nat64-prefix={{ . }}"
+            {{- end }}
             - "--feature-gates=EnableWatchEventListener={{- .Values.workflow.enableWatchEventListener | toString -}}"
             - "--feature-gates=EnablePatchStatusAtOnce={{- .Values.workflow.enablePatchStatusAtOnce | toString -}}"
             - "--feature-gates=EnableSuspendOnFailure={{- .Values.workflow.enableSuspendOnFailure | toString -}}"
