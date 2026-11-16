@@ -32,6 +32,7 @@ ignoreWorkflowWithoutControllerRequirement: false
 ## @param workflow.step.errorRetryTimes The max retry times of a failed workflow step
 ## @param workflow.http.maxTimeout The longest timeout a workflow HTTP request may set, as a Go duration with a unit (for example 60s)
 ## @param workflow.http.maxResponseBytes The largest response body a workflow HTTP request may read, as a whole number of bytes (for example 1048576, not 1Mi)
+## @param workflow.http.nat64Prefixes Network-specific NAT64 prefixes (RFC 6052: /32, /40, /48, /56, /64 or /96); a workflow HTTP request to an address under one is judged by the IPv4 address it carries
 ## @param workflow.groupByLabel The label used to group workflow record
 
 workflow:
@@ -67,6 +68,7 @@ workflow:
   http:
     maxTimeout: 60s
     maxResponseBytes: 1048576
+    nat64Prefixes: []
   groupByLabel: "pipeline.oam.dev/name"
 
 ## @section KubeVela workflow backup parameters
