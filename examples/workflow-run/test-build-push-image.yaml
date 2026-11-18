@@ -32,7 +32,7 @@ spec:
       - name: build-from-public-repo
         type: build-push-image
         properties:
-          kanikoExecutor: "gcr.io/kaniko-project/executor:v1.9.0"
+          kanikoExecutor: "ghcr.io/osscontainertools/kaniko:v1.29.1"
           context:
             git: "github.com/kelseyhightower/helloworld"
             branch: "master"
