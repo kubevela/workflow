@@ -65,8 +65,8 @@ spec:
     - name: build-push
       type: build-push-image
       properties:
-        # use your kaniko executor image like below, if not set, it will use default image oamdev/kaniko-executor:v1.9.1
-        # kanikoExecutor: gcr.io/kaniko-project/executor:latest
+        # use your kaniko executor image like below, if not set, it will use default image ghcr.io/osscontainertools/kaniko:v1.29.1
+        # kanikoExecutor: ghcr.io/osscontainertools/kaniko:v1.29.1
         # you can use context with git and branch or directly specify the context, please refer to https://github.com/GoogleContainerTools/kaniko#kaniko-build-contexts
         context:
           git: github.com/FogDong/simple-web-demo
