@@ -19,9 +19,7 @@ package http
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	_ "embed"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kubevela/workflow/pkg/utils/stepsecret"
 
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
@@ -39,6 +39,7 @@ import (
 	cuexruntime "github.com/kubevela/pkg/cue/cuex/runtime"
 
 	"github.com/kubevela/workflow/pkg/cue/model"
+	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/features"
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/ratelimiter"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
@@ -138,7 +139,7 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}
 	defaultClient := &http.Client{
 		Transport: httpguard.SecureTransport(nil, policy),
-		Timeout:   time.Second * 3,
+		Timeout:   httpguard.DefaultTimeout(),
 		// A custom CheckRedirect replaces the net/http default, so the
 		// redirect limit is enforced here too.
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -151,13 +152,11 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	method := params.Params.Method
 	url := params.Params.URL
 	if request := params.Params.Request; request != nil {
-		if request.Timeout != "" {
-			timeout, err := time.ParseDuration(request.Timeout)
-			if err != nil {
-				return nil, fmt.Errorf("invalid timeout %s: %w", timeout, err)
-			}
-			defaultClient.Timeout = timeout
+		timeout, err := httpguard.RequestTimeout(request.Timeout)
+		if err != nil {
+			return nil, err
 		}
+		defaultClient.Timeout = timeout
 		if request.RateLimiter != nil {
 			period, err := time.ParseDuration(request.RateLimiter.Period)
 			if err != nil {
@@ -176,24 +175,23 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 		header.Set("Content-Type", "application/json")
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), method, url, reader)
+	req, err := http.NewRequestWithContext(ctx, method, url, reader)
 	if err != nil {
 		return nil, err
 	}
 	req.Header = header
 	req.Trailer = trailer
 
-	if params.Params.TLSConfig != nil {
-		if params.Params.TLSConfig.Namespace == "" {
-			params.Params.TLSConfig.Namespace = fmt.Sprint(params.ProcessContext.GetData(model.ContextNamespace))
+	if tlsConfig := params.Params.TLSConfig; tlsConfig != nil {
+		key, err := stepsecret.Key(ctx, params.KubeClient, tlsConfig.Secret, tlsConfig.Namespace, stepNamespace(params.ProcessContext))
+		if err != nil {
+			return nil, fmt.Errorf("tls_config: %w", err)
 		}
-		if tr, err := getTransport(ctx, params.KubeClient, params.Params.TLSConfig.Secret, params.Params.TLSConfig.Namespace); err == nil && tr != nil {
-			if transport, ok := tr.(*http.Transport); ok {
-				defaultClient.Transport = httpguard.SecureTransport(transport, policy)
-			} else {
-				defaultClient.Transport = tr
-			}
+		tr, err := getTransport(ctx, params.KubeClient, key)
+		if err != nil {
+			return nil, fmt.Errorf("tls_config: %w", err)
 		}
+		defaultClient.Transport = httpguard.SecureTransport(tr, policy)
 	}
 
 	// The transport is built for this request, so release its idle
@@ -207,7 +205,10 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}
 	//nolint:errcheck
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	b, err := httpguard.ReadResponseBody(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 	// parse response body and headers
 	return &ResponseVars{
 		Body:       string(b),
@@ -217,53 +218,20 @@ func runHTTP(ctx context.Context, params *DoParams) (*ResponseVars, error) {
 	}, nil
 }
 
-func getTransport(ctx context.Context, cli client.Client, secretName, ns string) (http.RoundTripper, error) {
+// getTransport builds the TLS transport from the Secret at key.
+func getTransport(ctx context.Context, cli client.Client, key client.ObjectKey) (*http.Transport, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			NextProtos: []string{"http/1.1"},
 		},
 	}
-	objectKey := client.ObjectKey{
-		Namespace: ns,
-		Name:      secretName,
-	}
-	index := strings.Index(secretName, "/")
-	if index > 0 {
-		objectKey.Namespace = secretName[:index-1]
-		objectKey.Name = secretName[index:]
-	}
 	secret := new(v1.Secret)
-	if err := cli.Get(ctx, objectKey, secret); err != nil {
+	if err := cli.Get(ctx, key, secret); err != nil {
 		return nil, err
 	}
-	if ca, ok := secret.Data["ca.crt"]; ok {
-		caData, err := base64.StdEncoding.DecodeString(string(ca))
-		if err != nil {
-			return nil, err
-		}
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(caData)
-		tr.TLSClientConfig.RootCAs = pool
+	if err := stepsecret.ApplyTLS(tr.TLSClientConfig, secret.Data); err != nil {
+		return nil, err
 	}
-	var err error
-	var certData, keyData []byte
-	if clientCert, ok := secret.Data["client.crt"]; ok {
-		certData, err = base64.StdEncoding.DecodeString(string(clientCert))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if clientKey, ok := secret.Data["client.key"]; ok {
-		keyData, err = base64.StdEncoding.DecodeString(string(clientKey))
-		if err != nil {
-			return nil, err
-		}
-	}
-	cliCrt, err := tls.X509KeyPair(certData, keyData)
-	if err != nil {
-		return nil, errors.WithMessage(err, "parse client keypair")
-	}
-	tr.TLSClientConfig.Certificates = []tls.Certificate{cliCrt}
 	return tr, nil
 }
 
@@ -288,4 +256,16 @@ func GetProviders() map[string]cuexruntime.ProviderFn {
 	return map[string]cuexruntime.ProviderFn{
 		"do": providertypes.LegacyGenericProviderFn[RequestVars, ResponseVars](Do),
 	}
+}
+
+// stepNamespace is the namespace the step runs in, or "" when the process context has none, which
+// stepsecret.Key refuses.
+func stepNamespace(pCtx process.Context) string {
+	if pCtx == nil {
+		return ""
+	}
+	if ns, ok := pCtx.GetData(model.ContextNamespace).(string); ok {
+		return ns
+	}
+	return ""
 }
