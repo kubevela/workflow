@@ -1,0 +1,21 @@
+apiVersion: core.oam.dev/v1beta1
+kind: WorkflowStepDefinition
+metadata:
+  name: side-effect
+  namespace: vela-system
+spec:
+  schematic:
+    cue:
+      template: |
+        import (
+        	"vela/http"
+        )
+
+        req: http.#HTTPDo & {
+        	$params: {
+        		method: "POST"
+        		url:    parameter.url
+        		request: body: context.stepName
+        	}
+        }
+        parameter: url: string
