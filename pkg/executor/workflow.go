@@ -1001,6 +1001,9 @@ func (e *engine) GetOperation() *types.Operation {
 const conditionWithoutExpressionsMessage = "this step's if is a $( ) condition, which needs expressions, " +
 	"and this run does not read them; turn them on for it, or write the if in CUE"
 
+// conditionErrorMessage begins the message of a step whose $( ) if failed to evaluate.
+const conditionErrorMessage = "this step's if could not be evaluated: "
+
 // misplacedConditionMessage fails a step whose if holds a $( ) that is not the
 // whole of it.
 const misplacedConditionMessage = "this step's if holds a $( ) that is not the whole condition; " +
@@ -1008,9 +1011,10 @@ const misplacedConditionMessage = "this step's if holds a $( ) that is not the w
 
 // conditionPreCheck decides a step whose if is a $( ) condition: run on true,
 // skipped on false, and held back while a read in it is still to be answered.
-// It fails the step when the run has no evaluator for the condition, or when the
-// if holds a $( ) that is not the whole of it, since neither is CUE. It reports
-// false for any other if, which stays CUE.
+// It fails the step when the condition cannot be evaluated, since skipping would
+// let the workflow succeed without a step nobody chose to leave out; and when the
+// run has no evaluator for it, or the if holds a $( ) that is not the whole of
+// it, since neither is CUE. It reports false for any other if, which stays CUE.
 func conditionPreCheck(step oamv1alpha1.WorkflowStep, options *types.PreCheckOptions) (*types.PreCheckResult, bool, error) {
 	if expressions.MisplacedCondition(step.If) {
 		return &types.PreCheckResult{Fail: true, Message: misplacedConditionMessage}, true, nil
@@ -1029,7 +1033,7 @@ func conditionPreCheck(step oamv1alpha1.WorkflowStep, options *types.PreCheckOpt
 	case errors.Is(err, cel.ErrNotReady):
 		return &types.PreCheckResult{Wait: true, Message: err.Error()}, true, nil
 	case err != nil:
-		return &types.PreCheckResult{Skip: true}, true, err
+		return &types.PreCheckResult{Fail: true, Message: conditionErrorMessage + err.Error()}, true, nil
 	}
 	return &types.PreCheckResult{Skip: !run}, true, nil
 }

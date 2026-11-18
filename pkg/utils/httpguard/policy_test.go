@@ -398,3 +398,106 @@ func TestSecureTransport_dropsCustomTLSDialers(t *testing.T) {
 	assert.Nil(t, transport.DialTLS) //nolint:staticcheck // the hook under test
 	assert.NotNil(t, transport.DialContext)
 }
+
+// A NAT64 address under the well-known prefix carries an IPv4 address, which the gateway reaches
+// for it: that address is checked as if it were dialled.
+func TestBlockedChecksTheIPv4ANAT64AddressCarries(t *testing.T) {
+	_, metadata, _ := net.ParseCIDR("169.254.0.0/16")
+	p := Policy{BlockLoopback: true, DenyCIDRs: []*net.IPNet{metadata}}
+	for addr, blocked := range map[string]bool{
+		"64:ff9b::a9fe:a9fe": true,  // 169.254.169.254
+		"64:ff9b::7f00:1":    true,  // 127.0.0.1
+		"64:ff9b::808:808":   false, // 8.8.8.8
+	} {
+		require.Equal(t, blocked, p.Blocked(net.ParseIP(addr)), addr)
+	}
+	require.True(t, Policy{BlockPrivate: true}.Blocked(net.ParseIP("64:ff9b::a00:1")), "10.0.0.1, when private addresses are blocked")
+	require.False(t, Policy{}.Blocked(net.ParseIP("64:ff9b::a00:1")))
+}
+
+// rfc6052Octets are the octets RFC 6052 section 2.2 puts an IPv4 address in, per prefix length.
+var rfc6052Octets = map[int][4]int{
+	32: {4, 5, 6, 7},
+	40: {5, 6, 7, 9},
+	48: {6, 7, 9, 10},
+	56: {7, 9, 10, 11},
+	64: {9, 10, 11, 12},
+	96: {12, 13, 14, 15},
+}
+
+// embed places v4 in prefix as RFC 6052 section 2.2 lays it out, skipping bits 64 to 71.
+func embed(t *testing.T, prefix string, v4 string) net.IP {
+	t.Helper()
+	_, n, err := net.ParseCIDR(prefix)
+	require.NoError(t, err)
+	ones, _ := n.Mask.Size()
+	out := make(net.IP, net.IPv6len)
+	copy(out, n.IP.To16())
+	at := rfc6052Octets[ones]
+	for i, b := range net.ParseIP(v4).To4() {
+		out[at[i]] = b
+	}
+	return out
+}
+
+// withNAT64Prefixes adds prefixes for the rest of the test.
+func withNAT64Prefixes(t *testing.T, prefixes ...string) {
+	t.Helper()
+	restore := NAT64Prefixes
+	NAT64Prefixes = append([]*net.IPNet(nil), restore...)
+	t.Cleanup(func() { NAT64Prefixes = restore })
+	for _, prefix := range prefixes {
+		require.NoError(t, AddNAT64Prefix(prefix))
+	}
+}
+
+// A NAT64 address is refused when the IPv4 address it carries is, under the well-known prefix,
+// the local-use prefix, and a network-specific prefix the operator configures.
+func TestBlockedUnwrapsNAT64Prefixes(t *testing.T) {
+	p := Policy{BlockLoopback: true, BlockPrivate: true}
+	require.True(t, p.Blocked(embed(t, "64:ff9b::/96", "127.0.0.1")), "well-known prefix")
+	require.True(t, p.Blocked(embed(t, "64:ff9b:1::/48", "127.0.0.1")), "local-use prefix")
+	require.False(t, p.Blocked(embed(t, "64:ff9b:1::/48", "93.184.216.34")), "a public address through the local-use prefix")
+
+	require.False(t, p.Blocked(embed(t, "2001:db8:122:344::/64", "10.0.0.1")), "an unconfigured network-specific prefix is plain IPv6")
+	withNAT64Prefixes(t, "2001:db8:122:344::/64")
+	require.True(t, p.Blocked(embed(t, "2001:db8:122:344::/64", "10.0.0.1")), "a configured network-specific prefix")
+	require.Error(t, AddNAT64Prefix("2001:db8::/80"), "RFC 6052 allows /32, /40, /48, /56, /64 and /96 only")
+}
+
+// The IPv4 address carried by each example in RFC 6052 section 2.4 is 192.0.2.33.
+func TestNAT64IPv4ReadsTheRFC6052Examples(t *testing.T) {
+	for prefix, addr := range map[string]string{
+		"2001:db8::/32":         "2001:db8:c000:221::",
+		"2001:db8:100::/40":     "2001:db8:1c0:2:21::",
+		"2001:db8:122::/48":     "2001:db8:122:c000:2:2100::",
+		"2001:db8:122:300::/56": "2001:db8:122:3c0:0:221::",
+		"2001:db8:122:344::/64": "2001:db8:122:344:c0:2:2100:0",
+		"2001:db8:122:344::/96": "2001:db8:122:344::192.0.2.33",
+	} {
+		t.Run(prefix, func(t *testing.T) {
+			withNAT64Prefixes(t, prefix)
+			require.Equal(t, "192.0.2.33", nat64IPv4(net.ParseIP(addr)).String())
+		})
+	}
+}
+
+// Under overlapping prefixes an address is read by the longest one containing it.
+func TestNAT64IPv4ReadsTheLongestPrefix(t *testing.T) {
+	withNAT64Prefixes(t, "2001:db8::/32", "2001:db8:122:344::/96")
+	addr := embed(t, "2001:db8:122:344::/96", "127.0.0.1")
+	require.Equal(t, "127.0.0.1", nat64IPv4(addr).String())
+	require.True(t, Policy{BlockLoopback: true}.Blocked(addr))
+}
+
+// A prefix overlapping the IPv4-mapped range is refused, and an IPv4 address is never unwrapped.
+func TestNAT64PrefixesNeverCoverIPv4(t *testing.T) {
+	require.Error(t, AddNAT64Prefix("::ffff:0:0/96"))
+	require.Error(t, AddNAT64Prefix("::/32"))
+
+	restore := NAT64Prefixes
+	t.Cleanup(func() { NAT64Prefixes = restore })
+	NAT64Prefixes = append([]*net.IPNet{{IP: net.ParseIP("::ffff:0:0"), Mask: net.CIDRMask(96, 128)}}, restore...)
+	require.Nil(t, nat64IPv4(net.ParseIP("127.0.0.1")))
+	require.True(t, Policy{BlockLoopback: true}.Blocked(net.ParseIP("127.0.0.1")))
+}

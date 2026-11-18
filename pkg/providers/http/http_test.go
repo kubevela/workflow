@@ -42,6 +42,7 @@ import (
 	"github.com/kubevela/workflow/pkg/providers/legacy/http/testdata"
 	"github.com/kubevela/workflow/pkg/providers/types"
 	"github.com/kubevela/workflow/pkg/utils/httpguard"
+	"github.com/kubevela/workflow/pkg/utils/stepsecret"
 )
 
 func TestHttpDo(t *testing.T) {
@@ -352,8 +353,10 @@ func TestHTTPSDo(t *testing.T) {
 	ctx := context.Background()
 	s := newMockHttpsServer()
 	defer s.Close()
+	reads := 0
 	cli := &test.MockClient{
 		MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+			reads++
 			secret := obj.(*v1.Secret)
 			*secret = v1.Secret{
 				Data: map[string][]byte{
@@ -376,10 +379,29 @@ func TestHTTPSDo(t *testing.T) {
 			},
 		},
 		RuntimeParams: types.RuntimeParams{
-			KubeClient: cli,
+			KubeClient:     cli,
+			ProcessContext: process.NewContext(process.ContextData{Namespace: "default"}),
 		},
 	})
 	r.NoError(err)
+
+	// A step with no namespace reads no TLS Secret.
+	reads = 0
+	_, err = Do(ctx, &DoParams{
+		Params: RequestVars{
+			Method: "GET",
+			URL:    s.URL + "/api/v1/token?val=test-token",
+			TLSConfig: &TLSConfig{
+				Secret:    "certs",
+				Namespace: "default",
+			},
+		},
+		RuntimeParams: types.RuntimeParams{
+			KubeClient: cli,
+		},
+	})
+	r.ErrorContains(err, "the step has no namespace")
+	r.Zero(reads, "no Secret is read")
 }
 
 func TestHttpDo_blocksMetadata(t *testing.T) {
@@ -520,4 +542,45 @@ func newMockHttpsServer() *httptest.Server {
 	}
 	ts.StartTLS()
 	return ts
+}
+
+func TestGetTransportSecretKey(t *testing.T) {
+	testCases := map[string]struct {
+		secretName string
+		namespace  string
+		expected   client.ObjectKey
+	}{
+		"secret in the given namespace": {
+			secretName: "certs",
+			namespace:  "default",
+			expected:   client.ObjectKey{Namespace: "default", Name: "certs"},
+		},
+		"secret given as namespace/name": {
+			secretName: "vela-system/certs",
+			namespace:  "default",
+			expected:   client.ObjectKey{Namespace: "vela-system", Name: "certs"},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var got client.ObjectKey
+			cli := &test.MockClient{
+				MockGet: func(_ context.Context, key client.ObjectKey, obj client.Object) error {
+					got = key
+					secret := obj.(*v1.Secret)
+					*secret = v1.Secret{
+						Data: map[string][]byte{
+							"ca.crt":     []byte(testdata.MockCerts.Ca),
+							"client.crt": []byte(testdata.MockCerts.ClientCrt),
+							"client.key": []byte(testdata.MockCerts.ClientKey),
+						},
+					}
+					return nil
+				},
+			}
+			_, err := getTransport(context.Background(), cli, stepsecret.RefKey(tc.secretName, tc.namespace))
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, got)
+		})
+	}
 }
