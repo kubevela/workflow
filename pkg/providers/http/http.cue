@@ -6,7 +6,7 @@
 
 	$params: {
 		// +usage=The method of HTTP request
-		method: *"GET" | "POST" | "PUT" | "DELETE"
+		method: *"GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "TRACE" | "PATCH"
 		// +usage=The url to request
 		url: string
 		// +usage=The request config
@@ -60,3 +60,9 @@
 #HTTPPut: #HTTPDo & {$params: method: "PUT"}
 
 #HTTPDelete: #HTTPDo & {$params: method: "DELETE"}
+
+#HTTPPatch: #HTTPDo & {$params: method: "PATCH"}
+
+#HTTPHead: #HTTPDo & {$params: method: "HEAD"}
+
+#HTTPOptions: #HTTPDo & {$params: method: "OPTIONS"}
