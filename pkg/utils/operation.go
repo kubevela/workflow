@@ -294,13 +294,15 @@ func (wo workflowRunOperator) Terminate(ctx context.Context) error {
 	return writeOutputF(wo.outputWriter, "Successfully terminate workflow: %s\n", run.Name)
 }
 
-// TerminateWorkflow terminate workflow
-func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+// TerminateStatus marks status terminated: not suspended, and every running or suspending step and
+// sub-step failed with reason Terminate, as is a failed one unless it failed after its retries or on
+// a timeout.
+func TerminateStatus(status *v1alpha1.WorkflowRunStatus) {
 	// set the workflow terminated to true
-	run.Status.Terminated = true
+	status.Terminated = true
 	// set the workflow suspend to false
-	run.Status.Suspend = false
-	steps := run.Status.Steps
+	status.Suspend = false
+	steps := status.Steps
 	for i, step := range steps {
 		switch step.Phase {
 		case v1alpha1.WorkflowStepPhaseFailed:
@@ -325,7 +327,11 @@ func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.Wor
 			}
 		}
 	}
+}
 
+// TerminateWorkflow terminate workflow
+func TerminateWorkflow(ctx context.Context, cli client.Client, run *v1alpha1.WorkflowRun) error {
+	TerminateStatus(&run.Status)
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return cli.Status().Patch(ctx, run, client.Merge)
 	})
