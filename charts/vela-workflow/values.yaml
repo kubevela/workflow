@@ -191,17 +191,11 @@ admissionWebhooks:
     mountPath: /etc/k8s-webhook-certs
   patch:
     # When admission webhooks and patching are enabled without cert-manager,
-    # vela-workflow manages the webhook certificate in-process. The remaining
-    # patch values are kept so existing values files remain compatible; no
-    # certificate patch Jobs use them.
+    # vela-workflow manages the webhook certificate in-process. (The image,
+    # nodeSelector, affinity and tolerations of the old certificate patch Jobs
+    # were removed with the Jobs; values files that still set them keep working,
+    # Helm ignores them.)
     enabled: true
-    image:
-      repository: oamdev/kube-webhook-certgen
-      tag: v2.4.1
-      pullPolicy: IfNotPresent
-    nodeSelector: {}
-    affinity: {}
-    tolerations: []
   certManager:
     enabled: false
 
