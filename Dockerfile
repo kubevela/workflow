@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY cmd/http_deny.go cmd/http_deny.go
+COPY cmd/webhook_tls.go cmd/webhook_tls.go
 COPY api/ api/
 COPY controllers/ controllers/
 COPY pkg/ pkg/

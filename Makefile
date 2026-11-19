@@ -72,11 +72,11 @@ helm-doc-gen: helmdoc
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager ./cmd/main.go
+	go build -o bin/manager ./cmd
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	go run ./cmd
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
