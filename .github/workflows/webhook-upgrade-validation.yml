@@ -95,6 +95,9 @@ jobs:
             echo "ERROR: Expected 24 built-in definitions, got $DEFINITION_COUNT"
             exit 1
           fi
+          kubectl get workflowstepdefinitions -n vela-system \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.metadata.uid}{"\n"}{end}' \
+            | sort > "$RUNNER_TEMP/builtin-definitions-before"
 
       - name: Upgrade and restart controller
         run: |
@@ -163,6 +166,12 @@ jobs:
             echo "FAIL: Expected 24 built-in definitions after upgrade, got $DEFINITION_COUNT"
             exit 1
           fi
+          kubectl get workflowstepdefinitions -n vela-system \
+            -o jsonpath='{range .items[*]}{.metadata.name}={.metadata.uid}{"\n"}{end}' \
+            | sort > "$RUNNER_TEMP/builtin-definitions-after"
+          diff -u \
+            "$RUNNER_TEMP/builtin-definitions-before" \
+            "$RUNNER_TEMP/builtin-definitions-after"
 
       - name: Cleanup k3d cluster
         if: ${{ always() }}
