@@ -29,16 +29,16 @@ helm install --create-namespace -n vela-system workflow kubevela/vela-workflow -
 
 ### Core parameters
 
-| Name                                           | Description                                                                                                           | Value          |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
-| `systemDefinitionNamespace`                    | System definition namespace, if unspecified, will use built-in variable `.Release.Namespace`.                         | `nil`          |
-| `builtinDefinitions.job.image.repository`      | Image repository used by the built-in definition hook Jobs                                                            | `alpine/k8s`   |
-| `builtinDefinitions.job.image.tag`             | Image tag used by the built-in definition hook Jobs                                                                   | `1.31.13`      |
-| `builtinDefinitions.job.image.pullPolicy`      | Image pull policy used by the built-in definition hook Jobs                                                           | `IfNotPresent` |
-| `builtinDefinitions.job.rolloutTimeoutSeconds` | Seconds to wait for the controller rollout and cert-manager CA injection                                              | `300`          |
-| `builtinDefinitions.job.applyRetries`          | Number of attempts to apply built-in definitions                                                                      | `6`            |
-| `concurrentReconciles`                         | concurrentReconciles is the concurrent reconcile number of the controller                                             | `4`            |
-| `ignoreWorkflowWithoutControllerRequirement`   | will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation | `false`        |
+| Name                                           | Description                                                                                                           | Value                                                                             |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `systemDefinitionNamespace`                    | System definition namespace, if unspecified, will use built-in variable `.Release.Namespace`.                         | `nil`                                                                             |
+| `builtinDefinitions.job.image.repository`      | Image repository used by the built-in definition hook Jobs                                                            | `alpine/k8s`                                                                      |
+| `builtinDefinitions.job.image.tag`             | Image tag used by the built-in definition hook Jobs                                                                   | `1.34.13@sha256:4011c68d73de6803987509ad1ab9520124a27e31484e3f0e45f95a74ecac7a45` |
+| `builtinDefinitions.job.image.pullPolicy`      | Image pull policy used by the built-in definition hook Jobs                                                           | `IfNotPresent`                                                                    |
+| `builtinDefinitions.job.rolloutTimeoutSeconds` | Seconds to wait for the controller rollout and cert-manager CA injection                                              | `300`                                                                             |
+| `builtinDefinitions.job.applyRetries`          | Number of attempts to apply built-in definitions                                                                      | `6`                                                                               |
+| `concurrentReconciles`                         | concurrentReconciles is the concurrent reconcile number of the controller                                             | `4`                                                                               |
+| `ignoreWorkflowWithoutControllerRequirement`   | will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation | `false`                                                                           |
 
 ### KubeVela workflow parameters
 
