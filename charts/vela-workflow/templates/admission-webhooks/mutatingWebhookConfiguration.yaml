@@ -1,4 +1,7 @@
 {{- if .Values.admissionWebhooks.enabled -}}
+{{- $mName := printf "%s-admission" (include "kubevela.fullname" .) -}}
+{{- $webhookName := "mutating.core.oam.dev.v1alpha1.workflowruns" -}}
+{{- $hooks := include "kubevela.existingWebhooks" (dict "kind" "MutatingWebhookConfiguration" "name" $mName) | fromJson -}}
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -10,17 +13,13 @@ metadata:
   {{- end }}
 webhooks:
   - clientConfig:
-      caBundle: Cg==
+      {{- include "kubevela.webhookCABundle" (dict "root" . "hooks" $hooks "name" $webhookName) | nindent 6 }}
       service:
         name: {{ template "kubevela.name" . }}-webhook
         namespace: {{ .Release.Namespace }}
         path: /mutating-core-oam-dev-v1alpha1-workflowruns
-    {{- if .Values.admissionWebhooks.patch.enabled  }}
-    failurePolicy: Ignore
-    {{- else }}
-    failurePolicy: Fail
-    {{- end }}
-    name: mutating.core.oam.dev.v1alpha1.workflowruns
+    {{- include "kubevela.webhookFailurePolicy" (dict "root" . "hooks" $hooks "name" $webhookName "policy" "Fail") | nindent 4 }}
+    name: {{ $webhookName }}
     sideEffects: None
     rules:
       - apiGroups:
