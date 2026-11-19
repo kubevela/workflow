@@ -97,23 +97,41 @@ func getConfigurations(ctx context.Context, c client.Client, name string) ([]cli
 }
 
 func webhookService(configs []client.Object, name string) (*admissionregistrationv1.ServiceReference, error) {
+	var service *admissionregistrationv1.ServiceReference
+	check := func(candidate *admissionregistrationv1.ServiceReference) error {
+		if candidate == nil {
+			return nil
+		}
+		if service == nil {
+			service = candidate
+			return nil
+		}
+		if candidate.Namespace != service.Namespace || candidate.Name != service.Name {
+			return fmt.Errorf("webhook configurations named %s target different Services: %s/%s and %s/%s",
+				name, service.Namespace, service.Name, candidate.Namespace, candidate.Name)
+		}
+		return nil
+	}
 	for _, obj := range configs {
 		switch o := obj.(type) {
 		case *admissionregistrationv1.MutatingWebhookConfiguration:
 			for _, w := range o.Webhooks {
-				if w.ClientConfig.Service != nil {
-					return w.ClientConfig.Service, nil
+				if err := check(w.ClientConfig.Service); err != nil {
+					return nil, err
 				}
 			}
 		case *admissionregistrationv1.ValidatingWebhookConfiguration:
 			for _, w := range o.Webhooks {
-				if w.ClientConfig.Service != nil {
-					return w.ClientConfig.Service, nil
+				if err := check(w.ClientConfig.Service); err != nil {
+					return nil, err
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("no webhook with a service found in the webhook configurations named %s", name)
+	if service == nil {
+		return nil, fmt.Errorf("no webhook with a service found in the webhook configurations named %s", name)
+	}
+	return service, nil
 }
 
 func patchWebhook(cc *admissionregistrationv1.WebhookClientConfig, failurePolicy **admissionregistrationv1.FailurePolicyType,

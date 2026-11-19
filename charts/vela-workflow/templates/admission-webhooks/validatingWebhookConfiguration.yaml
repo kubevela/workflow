@@ -22,11 +22,7 @@ webhooks:
         name: {{ template "kubevela.name" . }}-webhook
         namespace: {{ .Release.Namespace }}
         path: /validating-core-oam-dev-v1alpha1-workflowruns
-    {{- if .Values.admissionWebhooks.certManager.enabled }}
-    failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
-    {{- else }}
     {{- include "kubevela.webhookFailurePolicy" (dict "root" . "hooks" $hooks "name" $webhookName "policy" .Values.admissionWebhooks.failurePolicy) | nindent 4 }}
-    {{- end }}
     name: {{ $webhookName }}
     sideEffects: None
     rules:

@@ -122,6 +122,9 @@ spec:
             {{- if $runtimeWebhookCerts }}
             - "--webhook-tls-secret={{ .Release.Namespace }}/{{ include "kubevela.fullname" . }}-admission"
             - "--webhook-configuration={{ include "kubevela.fullname" . }}-admission"
+            {{- if not (has .Values.admissionWebhooks.failurePolicy (list "Fail" "Ignore")) }}
+            {{- fail (printf "admissionWebhooks.failurePolicy must be Fail or Ignore; got %v" .Values.admissionWebhooks.failurePolicy) }}
+            {{- end }}
             - "--webhook-failure-policy={{ .Values.admissionWebhooks.failurePolicy }}"
             {{- end }}
             {{ end }}

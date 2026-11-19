@@ -185,6 +185,15 @@ func TestEnsure(t *testing.T) {
 		require.Equal(t, res.CABundle, v.Webhooks[0].ClientConfig.CABundle)
 	})
 
+	t.Run("rejects configurations that target different Services", func(t *testing.T) {
+		validating := testValidating()
+		validating.Webhooks[0].ClientConfig.Service.Name = "other-webhook"
+		c := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(testMutating(), validating).Build()
+
+		_, err := Ensure(ctx, c, testOptions())
+		require.ErrorContains(t, err, "target different Services")
+	})
+
 	t.Run("fails when neither configuration exists", func(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(testScheme(t)).Build()
 		_, err := Ensure(ctx, c, testOptions())
