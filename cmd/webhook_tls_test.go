@@ -118,8 +118,15 @@ func TestWebhookServingCert(t *testing.T) {
 	})
 	var serving atomic.Bool
 	resyncCtx, cancel := context.WithCancel(ctx)
-	t.Cleanup(cancel)
-	go resyncWebhookTLS(resyncCtx, c, opts, certDir, serving.Load)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		resyncWebhookTLS(resyncCtx, c, opts, certDir, serving.Load)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
 
 	require.Eventually(t, func() bool {
 		return len(getWebhook().ClientConfig.CABundle) > 0

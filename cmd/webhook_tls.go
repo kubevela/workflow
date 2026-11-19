@@ -130,7 +130,9 @@ func resyncWebhookTLS(ctx context.Context, c client.Client, opts webhookcerts.Op
 		}
 		if up && !policySet {
 			policySet = true
-			klog.InfoS("Webhook server is serving, set the webhook failurePolicy", "failurePolicy", opts.FailurePolicy)
+			if opts.FailurePolicy != "" {
+				klog.InfoS("Webhook server is serving, set the webhook failurePolicy", "failurePolicy", opts.FailurePolicy)
+			}
 		}
 	}
 }

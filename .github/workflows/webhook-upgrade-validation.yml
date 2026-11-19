@@ -102,7 +102,19 @@ jobs:
             --timeout 3m \
             vela-workflow \
             ./charts/vela-workflow
-          kubectl rollout restart deployment/vela-workflow -n vela-system
+
+          kubectl scale deployment/vela-workflow -n vela-system --replicas=0
+          kubectl wait --for=delete pod \
+            -l app.kubernetes.io/instance=vela-workflow \
+            -n vela-system \
+            --timeout=3m
+          kubectl patch validatingwebhookconfiguration vela-workflow-admission \
+            --type=json \
+            -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
+          kubectl patch mutatingwebhookconfiguration vela-workflow-admission \
+            --type=json \
+            -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
+          kubectl scale deployment/vela-workflow -n vela-system --replicas=1
           kubectl rollout status deployment/vela-workflow -n vela-system --timeout=3m
 
       - name: Dump webhook configurations
