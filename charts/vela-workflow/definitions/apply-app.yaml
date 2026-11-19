@@ -10,7 +10,7 @@ metadata:
   labels:
     custom.definition.oam.dev/scope: WorkflowRun
   name: apply-app
-  namespace: {{ include "systemDefinitionNamespace" . }}
+  namespace: '{{ include "systemDefinitionNamespace" . }}'
 spec:
   schematic:
     cue:

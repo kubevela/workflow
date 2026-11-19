@@ -9,7 +9,7 @@ metadata:
     definition.oam.dev/description: Send request to chat-gpt
     definition.oam.dev/example-url: https://raw.githubusercontent.com/kubevela/workflow/main/examples/workflow-run/chat-gpt.yaml
   name: chat-gpt
-  namespace: {{ include "systemDefinitionNamespace" . }}
+  namespace: '{{ include "systemDefinitionNamespace" . }}'
 spec:
   schematic:
     cue:

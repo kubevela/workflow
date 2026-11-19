@@ -9,7 +9,7 @@ metadata:
   labels:
     custom.definition.oam.dev/scope: WorkflowRun
   name: addon-operation
-  namespace: {{ include "systemDefinitionNamespace" . }}
+  namespace: '{{ include "systemDefinitionNamespace" . }}'
 spec:
   schematic:
     cue:
