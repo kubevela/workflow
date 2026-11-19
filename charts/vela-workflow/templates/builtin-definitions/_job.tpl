@@ -3,7 +3,7 @@ Returns builtinDefinitions.job as YAML, filled with defaults for upgrades that
 use --reuse-values from a release that predates these values.
 */}}
 {{- define "kubevela.builtinDefinitionsJobValues" -}}
-{{- $defaults := dict "image" (dict "repository" "alpine/k8s" "tag" "1.31.13" "pullPolicy" "IfNotPresent") "rolloutTimeoutSeconds" 300 "applyRetries" 6 -}}
+{{- $defaults := dict "image" (dict "repository" "alpine/k8s" "tag" "1.34.13@sha256:4011c68d73de6803987509ad1ab9520124a27e31484e3f0e45f95a74ecac7a45" "pullPolicy" "IfNotPresent") "rolloutTimeoutSeconds" 300 "applyRetries" 6 -}}
 {{- $set := index (.Values.builtinDefinitions | default dict) "job" | default dict -}}
 {{- toYaml (mergeOverwrite $defaults (deepCopy $set)) -}}
 {{- end -}}
