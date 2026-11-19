@@ -76,30 +76,52 @@ jobs:
           fi
           echo "caBundle is valid (not placeholder)"
 
-      - name: Prepare failing chart (break patch job secret name)
-        run: |
-          sed -i 's/--secret-name={{ template "kubevela.fullname" . }}-admission$/--secret-name={{ template "kubevela.fullname" . }}-admission-DOES-NOT-EXIST/' \
-            charts/vela-workflow/templates/admission-webhooks/job-patch/job-patchWebhook.yaml
+          SECRET_CA=$(kubectl get secret -n vela-system vela-workflow-admission \
+            -o jsonpath='{.data.ca}')
+          SECRET_CA_KEY=$(kubectl get secret -n vela-system vela-workflow-admission \
+            -o jsonpath='{.data.ca\.key}')
+          if [ -z "$SECRET_CA" ] || [ -z "$SECRET_CA_KEY" ]; then
+            echo "ERROR: Runtime-managed Secret is missing ca or ca.key"
+            exit 1
+          fi
+          if kubectl get jobs -n vela-system -o name | grep -qE 'admission-(create|patch)'; then
+            echo "ERROR: Legacy admission certificate Job exists"
+            exit 1
+          fi
+          echo "BASELINE_CA=$SECRET_CA" >> "$GITHUB_ENV"
 
-      - name: Run Helm upgrade (expected to fail)
+      - name: Upgrade and restart controller
         run: |
-          set +e
           helm upgrade --install \
             --namespace vela-system \
             --set image.repository=oamdev/vela-workflow \
             --set image.tag=latest \
             --set image.pullPolicy=IfNotPresent \
-            --timeout 90s \
+            --reuse-values \
+            --wait \
+            --timeout 3m \
             vela-workflow \
-            ./charts/vela-workflow \
-            --debug
-          status=$?
-          echo "Helm upgrade exit code: ${status}"
-          if [ $status -eq 0 ]; then
-            echo "ERROR: Expected helm upgrade to fail" >&2
-            exit 1
-          fi
-          echo "Helm upgrade failed as expected"
+            ./charts/vela-workflow
+
+          kubectl scale deployment/vela-workflow -n vela-system --replicas=0
+          kubectl wait --for=delete pod \
+            -l app.kubernetes.io/instance=vela-workflow \
+            -n vela-system \
+            --timeout=3m
+          kubectl patch validatingwebhookconfiguration vela-workflow-admission \
+            --type=json \
+            -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
+          kubectl patch mutatingwebhookconfiguration vela-workflow-admission \
+            --type=json \
+            -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
+          kubectl scale deployment/vela-workflow -n vela-system --replicas=1
+          kubectl rollout status deployment/vela-workflow -n vela-system --timeout=3m
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            validatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            mutatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
 
       - name: Dump webhook configurations
         if: ${{ always() }}
@@ -109,27 +131,32 @@ jobs:
           echo "=== MutatingWebhookConfiguration ==="
           kubectl get mutatingwebhookconfiguration vela-workflow-admission -o yaml
 
-      - name: Verify caBundle preserved after failed upgrade
+      - name: Verify CA is reused after upgrade and restart
         run: |
-          echo "=== ValidatingWebhookConfiguration ==="
+          SECRET_CA=$(kubectl get secret -n vela-system vela-workflow-admission \
+            -o jsonpath='{.data.ca}')
+          if [ "$SECRET_CA" != "$BASELINE_CA" ]; then
+            echo "FAIL: Runtime-managed CA changed after upgrade or restart"
+            exit 1
+          fi
+
           VWH_CA=$(kubectl get validatingwebhookconfiguration vela-workflow-admission \
             -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
-          echo "caBundle length: ${#VWH_CA}"
-          if [ "$VWH_CA" = "Cg==" ] || [ -z "$VWH_CA" ]; then
-            echo "FAIL: caBundle is placeholder or empty after failed upgrade"
-            exit 1
-          fi
-          echo "PASS: ValidatingWebhook caBundle preserved"
-
-          echo "=== MutatingWebhookConfiguration ==="
           MWH_CA=$(kubectl get mutatingwebhookconfiguration vela-workflow-admission \
             -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
-          echo "caBundle length: ${#MWH_CA}"
-          if [ "$MWH_CA" = "Cg==" ] || [ -z "$MWH_CA" ]; then
-            echo "FAIL: caBundle is placeholder or empty after failed upgrade"
+          if [ "$VWH_CA" != "$BASELINE_CA" ] || [ "$MWH_CA" != "$BASELINE_CA" ]; then
+            echo "FAIL: Webhook caBundle does not match the Secret CA"
             exit 1
           fi
-          echo "PASS: MutatingWebhook caBundle preserved"
+          VWH_POLICY=$(kubectl get validatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].failurePolicy}')
+          MWH_POLICY=$(kubectl get mutatingwebhookconfiguration vela-workflow-admission \
+            -o jsonpath='{.webhooks[0].failurePolicy}')
+          if [ "$VWH_POLICY" != "Fail" ] || [ "$MWH_POLICY" != "Fail" ]; then
+            echo "FAIL: Controller did not restore failurePolicy after restart"
+            exit 1
+          fi
+          echo "PASS: CA and failurePolicy survived upgrade and restart"
 
       - name: Cleanup k3d cluster
         if: ${{ always() }}
