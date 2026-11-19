@@ -34,27 +34,31 @@ import (
 // Each method's definition, called through its CUE as a template calls it,
 // sends that method.
 func TestMethodDefinitionsSendTheirMethod(t *testing.T) {
+	// HEAD responses carry no body, so the server records the method it saw
+	var got string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.Method))
+		got = r.Method
 	}))
 	defer srv.Close()
 	// a client in the context keeps the provider off the kubeconfig singleton
 	ctx := context.WithValue(context.Background(), providertypes.KubeClientKey, fake.NewClientBuilder().Build())
 
 	for def, method := range map[string]string{
-		"#HTTPGet":    http.MethodGet,
-		"#HTTPPost":   http.MethodPost,
-		"#HTTPPut":    http.MethodPut,
-		"#HTTPDelete": http.MethodDelete,
+		"#HTTPGet":     http.MethodGet,
+		"#HTTPPost":    http.MethodPost,
+		"#HTTPPut":     http.MethodPut,
+		"#HTTPDelete":  http.MethodDelete,
+		"#HTTPPatch":   http.MethodPatch,
+		"#HTTPHead":    http.MethodHead,
+		"#HTTPOptions": http.MethodOptions,
 	} {
 		t.Run(def, func(t *testing.T) {
 			v := cuecontext.New().CompileString(GetTemplate() + fmt.Sprintf("\ncall: %s & {$params: {url: %q, request: body: \"hi\"}}", def, srv.URL))
 			require.NoError(t, v.Err())
-			out, err := GetProviders()["do"].Call(ctx, v.LookupPath(cue.ParsePath("call")))
+			got = ""
+			_, err := GetProviders()["do"].Call(ctx, v.LookupPath(cue.ParsePath("call")))
 			require.NoError(t, err)
-			body, err := out.LookupPath(cue.ParsePath("$returns.body")).String()
-			require.NoError(t, err)
-			require.Equal(t, method, body)
+			require.Equal(t, method, got)
 		})
 	}
 }

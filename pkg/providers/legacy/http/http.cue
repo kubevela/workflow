@@ -5,7 +5,7 @@
 	#provider: "op"
 
 	// +usage=The method of HTTP request
-	method: *"GET" | "POST" | "PUT" | "DELETE"
+	method: *"GET" | "HEAD" | "POST" | "PUT" | "DELETE" | "CONNECT" | "OPTIONS" | "TRACE" | "PATCH"
 	// +usage=The url to request
 	url: string
 	// +usage=The request config
@@ -52,3 +52,9 @@
 #HTTPPut: #HTTPDo & {method: "PUT"}
 
 #HTTPDelete: #HTTPDo & {method: "DELETE"}
+
+#HTTPPatch: #HTTPDo & {method: "PATCH"}
+
+#HTTPHead: #HTTPDo & {method: "HEAD"}
+
+#HTTPOptions: #HTTPDo & {method: "OPTIONS"}
