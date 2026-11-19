@@ -6,14 +6,36 @@ set -eu
 kubectl -n "$CONTROLLER_NAMESPACE" rollout status "deployment/$CONTROLLER_DEPLOYMENT" \
   --timeout="${ROLLOUT_TIMEOUT_SECONDS}s"
 
+case "$APPLY_RETRIES" in
+  ''|0|0[0-9]*|*[!0-9]*)
+    echo "APPLY_RETRIES must be a positive integer" >&2
+    exit 1
+    ;;
+esac
+
 # cert-manager injects the CA asynchronously. Runtime cert management sets it
 # during controller startup, before the Deployment becomes ready.
 if [ -n "$WEBHOOK_CONFIGURATION" ]; then
   waited=0
-  while kubectl get validatingwebhookconfiguration "$WEBHOOK_CONFIGURATION" \
-    -o jsonpath='{range .webhooks[*]}{.name}={.clientConfig.caBundle}{"\n"}{end}' | grep -qE '^[^=]+=(Cg==)?$'; do
+  while :; do
+    ready=true
+    for kind in validatingwebhookconfiguration mutatingwebhookconfiguration; do
+      if ! bundles=$(kubectl get "$kind" "$WEBHOOK_CONFIGURATION" \
+        -o jsonpath='{range .webhooks[*]}{.name}={.clientConfig.caBundle}{"\n"}{end}'); then
+        echo "Waiting for $kind/$WEBHOOK_CONFIGURATION" >&2
+        ready=false
+        break
+      fi
+      if [ -z "$bundles" ] || printf '%s\n' "$bundles" | grep -qE '^[^=]+=(Cg==)?$'; then
+        ready=false
+        break
+      fi
+    done
+    if [ "$ready" = true ]; then
+      break
+    fi
     if [ "$waited" -ge "$ROLLOUT_TIMEOUT_SECONDS" ]; then
-      echo "Webhook $WEBHOOK_CONFIGURATION still has no CA bundle after ${waited}s" >&2
+      echo "Webhook $WEBHOOK_CONFIGURATION still has an unavailable CA bundle after ${waited}s" >&2
       exit 1
     fi
     sleep 5
