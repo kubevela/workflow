@@ -120,3 +120,25 @@ failurePolicy: Ignore
 failurePolicy: {{ .policy }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Returns an index of the built-in definitions by kind.
+*/}}
+{{- define "kubevela.builtinDefinitions" -}}
+{{- $index := dict -}}
+{{- range $path, $_ := .Files.Glob "definitions/*.yaml" -}}
+{{-   $def := tpl ($.Files.Get $path) $ | fromYaml -}}
+{{-   $kind := $def.kind -}}
+{{-   $entry := get $index $kind | default (dict "resource" (printf "%ss.core.oam.dev" (lower $kind)) "names" list) -}}
+{{-   $_ := set $entry "names" (append $entry.names $def.metadata.name) -}}
+{{-   $_ := set $index $kind $entry -}}
+{{- end -}}
+{{- toYaml $index -}}
+{{- end -}}
+
+{{/*
+Names the ConfigMap holding built-in definitions of one kind.
+*/}}
+{{- define "kubevela.builtinDefinitionsConfigMap" -}}
+{{- printf "%s-builtin-%ss" (include "kubevela.fullname" .root) (lower .kind) -}}
+{{- end -}}

@@ -90,6 +90,12 @@ jobs:
           fi
           echo "BASELINE_CA=$SECRET_CA" >> "$GITHUB_ENV"
 
+          DEFINITION_COUNT=$(kubectl get workflowstepdefinitions -n vela-system -o name | wc -l | tr -d ' ')
+          if [ "$DEFINITION_COUNT" -ne 24 ]; then
+            echo "ERROR: Expected 24 built-in definitions, got $DEFINITION_COUNT"
+            exit 1
+          fi
+
       - name: Upgrade and restart controller
         run: |
           helm upgrade --install \
@@ -151,6 +157,12 @@ jobs:
             exit 1
           fi
           echo "PASS: CA and failurePolicy survived upgrade and restart"
+
+          DEFINITION_COUNT=$(kubectl get workflowstepdefinitions -n vela-system -o name | wc -l | tr -d ' ')
+          if [ "$DEFINITION_COUNT" -ne 24 ]; then
+            echo "FAIL: Expected 24 built-in definitions after upgrade, got $DEFINITION_COUNT"
+            exit 1
+          fi
 
       - name: Cleanup k3d cluster
         if: ${{ always() }}

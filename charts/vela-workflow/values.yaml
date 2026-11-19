@@ -7,6 +7,20 @@
 ## @param systemDefinitionNamespace System definition namespace, if unspecified, will use built-in variable `.Release.Namespace`.
 systemDefinitionNamespace:
 
+## @param builtinDefinitions.job.image.repository Image repository used by the built-in definition hook Jobs
+## @param builtinDefinitions.job.image.tag Image tag used by the built-in definition hook Jobs
+## @param builtinDefinitions.job.image.pullPolicy Image pull policy used by the built-in definition hook Jobs
+## @param builtinDefinitions.job.rolloutTimeoutSeconds Seconds to wait for the controller rollout and cert-manager CA injection
+## @param builtinDefinitions.job.applyRetries Number of attempts to apply built-in definitions
+builtinDefinitions:
+  job:
+    image:
+      repository: alpine/k8s
+      tag: 1.31.13
+      pullPolicy: IfNotPresent
+    rolloutTimeoutSeconds: 300
+    applyRetries: 6
+
 ## @param concurrentReconciles concurrentReconciles is the concurrent reconcile number of the controller
 concurrentReconciles: 4
 ## @param ignoreWorkflowWithoutControllerRequirement will determine whether to process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation
