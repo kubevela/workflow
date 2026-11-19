@@ -216,6 +216,9 @@ admissionWebhooks:
   certificate:
     mountPath: /etc/k8s-webhook-certs
   patch:
+    # When enabled without cert-manager, vela-workflow manages the webhook
+    # certificate in-process. The remaining patch values are kept so existing
+    # values files remain compatible; no certificate patch Jobs use them.
     enabled: true
     image:
       repository: oamdev/kube-webhook-certgen

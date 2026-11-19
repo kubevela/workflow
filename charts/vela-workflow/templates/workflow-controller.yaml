@@ -1,3 +1,4 @@
+{{- $runtimeWebhookCerts := include "kubevela.webhookRuntimeCerts" . -}}
 {{- if .Values.serviceAccount.create -}}
 apiVersion: v1
 kind: ServiceAccount
@@ -118,6 +119,11 @@ spec:
             - "--use-webhook=true"
             - "--webhook-port={{ .Values.webhookService.port }}"
             - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
+            {{- if $runtimeWebhookCerts }}
+            - "--webhook-tls-secret={{ .Release.Namespace }}/{{ include "kubevela.fullname" . }}-admission"
+            - "--webhook-configuration={{ include "kubevela.fullname" . }}-admission"
+            - "--webhook-failure-policy={{ .Values.admissionWebhooks.failurePolicy }}"
+            {{- end }}
             {{ end }}
             {{ if ne .Values.logFilePath "" }}
             - "--log-file-path={{ .Values.logFilePath }}"
@@ -222,14 +228,20 @@ spec:
           volumeMounts:
             - mountPath: {{ .Values.admissionWebhooks.certificate.mountPath }}
               name: tls-cert-vol
+              {{- if not $runtimeWebhookCerts }}
               readOnly: true
+              {{- end }}
           {{ end }}
       {{ if .Values.admissionWebhooks.enabled }}
       volumes:
         - name: tls-cert-vol
+          {{- if $runtimeWebhookCerts }}
+          emptyDir: {}
+          {{- else }}
           secret:
             defaultMode: 420
             secretName: {{ template "kubevela.fullname" . }}-admission
+          {{- end }}
       {{ end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
