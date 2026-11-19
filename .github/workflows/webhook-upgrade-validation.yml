@@ -116,6 +116,12 @@ jobs:
             -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
           kubectl scale deployment/vela-workflow -n vela-system --replicas=1
           kubectl rollout status deployment/vela-workflow -n vela-system --timeout=3m
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            validatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            mutatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
 
       - name: Dump webhook configurations
         if: ${{ always() }}
