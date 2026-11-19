@@ -182,7 +182,7 @@ func TestEnsure(t *testing.T) {
 	t.Run("fails when neither configuration exists", func(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(testScheme(t)).Build()
 		_, err := Ensure(ctx, c, testOptions())
-		require.Error(t, err)
+		require.ErrorContains(t, err, "no webhook with a service found")
 	})
 }
 

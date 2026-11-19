@@ -238,7 +238,8 @@ spec:
       volumes:
         - name: tls-cert-vol
           {{- if $runtimeWebhookCerts }}
-          emptyDir: {}
+          emptyDir:
+            medium: Memory
           {{- else }}
           secret:
             defaultMode: 420
