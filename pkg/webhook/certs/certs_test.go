@@ -179,6 +179,23 @@ func TestEnsure(t *testing.T) {
 		require.Equal(t, res.CABundle, v.Webhooks[0].ClientConfig.CABundle)
 	})
 
+	t.Run("leaves URL-backed webhook CA bundles unchanged", func(t *testing.T) {
+		validating := testValidating()
+		url := "https://external-webhook.example.com/validate"
+		externalCA := []byte("external-ca")
+		validating.Webhooks[0].ClientConfig.Service = nil
+		validating.Webhooks[0].ClientConfig.URL = &url
+		validating.Webhooks[0].ClientConfig.CABundle = externalCA
+		c := fake.NewClientBuilder().WithScheme(testScheme(t)).WithObjects(testMutating(), validating).Build()
+
+		_, err := Ensure(ctx, c, testOptions())
+		require.NoError(t, err)
+
+		v := &admissionregistrationv1.ValidatingWebhookConfiguration{}
+		require.NoError(t, c.Get(ctx, client.ObjectKey{Name: testConfig}, v))
+		require.Equal(t, externalCA, v.Webhooks[0].ClientConfig.CABundle)
+	})
+
 	t.Run("rejects configurations that target different Services", func(t *testing.T) {
 		validating := testValidating()
 		validating.Webhooks[0].ClientConfig.Service.Name = "other-webhook"
@@ -222,4 +239,7 @@ func TestWriteFiles(t *testing.T) {
 	got, err = os.ReadFile(filepath.Join(dir, servingcert.CertKey))
 	require.NoError(t, err)
 	require.Equal(t, renewed.Cert, got)
+	got, err = os.ReadFile(filepath.Join(dir, servingcert.KeyKey))
+	require.NoError(t, err)
+	require.Equal(t, renewed.Key, got)
 }

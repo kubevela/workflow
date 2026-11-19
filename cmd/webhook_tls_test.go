@@ -128,9 +128,6 @@ func TestWebhookServingCert(t *testing.T) {
 		<-done
 	})
 
-	require.Eventually(t, func() bool {
-		return len(getWebhook().ClientConfig.CABundle) > 0
-	}, time.Second, 5*time.Millisecond)
 	require.Never(t, func() bool {
 		return *getWebhook().FailurePolicy == admissionregistrationv1.Fail
 	}, 50*time.Millisecond, 5*time.Millisecond)

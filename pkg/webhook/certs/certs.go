@@ -138,7 +138,7 @@ func webhookService(configs []client.Object, name string) (*admissionregistratio
 func patchWebhook(cc *admissionregistrationv1.WebhookClientConfig, failurePolicy **admissionregistrationv1.FailurePolicyType,
 	ca []byte, policy admissionregistrationv1.FailurePolicyType) bool {
 	changed := false
-	if !bytes.Equal(cc.CABundle, ca) {
+	if cc.Service != nil && !bytes.Equal(cc.CABundle, ca) {
 		cc.CABundle = ca
 		changed = true
 	}
