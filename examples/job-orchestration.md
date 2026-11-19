@@ -1,6 +1,6 @@
 # Kubernetes Job Orchestration
 
-Kubevela provides a simple way to orchestrate Jobs in Kubernetes. With the built-in !(`apply-job`)[../charts/vela-core/templates/definitions/apply-job.yaml] workflow step, you can easily create a workflow that runs a series of Jobs in order.
+Kubevela provides a simple way to orchestrate Jobs in Kubernetes. With the built-in !(`apply-job`)[../charts/vela-workflow/definitions/apply-job.yaml] workflow step, you can easily create a workflow that runs a series of Jobs in order.
 
 ## Run Jobs in Order
 

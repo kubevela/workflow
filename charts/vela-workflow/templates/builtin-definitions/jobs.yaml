@@ -1,0 +1,9 @@
+{{- /*
+Built-in definitions are hook-managed so they are applied only after the
+controller Deployment has rolled out and its webhook certificate is ready.
+*/ -}}
+{{ include "kubevela.builtinDefinitionsJob" (dict "root" . "action" "keep" "hook" "pre-upgrade" "weight" 0) }}
+---
+{{ include "kubevela.builtinDefinitionsJob" (dict "root" . "action" "apply" "hook" "post-install,post-upgrade,post-rollback" "weight" 10) }}
+---
+{{ include "kubevela.builtinDefinitionsJob" (dict "root" . "action" "delete" "hook" "pre-delete" "weight" 0) }}
