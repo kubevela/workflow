@@ -1,12 +1,10 @@
 {{- if .Values.admissionWebhooks.enabled -}}
-{{- /* Preserve existing caBundle on upgrade to avoid breaking admission if hooks fail. */}}
 {{- $vName := printf "%s-admission" (include "kubevela.fullname" .) -}}
-{{- $existing := (lookup "admissionregistration.k8s.io/v1" "ValidatingWebhookConfiguration" "" $vName) -}}
-{{- $existingCaBundle := "" -}}
-{{- if $existing -}}
-{{- range $existing.webhooks -}}
-{{- if eq .name "validating.core.oam.dev.v1alpha2.applicationconfigurations" -}}{{- $existingCaBundle = .clientConfig.caBundle -}}{{- end -}}
-{{- end -}}
+{{- $webhookName := "validating.core.oam.dev.v1alpha1.workflowruns" -}}
+{{- $legacyWebhookName := "validating.core.oam.dev.v1alpha2.applicationconfigurations" -}}
+{{- $hooks := include "kubevela.existingWebhooks" (dict "kind" "ValidatingWebhookConfiguration" "name" $vName) | fromJson -}}
+{{- if and (not (hasKey $hooks $webhookName)) (hasKey $hooks $legacyWebhookName) -}}
+{{- $_ := set $hooks $webhookName (get $hooks $legacyWebhookName) -}}
 {{- end -}}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -19,17 +17,13 @@ metadata:
   {{- end }}
 webhooks:
   - clientConfig:
-      caBundle: {{ default "Cg==" $existingCaBundle }}
+      {{- include "kubevela.webhookCABundle" (dict "root" . "hooks" $hooks "name" $webhookName) | nindent 6 }}
       service:
         name: {{ template "kubevela.name" . }}-webhook
         namespace: {{ .Release.Namespace }}
         path: /validating-core-oam-dev-v1alpha1-workflowruns
-    {{- if .Values.admissionWebhooks.patch.enabled  }}
-    failurePolicy: Ignore
-    {{- else }}
-    failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
-    {{- end }}
-    name: validating.core.oam.dev.v1alpha2.applicationconfigurations
+    {{- include "kubevela.webhookFailurePolicy" (dict "root" . "hooks" $hooks "name" $webhookName "policy" .Values.admissionWebhooks.failurePolicy) | nindent 4 }}
+    name: {{ $webhookName }}
     timeoutSeconds: {{ .Values.admissionWebhookTimeout }}
     sideEffects: None
     rules:
