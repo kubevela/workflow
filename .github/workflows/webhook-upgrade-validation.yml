@@ -27,6 +27,11 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
 
+      - name: Prepare pre-change chart
+        run: |
+          git fetch origin release-0.7 --depth=1
+          git worktree add --detach "$RUNNER_TEMP/vela-workflow-baseline" FETCH_HEAD
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -52,7 +57,7 @@ jobs:
             --wait \
             --timeout 3m \
             vela-workflow \
-            ./charts/vela-workflow
+            "$RUNNER_TEMP/vela-workflow-baseline/charts/vela-workflow"
 
       - name: Verify baseline webhook state
         run: |
@@ -80,8 +85,12 @@ jobs:
             -o jsonpath='{.data.ca}')
           SECRET_CA_KEY=$(kubectl get secret -n vela-system vela-workflow-admission \
             -o jsonpath='{.data.ca\.key}')
-          if [ -z "$SECRET_CA" ] || [ -z "$SECRET_CA_KEY" ]; then
-            echo "ERROR: Runtime-managed Secret is missing ca or ca.key"
+          if [ -z "$SECRET_CA" ]; then
+            echo "ERROR: Baseline Secret is missing its CA"
+            exit 1
+          fi
+          if [ -n "$SECRET_CA_KEY" ]; then
+            echo "ERROR: Baseline Job-created Secret unexpectedly contains ca.key"
             exit 1
           fi
           if kubectl get jobs -n vela-system -o name | grep -qE 'admission-(create|patch)'; then
@@ -116,6 +125,12 @@ jobs:
             -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
           kubectl scale deployment/vela-workflow -n vela-system --replicas=1
           kubectl rollout status deployment/vela-workflow -n vela-system --timeout=3m
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            validatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
+          kubectl wait --for=jsonpath='{.webhooks[0].failurePolicy}'=Fail \
+            mutatingwebhookconfiguration/vela-workflow-admission \
+            --timeout=30s
 
       - name: Dump webhook configurations
         if: ${{ always() }}
