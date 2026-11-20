@@ -1,0 +1,68 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-suspend.yaml
+# 2. Watch in real-time: kubectl get workflowrun test-suspend -w
+# 3. Check current step while suspended: kubectl get workflowrun test-suspend -o jsonpath='{.status.steps[?(@.phase=="running")].name}'
+# 4. See suspend messages: kubectl get workflowrun test-suspend -o jsonpath='{.status.steps[*].message}'
+# 5. For manual-suspend step, resume with: kubectl patch workflowrun test-suspend --type=merge -p '{"spec":{"suspend":false}}'
+# 6. Verify ConfigMap created after suspend: kubectl get configmap delayed-config -o yaml
+# 7. Check total execution time: kubectl get workflowrun test-suspend -o jsonpath='{.status.startTime}{"\n"}{.status.endTime}'
+# 8. Cleanup: kubectl delete workflowrun test-suspend && kubectl delete configmap delayed-config
+# Note: This workflow will take 3m40s+ to complete (or indefinitely if manual-suspend isn't resumed)
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-suspend
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: start
+        type: print-message-in-status
+        properties:
+          message: "Workflow started"
+
+      - name: short-suspend
+        type: suspend
+        properties:
+          duration: "10s"
+          message: "Waiting 10 seconds before continuing"
+
+      - name: after-short-wait
+        type: print-message-in-status
+        properties:
+          message: "Resumed after 10 seconds"
+
+      - name: medium-suspend
+        type: suspend
+        properties:
+          duration: "1m"
+          message: "Pausing for 1 minute"
+
+      - name: deploy-after-wait
+        type: apply-object
+        properties:
+          value:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: delayed-config
+              namespace: default
+            data:
+              status: "created after suspend"
+
+      - name: long-suspend
+        type: suspend
+        properties:
+          duration: "2m30s"
+          message: "Waiting 2 minutes and 30 seconds"
+
+      - name: manual-suspend
+        type: suspend
+        properties:
+          message: "Manual intervention required - resume with 'vela workflow resume'"
+
+      - name: final-step
+        type: print-message-in-status
+        properties:
+          message: "Workflow completed after all suspensions"
+

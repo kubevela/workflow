@@ -1,0 +1,23 @@
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-notification
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      # Using NOTIFICATION type as requested
+      - name: slack-notification
+        type: notification
+        properties:
+          slack:
+            url:
+              value: "slack_webhook_url"
+            message:
+              text: "🚀 Testing notification step type - Message from KubeVela Workflow!"
+
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "Notification sent via notification type"
+

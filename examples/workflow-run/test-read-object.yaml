@@ -1,0 +1,78 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-read-object.yaml
+# 2. Watch: kubectl get workflowrun test-read-object -w
+# 3. Verify ConfigMap was created: kubectl get configmap test-config -n default
+# 4. Check ConfigMap data: kubectl get configmap test-config -o jsonpath='{.data}'
+# 5. Verify Deployment created: kubectl get deployment nginx-app -n default
+# 6. Check workflow read steps succeeded: kubectl get workflowrun test-read-object -o jsonpath='{.status.steps[?(@.type=="read-object")].phase}'
+# 7. View read object outputs in workflow context: kubectl get configmap workflow-test-read-object-context -o yaml
+# 8. Cleanup: kubectl delete workflowrun test-read-object && kubectl delete configmap test-config && kubectl delete deployment nginx-app
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-read-object
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      # First create a ConfigMap to read
+      - name: create-configmap
+        type: apply-object
+        properties:
+          value:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: test-config
+              namespace: default
+            data:
+              app-name: "my-app"
+              version: "v1.0"
+
+      # Read the ConfigMap back
+      - name: read-configmap
+        type: read-object
+        properties:
+          apiVersion: v1
+          kind: ConfigMap
+          name: test-config
+          namespace: default
+
+      # Create a Deployment
+      - name: create-deployment
+        type: apply-object
+        properties:
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: nginx-app
+              namespace: default
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: nginx
+              template:
+                metadata:
+                  labels:
+                    app: nginx
+                spec:
+                  containers:
+                  - name: nginx
+                    image: nginx:latest
+
+      # Read the Deployment
+      - name: read-deployment
+        type: read-object
+        properties:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: nginx-app
+          namespace: default
+
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "Successfully read ConfigMap and Deployment objects"
+

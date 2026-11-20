@@ -173,6 +173,16 @@ You can use KubeVela Workflow as an SDK to integrate it into your project. For e
 
 You just need to initialize a workflow instance and generate all the task runners with the instance, then execute the task runners. Please check out the example in [Workflow](https://github.com/kubevela/workflow/blob/main/controllers/workflowrun_controller.go#L101) or [KubeVela](https://github.com/kubevela/kubevela/blob/master/pkg/controller/core.oam.dev/v1alpha2/application/application_controller.go#L197).
 
+## Local Development
+
+If you want to run the workflow controller locally in your IDE for development:
+
+1. Install CRDs and create namespace: `make core-install`
+2. Install built-in workflow step definitions: `make def-install`
+3. Run the controller: `make run`
+
+For detailed setup instructions, see [Local Development Guide](./docs/local-development.md).
+
 ## Contributing
 
 Check out [CONTRIBUTING](https://kubevela.io/docs/contributor/overview) to see how to develop with KubeVela Workflow.

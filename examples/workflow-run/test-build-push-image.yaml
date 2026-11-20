@@ -1,0 +1,49 @@
+# Testing Steps:
+# 1. Create docker registry secret: kubectl create secret docker-registry docker-secret --docker-server=https://index.docker.io/v1/ --docker-username=<user> --docker-password=<pass>
+# 2. Create git token secret (if private repo): kubectl create secret generic git-secret --from-literal=token=<your-git-token>
+# 3. Apply: kubectl apply -f test-build-push-image.yaml
+# 4. Watch: kubectl get workflowrun test-build-push-image -w
+# 5. Check kaniko pod: kubectl get pods -l workflow.oam.dev/step-name -n default
+# 6. View build logs: kubectl logs <kaniko-pod-name> -n default
+# 7. Verify image pushed: docker pull <your-image>
+# 8. Cleanup: kubectl delete workflowrun test-build-push-image && kubectl delete pods -l workflow.oam.dev/step-name
+# Note: Replace image name with your registry. This requires valid Docker Hub credentials.
+
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-build-push-image
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      # Create image registry secret
+      - name: create-docker-secret
+        type: export2secret
+        properties:
+          secretName: image-registry-secret
+          kind: docker-registry
+          dockerRegistry:
+            username: "docker-username"
+            password: "docker-password"
+            server: "https://index.docker.io/v1/"
+
+      # Example 1: Build from public GitHub repo
+      - name: build-from-public-repo
+        type: build-push-image
+        properties:
+          kanikoExecutor: "gcr.io/kaniko-project/executor:v1.9.0"
+          context:
+            git: "github.com/kelseyhightower/helloworld"
+            branch: "master"
+          image: "vishal210893/helloworld-kaniko:v1.0.0"
+          dockerfile: "./Dockerfile"
+          credentials:
+            image:
+              name: image-registry-secret
+
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "All images built and pushed successfully"
+

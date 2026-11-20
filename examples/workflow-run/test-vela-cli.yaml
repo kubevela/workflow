@@ -1,0 +1,55 @@
+# Testing Steps:
+# 1. Ensure vela CLI and KubeVela are installed in cluster
+# 2. Apply: kubectl apply -f test-vela-cli.yaml
+# 3. Watch: kubectl get workflowrun test-vela-cli -w
+# 4. Check job pods created: kubectl get pods -l 'workflow.oam.dev/step-name' -n default
+# 5. View CLI command outputs: kubectl logs -l 'workflow.oam.dev/step-name=test-vela-cli-check-version' -n default
+# 6. Check list-apps output: kubectl logs -l 'workflow.oam.dev/step-name=test-vela-cli-list-apps' -n default
+# 7. View all jobs created: kubectl get jobs -n default
+# 8. Cleanup: kubectl delete workflowrun test-vela-cli && kubectl delete jobs -l 'workflow.oam.dev/step-name' -n default
+# Note: Requires vela CLI image and proper RBAC (serviceAccount kubevela-vela-core must exist)
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-vela-cli
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: check-version
+        type: vela-cli
+        properties:
+          command:
+            - "vela"
+            - "version"
+
+      - name: list-apps
+        type: vela-cli
+        properties:
+          command:
+            - "vela"
+            - "ls"
+            - "-A"
+
+      - name: get-workflow-status
+        type: vela-cli
+        properties:
+          command:
+            - "vela"
+            - "workflow"
+            - "ls"
+
+      - name: custom-cli-command
+        type: vela-cli
+        properties:
+          image: "oamdev/vela-cli:v1.9.0"
+          command:
+            - "vela"
+            - "show"
+          serviceAccountName: "kubevela-vela-core"
+
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "Vela CLI commands executed successfully"
+

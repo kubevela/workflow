@@ -4,6 +4,7 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
+    custom.definition.oam.dev/category: Process Control
     definition.oam.dev/description: Suspend the current workflow, it can be resumed by 'vela workflow resume' command.
   name: suspend
   namespace: {{ include "systemDefinitionNamespace" . }}
@@ -11,8 +12,16 @@ spec:
   schematic:
     cue:
       template: |
+        import "vela/builtin"
+
+        suspend: builtin.#Suspend & {
+        	$params: parameter
+        }
+
         parameter: {
         	// +usage=Specify the wait duration time to resume workflow such as "30s", "1min" or "2m15s"
         	duration?: string
+        	// +usage=The suspend message to show
+        	message?: string
         }
 

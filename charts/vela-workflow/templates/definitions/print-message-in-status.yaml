@@ -4,21 +4,19 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
+    custom.definition.oam.dev/category: Process Control
     definition.oam.dev/description: print message in workflow step status
-  labels:
-    custom.definition.oam.dev/ui-hidden: "true"
   name: print-message-in-status
   namespace: {{ include "systemDefinitionNamespace" . }}
 spec:
   schematic:
     cue:
       template: |
-        import (
-        	"vela/op"
-        )
+        import "vela/builtin"
 
         parameter: message: string
-        msg: op.#Message & {
-        	message: parameter.message
+
+        msg: builtin.#Message & {
+        	$params: parameter
         }
 

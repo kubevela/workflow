@@ -1,0 +1,63 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-apply-deployment.yaml
+# 2. Watch status: kubectl get workflowrun test-apply-deployment -w
+# 3. Check deployments created: kubectl get deployments -n default
+# 4. Verify pods running: kubectl get pods -n default
+# 5. Check workflow details: kubectl get workflowrun test-apply-deployment -o yaml
+# 6. Cleanup: kubectl delete workflowrun test-apply-deployment && kubectl delete deployment deploy-nginx deploy-busybox deploy-redis deploy-web-app
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-apply-deployment
+  namespace: default
+  annotations:
+    workflowrun.oam.dev/debug: "true"
+spec:
+  workflowSpec:
+    steps:
+      # Example 1: Simple deployment with just an image
+      - name: deploy-nginx
+        type: apply-deployment
+        properties:
+          image: nginx:1.21
+
+      # Example 2: Deployment with custom command
+      - name: deploy-busybox
+        type: apply-deployment
+        properties:
+          image: busybox:latest
+          cmd:
+            - "sh"
+            - "-c"
+            - "echo 'Hello from busybox' && sleep 3600"
+
+      # Example 3: Wait for first deployment, then deploy another
+      - name: suspend-for-check
+        type: suspend
+        properties:
+          duration: "10s"
+
+      # Example 4: Conditional deployment based on context
+      - name: deploy-redis
+        type: apply-deployment
+        if: status["deploy-nginx"].phase == "succeeded"
+        properties:
+          image: redis:alpine
+          cmd:
+            - "redis-server"
+            - "--appendonly"
+            - "yes"
+
+      # Example 5: Deploy a web application
+      - name: deploy-web-app
+        type: apply-deployment
+        properties:
+          image: crccheck/hello-world
+          # This image runs on port 8000 by default
+
+      # Final step: Print completion message
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "All deployments completed successfully!"
+
