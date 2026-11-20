@@ -190,6 +190,58 @@ func TestOutput(t *testing.T) {
 	r.Equal(stepStatus["mystep"].Phase, v1alpha1.WorkflowStepPhaseSucceeded)
 }
 
+func TestOutputOfAScriptWithImportFromReturns(t *testing.T) {
+	wfCtx := mockContext(t)
+	r := require.New(t)
+	cuectx := cuecontext.New()
+	taskValue := cuectx.CompileString(`output: $returns: value: data: "config.json": "{\"region\":\"us-east-1\",\"subnets\":[{\"id\":\"subnet-1\"}]}"`)
+	r.NoError(taskValue.Err())
+	err := Output(wfCtx, taskValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Outputs: oamv1alpha1.StepOutputs{{
+				Name: "region",
+				ValueFrom: `import "encoding/json"
+json.Unmarshal(output.value.data["config.json"]).region`,
+			}, {
+				Name: "subnets",
+				ValueFrom: `import "encoding/json"
+#d: json.Unmarshal(output.value.data["config.json"])
+{
+	subnetIds: [ for s in #d.subnets { s.id } ]
+}`,
+			}},
+		},
+	}, v1alpha1.StepStatus{
+		Phase: v1alpha1.WorkflowStepPhaseSucceeded,
+	}, nil)
+	r.NoError(err)
+	region, err := wfCtx.GetVar("region")
+	r.NoError(err)
+	regionStr, err := region.String()
+	r.NoError(err)
+	r.Equal("us-east-1", regionStr)
+
+	paramValue := cuectx.CompileString(`parameter: {}`)
+	filled, err := Input(wfCtx, paramValue, oamv1alpha1.WorkflowStep{
+		WorkflowStepBase: oamv1alpha1.WorkflowStepBase{
+			Inputs: oamv1alpha1.StepInputs{{
+				From:         "region",
+				ParameterKey: "region",
+			}, {
+				From:         "subnets",
+				ParameterKey: "vpc",
+			}},
+		},
+	})
+	r.NoError(err)
+	regionStr, err = filled.LookupPath(cue.ParsePath("parameter.region")).String()
+	r.NoError(err)
+	r.Equal("us-east-1", regionStr)
+	subnet, err := filled.LookupPath(cue.ParsePath("parameter.vpc.subnetIds[0]")).String()
+	r.NoError(err)
+	r.Equal("subnet-1", subnet)
+}
+
 func mockContext(t *testing.T) wfContext.Context {
 	cli := &test.MockClient{
 		MockCreate: func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
