@@ -4,6 +4,7 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
+    custom.definition.oam.dev/category: Config Management
     definition.oam.dev/description: Read a config
   name: read-config
   namespace: {{ include "systemDefinitionNamespace" . }}
@@ -11,24 +12,15 @@ spec:
   schematic:
     cue:
       template: |
-        import (
-        	"vela/op"
-        )
+        import "vela/config"
 
-        output: op.#ReadConfig & {
-        	name: parameter.name
-        	if parameter.namespace != _|_ {
-        		namespace: parameter.namespace
-        	}
-        	if parameter.namespace == _|_ {
-        		namespace: context.namespace
-        	}
+        output: config.#ReadConfig & {
+        	$params: parameter
         }
         parameter: {
         	//+usage=Specify the name of the config.
         	name: string
 
         	//+usage=Specify the namespace of the config.
-        	namespace?: string
+        	namespace: *context.namespace | string
         }
-

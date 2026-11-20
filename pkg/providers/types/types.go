@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/kubevela/pkg/util/singleton"
+	wfconfig "github.com/kubevela/workflow/pkg/config"
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/types"
@@ -46,6 +47,8 @@ const (
 	KubeHandlersKey ContextKey = "kubeHandlers"
 	// KubeClientKey is the key for kube client.
 	KubeClientKey ContextKey = "kubeClient"
+	// ConfigFactoryKey is the key for config factory.
+	ConfigFactoryKey ContextKey = "configFactory"
 )
 
 // Dispatcher is a client for apply resources.
@@ -69,6 +72,7 @@ type RuntimeParams struct {
 	Labels          map[string]string
 	KubeHandlers    *KubeHandlers
 	KubeClient      client.Client
+	ConfigFactory   wfconfig.Factory
 }
 
 // Params is the input parameters of a provider.
@@ -169,6 +173,9 @@ func WithRuntimeParams(parent context.Context, params RuntimeParams) context.Con
 	ctx := context.WithValue(parent, WorkflowContextKey, params.WorkflowContext)
 	ctx = context.WithValue(ctx, ProcessContextKey, params.ProcessContext)
 	ctx = context.WithValue(ctx, ActionKey, params.Action)
+	if params.ConfigFactory != nil {
+		ctx = context.WithValue(ctx, ConfigFactoryKey, params.ConfigFactory)
+	}
 	return ctx
 }
 
@@ -194,6 +201,9 @@ func RuntimeParamsFrom(ctx context.Context) RuntimeParams {
 		params.KubeClient = kubeClient
 	} else {
 		params.KubeClient = singleton.KubeClient.Get()
+	}
+	if configFactory, ok := ctx.Value(ConfigFactoryKey).(wfconfig.Factory); ok {
+		params.ConfigFactory = configFactory
 	}
 	return params
 }

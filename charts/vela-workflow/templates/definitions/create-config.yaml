@@ -4,6 +4,7 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
+    custom.definition.oam.dev/category: Config Management
     definition.oam.dev/description: Create or update a config
   name: create-config
   namespace: {{ include "systemDefinitionNamespace" . }}
@@ -11,29 +12,17 @@ spec:
   schematic:
     cue:
       template: |
-        import (
-        	"vela/op"
-        )
+        import "vela/config"
 
-        deploy: op.#CreateConfig & {
-        	name: parameter.name
-        	if parameter.namespace != _|_ {
-        		namespace: parameter.namespace
-        	}
-        	if parameter.namespace == _|_ {
-        		namespace: context.namespace
-        	}
-        	if parameter.template != _|_ {
-        		template: parameter.template
-        	}
-        	config: parameter.config
+        deploy: config.#CreateConfig & {
+        	$params: parameter
         }
         parameter: {
         	//+usage=Specify the name of the config.
         	name: string
 
         	//+usage=Specify the namespace of the config.
-        	namespace?: string
+        	namespace: *context.namespace | string
 
         	//+usage=Specify the template of the config.
         	template?: string
@@ -41,4 +30,3 @@ spec:
         	//+usage=Specify the content of the config.
         	config: {...}
         }
-
