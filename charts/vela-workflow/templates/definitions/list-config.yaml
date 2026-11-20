@@ -4,6 +4,7 @@ apiVersion: core.oam.dev/v1beta1
 kind: WorkflowStepDefinition
 metadata:
   annotations:
+    custom.definition.oam.dev/category: Config Management
     definition.oam.dev/description: List the configs
   name: list-config
   namespace: {{ include "systemDefinitionNamespace" . }}
@@ -11,23 +12,14 @@ spec:
   schematic:
     cue:
       template: |
-        import (
-        	"vela/op"
-        )
+        import "vela/config"
 
-        output: op.#ListConfig & {
-        	if parameter.namespace != _|_ {
-        		namespace: parameter.namespace
-        	}
-        	if parameter.namespace == _|_ {
-        		namespace: context.namespace
-        	}
-        	template: parameter.template
+        output: config.#ListConfig & {
+        	$params: parameter
         }
         parameter: {
         	//+usage=Specify the template of the config.
         	template: string
         	//+usage=Specify the namespace of the config.
-        	namespace?: string
+        	namespace: *context.namespace | string
         }
-

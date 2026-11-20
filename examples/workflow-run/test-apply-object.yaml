@@ -1,0 +1,40 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-apply-object.yaml
+# 2. Watch: kubectl get workflowrun test-apply-object -w
+# 3. Verify deployment: kubectl get deployment nginx-test -n default
+# 4. Check pod: kubectl get pods -l app=nginx-test
+# 5. Verify nginx is running: kubectl logs -l app=nginx-test
+# 6. Cleanup: kubectl delete workflowrun test-apply-object && kubectl delete deployment nginx-test
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-apply-object
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: apply-deployment-manually
+        type: apply-object
+        properties:
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: nginx-test
+              namespace: default
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: nginx-test
+              template:
+                metadata:
+                  labels:
+                    app: nginx-test
+                spec:
+                  containers:
+                  - name: nginx
+                    image: nginx:latest
+                    ports:
+                    - containerPort: 80
+

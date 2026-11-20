@@ -1,0 +1,46 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-request.yaml
+# 2. Watch: kubectl get workflowrun test-request -w
+# 3. Check all steps succeeded: kubectl get workflowrun test-request -o jsonpath='{.status.steps[*].phase}'
+# 4. View request step outputs: kubectl get workflowrun test-request -o yaml | grep -A 20 "name: get-github-user"
+# 5. Check HTTP responses in context: kubectl get configmap workflow-test-request-context -o yaml
+# 6. Verify all requests completed: kubectl get workflowrun test-request -o jsonpath='{.status.phase}'
+# 7. Cleanup: kubectl delete workflowrun test-request
+# Note: Requires internet access to reach httpbin.org and api.github.com
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-request
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: get-github-user
+        type: request
+        properties:
+          url: "https://api.github.com/users/octocat"
+          method: GET
+
+      - name: post-webhook
+        type: request
+        properties:
+          url: "https://httpbin.org/post"
+          method: POST
+          body:
+            message: "Workflow step completed"
+            timestamp: "2026-02-08T12:00:00Z"
+            status: "success"
+
+      - name: api-call-with-headers
+        type: request
+        properties:
+          url: "https://httpbin.org/headers"
+          method: GET
+          header:
+            User-Agent: "KubeVela-Workflow/1.0"
+            Accept: "application/json"
+
+      - name: complete
+        type: print-message-in-status
+        properties:
+          message: "All HTTP requests completed"

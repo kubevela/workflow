@@ -24,6 +24,7 @@ webhooks:
         path: /validating-core-oam-dev-v1alpha1-workflowruns
     {{- include "kubevela.webhookFailurePolicy" (dict "root" . "hooks" $hooks "name" $webhookName "policy" .Values.admissionWebhooks.failurePolicy) | nindent 4 }}
     name: {{ $webhookName }}
+    timeoutSeconds: {{ .Values.admissionWebhookTimeout }}
     sideEffects: None
     rules:
       - apiGroups:
@@ -39,5 +40,4 @@ webhooks:
     admissionReviewVersions:
       - v1beta1
       - v1
-    timeoutSeconds: 5
 {{- end -}}

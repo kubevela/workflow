@@ -1,0 +1,64 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-print-message.yaml
+# 2. Watch: kubectl get workflowrun test-print-message -w
+# 3. Check all step messages: kubectl get workflowrun test-print-message -o jsonpath='{.status.steps[*].message}'
+# 4. View specific message: kubectl get workflowrun test-print-message -o jsonpath='{.status.steps[?(@.name=="start-message")].message}'
+# 5. See full status: kubectl get workflowrun test-print-message -o yaml | grep -A 2 message
+# 6. Verify deployment: kubectl get deployment nginx-deploy
+# 7. Cleanup: kubectl delete workflowrun test-print-message && kubectl delete deployment nginx-deploy
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-print-message
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: start-message
+        type: print-message-in-status
+        properties:
+          message: "Workflow started successfully"
+
+      - name: processing-step
+        type: suspend
+        properties:
+          duration: "5s"
+
+      - name: progress-message
+        type: print-message-in-status
+        properties:
+          message: "Processing completed, moving to next step"
+
+      - name: deploy-nginx
+        type: apply-object
+        properties:
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: nginx-deploy
+              namespace: default
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: nginx
+              template:
+                metadata:
+                  labels:
+                    app: nginx
+                spec:
+                  containers:
+                  - name: nginx
+                    image: nginx:latest
+
+      - name: deployment-complete
+        type: print-message-in-status
+        properties:
+          message: "Nginx deployment created successfully"
+
+      - name: final-message
+        type: print-message-in-status
+        properties:
+          message: "All workflow steps completed! Check status for messages."
+

@@ -1,0 +1,95 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-step-group.yaml
+# 2. Watch: kubectl get workflowrun test-step-group -w
+# 3. Verify parallel deployments: kubectl get deployments app1-deployment app2-deployment -n default
+# 4. Check all pods: kubectl get pods -l 'app in (app1,app2)'
+# 5. Verify ConfigMap from parallel step: kubectl get configmap parallel-config -o yaml
+# 6. Check substeps executed in parallel: kubectl get workflowrun test-step-group -o yaml | grep -A 30 "subSteps"
+# 7. Verify completion message: kubectl get workflowrun test-step-group -o jsonpath='{.status.steps[?(@.name=="verify-completion")].message}'
+# 8. Cleanup: kubectl delete workflowrun test-step-group && kubectl delete deployment app1-deployment app2-deployment && kubectl delete configmap parallel-config
+# Note: Parallel requests require internet access
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-step-group
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: parallel-deployments
+        type: step-group
+        subSteps:
+          - name: deploy-app1
+            type: apply-object
+            properties:
+              value:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: app1-deployment
+                  namespace: default
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      app: app1
+                  template:
+                    metadata:
+                      labels:
+                        app: app1
+                    spec:
+                      containers:
+                      - name: nginx
+                        image: nginx:latest
+
+          - name: deploy-app2
+            type: apply-object
+            properties:
+              value:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: app2-deployment
+                  namespace: default
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      app: app2
+                  template:
+                    metadata:
+                      labels:
+                        app: app2
+                    spec:
+                      containers:
+                      - name: redis
+                        image: redis:alpine
+
+          - name: create-config
+            type: export2config
+            properties:
+              configName: parallel-config
+              data:
+                deployed: "true"
+                timestamp: "2026-02-08"
+
+      - name: verify-completion
+        type: print-message-in-status
+        properties:
+          message: "All parallel deployments completed successfully"
+
+      - name: parallel-requests
+        type: step-group
+        subSteps:
+          - name: request1
+            type: request
+            properties:
+              url: "https://httpbin.org/get"
+              method: GET
+
+          - name: request2
+            type: request
+            properties:
+              url: "https://httpbin.org/delay/2"
+              method: GET
+

@@ -1,0 +1,36 @@
+# Testing Steps:
+# 1. Apply: kubectl apply -f test-export2config.yaml
+# 2. Watch: kubectl get workflowrun test-export2config -w
+# 3. Verify ConfigMaps created: kubectl get configmap app-config app-settings -n default
+# 4. Check app-config data: kubectl get configmap app-config -o yaml
+# 5. Verify data values: kubectl get configmap app-config -o jsonpath='{.data.app-name}'
+# 6. Check app-settings: kubectl get configmap app-settings -o jsonpath='{.data}'
+# 7. Cleanup: kubectl delete workflowrun test-export2config && kubectl delete configmap app-config app-settings
+apiVersion: core.oam.dev/v1alpha1
+kind: WorkflowRun
+metadata:
+  name: test-export2config
+  namespace: default
+spec:
+  workflowSpec:
+    steps:
+      - name: export-app-config
+        type: export2config
+        properties:
+          configName: app-config
+          data:
+            app-name: "my-application"
+            app-version: "v1.0.0"
+            environment: "production"
+            database-url: "postgres://db.example.com:5432/myapp"
+
+      - name: export-settings
+        type: export2config
+        properties:
+          configName: app-settings
+          namespace: default
+          data:
+            log-level: "info"
+            max-connections: "100"
+            timeout: "30s"
+
