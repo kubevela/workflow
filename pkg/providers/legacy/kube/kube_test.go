@@ -517,6 +517,45 @@ filter: {}
 		}, time.Second*2, time.Millisecond*300).Should(BeNil())
 	})
 
+	It("apply parallel with runtime labels", func() {
+		un1 := testUnstructured.DeepCopy()
+		un1.SetName("labeled-app1")
+		un1.SetLabels(map[string]string{
+			"test": "test",
+		})
+		un2 := testUnstructured.DeepCopy()
+		un2.SetName("labeled-app2")
+		un2.SetLabels(map[string]string{
+			"test": "test",
+		})
+		ctx := context.Background()
+		_, err := ApplyInParallel(ctx, &ApplyInParallelParams{
+			Params: ApplyInParallelVars{
+				Resources: []*unstructured.Unstructured{un1, un2},
+			},
+			RuntimeParams: providertypes.RuntimeParams{
+				Labels: map[string]string{
+					"hello": "world",
+				},
+				KubeClient: k8sClient,
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		for _, name := range []string{"labeled-app1", "labeled-app2"} {
+			pod := &corev1.Pod{}
+			Eventually(func() error {
+				return k8sClient.Get(context.Background(), client.ObjectKey{
+					Namespace: "default",
+					Name:      name,
+				}, pod)
+			}, time.Second*2, time.Millisecond*300).Should(BeNil())
+			Expect(pod.GetLabels()).Should(Equal(map[string]string{
+				"test":  "test",
+				"hello": "world",
+			}))
+		}
+	})
+
 	It("test error case", func() {
 		ctx := context.Background()
 		res, err := Read(ctx, &ResourceParams{

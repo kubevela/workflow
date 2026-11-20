@@ -184,6 +184,11 @@ func ApplyInParallel(ctx context.Context, params *ApplyInParallelParams) (*Apply
 		if workloads[i].GetNamespace() == "" {
 			workloads[i].SetNamespace("default")
 		}
+		for k, v := range params.RuntimeParams.Labels {
+			if err := k8s.AddLabel(workloads[i], k, v); err != nil {
+				return nil, err
+			}
+		}
 	}
 	deployCtx := handleContext(ctx, params.Params.Cluster)
 	if err := handlers.Apply(deployCtx, params.KubeClient, params.Params.Cluster, WorkflowResourceCreator, workloads...); err != nil {
