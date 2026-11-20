@@ -19,13 +19,13 @@ env:
 jobs:
 
   detect-noop:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       noop: ${{ steps.noop.outputs.should_skip }}
     steps:
       - name: Detect No-op Changes
         id: noop
-        uses: fkirc/skip-duplicate-actions@v5.3.0
+        uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           paths_ignore: '["**.md", "**.mdx", "**.png", "**.jpg"]'
@@ -33,24 +33,24 @@ jobs:
           concurrent_skipping: false
 
   unit-tests:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: detect-noop
     if: needs.detect-noop.outputs.noop != 'true'
 
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           submodules: true
 
       - name: Cache Go Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .work/pkg
           key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
@@ -61,7 +61,7 @@ jobs:
           sudo apt-get install -y golang-ginkgo-dev
 
       - name: install Kubebuilder
-        uses: RyanSiu1995/kubebuilder-action@v1.3.1
+        uses: RyanSiu1995/kubebuilder-action@e7e4de1c1eaf1d089b9a186f7526239acadf0b40 # v1.3.1
         with:
           version: 3.15.1
           kubebuilderOnly: false
@@ -71,7 +71,7 @@ jobs:
         run: make test
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
