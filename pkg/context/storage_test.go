@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"cuelang.org/go/cue/cuecontext"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,6 +80,33 @@ func TestGetOrCreateInMemoryContext(t *testing.T) {
 	store.GetOrCreateInMemoryContext(loaded)
 	r.Equal("vars", loaded.Data[ConfigMapKeyVars])
 	r.NotSame(created, loaded, "existing context should be copied, not shared")
+}
+
+func TestDeleteInMemoryContext(t *testing.T) {
+	r := require.New(t)
+	store := newStoreForTest()
+
+	store.CreateInMemoryContext(newConfigMap(generateStoreName("app"), "prod"))
+	store.CreateInMemoryContext(newConfigMap(generateStoreName("app"), "staging"))
+	r.NotNil(store.GetInMemoryContext(generateStoreName("app"), "prod"))
+
+	store.DeleteInMemoryContext("app", "prod")
+	r.Nil(store.GetInMemoryContext(generateStoreName("app"), "prod"), "delete should remove the stored context")
+	r.NotNil(store.GetInMemoryContext(generateStoreName("app"), "staging"), "delete should leave another namespace's context alone")
+
+	// The key is defaulted the same way reads and writes default it, in both
+	// directions: stored under "", deleted as "default", and the reverse.
+	store.CreateInMemoryContext(newConfigMap(generateStoreName("app"), ""))
+	store.DeleteInMemoryContext("app", "default")
+	r.Nil(store.GetInMemoryContext(generateStoreName("app"), "default"), "an empty namespace is the default namespace")
+
+	store.CreateInMemoryContext(newConfigMap(generateStoreName("app"), "default"))
+	store.DeleteInMemoryContext("app", "")
+	r.Nil(store.GetInMemoryContext(generateStoreName("app"), ""), "delete should default an empty namespace the same way")
+
+	// Deleting something that was never stored is a no-op.
+	store.DeleteInMemoryContext("missing", "prod")
+	r.Nil(store.GetInMemoryContext(generateStoreName("missing"), "prod"))
 }
 
 func TestInMemoryContextStorageConcurrentGetOrCreate(t *testing.T) {
