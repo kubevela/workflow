@@ -67,6 +67,27 @@ func TestInMemoryContextStorage(t *testing.T) {
 	r.NotNil(store.GetInMemoryContext("workflow-app-context", "default"))
 }
 
+func TestDeleteInMemoryContext(t *testing.T) {
+	r := require.New(t)
+	store := newStoreForTest()
+
+	store.CreateInMemoryContext(newConfigMap("workflow-app-context", "prod"))
+	store.CreateInMemoryContext(newConfigMap("workflow-app-context", "dev"))
+
+	// The delete key must resolve like the store keys do (#333): without the
+	// namespace it never matches, so the context of a deleted application
+	// stays in memory for the life of the controller.
+	store.DeleteInMemoryContext("app", "prod")
+	r.Nil(store.GetInMemoryContext("workflow-app-context", "prod"))
+	r.NotNil(store.GetInMemoryContext("workflow-app-context", "dev"), "another namespace's context must survive")
+
+	// An empty namespace resolves to "default", matching create, get and update.
+	store.CreateInMemoryContext(newConfigMap("workflow-app-context", ""))
+	store.DeleteInMemoryContext("app", "")
+	r.Nil(store.GetInMemoryContext("workflow-app-context", ""))
+	r.Nil(store.GetInMemoryContext("workflow-app-context", "default"))
+}
+
 func TestGetOrCreateInMemoryContext(t *testing.T) {
 	r := require.New(t)
 	store := newStoreForTest()

@@ -18,7 +18,6 @@ package context
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -90,9 +89,10 @@ func (o *inMemoryContextStorage) UpdateInMemoryContext(cm *v1.ConfigMap) {
 	o.contexts.Put(o.getKey(cm), cm, 0)
 }
 
-func (o *inMemoryContextStorage) DeleteInMemoryContext(appName string) {
+func (o *inMemoryContextStorage) DeleteInMemoryContext(appName, ns string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	key := fmt.Sprintf("workflow-%s-context", appName)
-	o.contexts.Delete(key)
+	// The store keys contexts under <ns>/<name> (contextKey), so the delete key
+	// must be built the same way or nothing is ever removed (#333).
+	o.contexts.Delete(contextKey(generateStoreName(appName), ns))
 }
