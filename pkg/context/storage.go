@@ -32,6 +32,8 @@ var (
 
 // inMemoryContextStorage holds live workflow contexts, not a disposable cache:
 // entries are stored without expiration and are only removed explicitly.
+// It keeps its own copies, so callers can keep changing the ConfigMaps they
+// pass in or get back without racing with other readers.
 type inMemoryContextStorage struct {
 	// mu serializes writes so that GetOrCreateInMemoryContext is atomic.
 	mu       sync.Mutex
@@ -69,24 +71,24 @@ func (o *inMemoryContextStorage) GetOrCreateInMemoryContext(cm *v1.ConfigMap) {
 		return
 	}
 	cm.Data = map[string]string{}
-	o.contexts.Put(o.getKey(cm), cm, 0)
+	o.contexts.Put(o.getKey(cm), cm.DeepCopy(), 0)
 }
 
 func (o *inMemoryContextStorage) GetInMemoryContext(name, ns string) *v1.ConfigMap {
-	return o.load(contextKey(name, ns))
+	return o.load(contextKey(name, ns)).DeepCopy()
 }
 
 func (o *inMemoryContextStorage) CreateInMemoryContext(cm *v1.ConfigMap) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	cm.Data = map[string]string{}
-	o.contexts.Put(o.getKey(cm), cm, 0)
+	o.contexts.Put(o.getKey(cm), cm.DeepCopy(), 0)
 }
 
 func (o *inMemoryContextStorage) UpdateInMemoryContext(cm *v1.ConfigMap) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	o.contexts.Put(o.getKey(cm), cm, 0)
+	o.contexts.Put(o.getKey(cm), cm.DeepCopy(), 0)
 }
 
 // DeleteInMemoryContext drops the stored context of an application. The key

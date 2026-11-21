@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
@@ -53,7 +54,7 @@ func TestInMemoryContextStorage(t *testing.T) {
 	cm.Data = map[string]string{"stale": "value"}
 	store.CreateInMemoryContext(cm)
 	r.Empty(cm.Data, "create should reset the context data")
-	r.Same(cm, store.GetInMemoryContext("workflow-app-context", "prod"))
+	r.Equal(cm, store.GetInMemoryContext("workflow-app-context", "prod"))
 	r.Nil(store.GetInMemoryContext("workflow-app-context", "other"))
 
 	updated := newConfigMap("workflow-app-context", "prod")
@@ -75,11 +76,37 @@ func TestGetOrCreateInMemoryContext(t *testing.T) {
 	store.GetOrCreateInMemoryContext(created)
 	r.NotNil(created.Data)
 	created.Data[ConfigMapKeyVars] = "vars"
+	store.UpdateInMemoryContext(created)
 
 	loaded := newConfigMap("workflow-app-context", "prod")
 	store.GetOrCreateInMemoryContext(loaded)
 	r.Equal("vars", loaded.Data[ConfigMapKeyVars])
 	r.NotSame(created, loaded, "existing context should be copied, not shared")
+}
+
+func TestInMemoryContextStorageKeepsCopies(t *testing.T) {
+	r := require.New(t)
+	store := newStoreForTest()
+
+	created := newConfigMap("workflow-app-context", "prod")
+	store.CreateInMemoryContext(created)
+	created.Data[ConfigMapKeyVars] = "changed after create"
+	r.Empty(store.GetInMemoryContext("workflow-app-context", "prod").Data)
+
+	updated := newConfigMap("workflow-app-context", "prod")
+	updated.Data = map[string]string{ConfigMapKeyVars: "vars"}
+	store.UpdateInMemoryContext(updated)
+	updated.Data[ConfigMapKeyVars] = "changed after update"
+	r.Equal("vars", store.GetInMemoryContext("workflow-app-context", "prod").Data[ConfigMapKeyVars])
+
+	got := store.GetInMemoryContext("workflow-app-context", "prod")
+	got.Data[ConfigMapKeyVars] = "changed after get"
+	r.Equal("vars", store.GetInMemoryContext("workflow-app-context", "prod").Data[ConfigMapKeyVars])
+
+	fresh := newConfigMap("workflow-other-context", "prod")
+	store.GetOrCreateInMemoryContext(fresh)
+	fresh.Data[ConfigMapKeyVars] = "changed after get or create"
+	r.Empty(store.GetInMemoryContext("workflow-other-context", "prod").Data)
 }
 
 func TestDeleteInMemoryContext(t *testing.T) {
@@ -109,11 +136,49 @@ func TestDeleteInMemoryContext(t *testing.T) {
 	r.Nil(store.GetInMemoryContext(generateStoreName("missing"), "prod"))
 }
 
+// slowMissCache holds every lookup that misses until all workers have missed
+// or the timeout passes. Without the store's lock every worker misses and
+// creates its own context; with it, only the first lookup misses.
+type slowMissCache struct {
+	cache.Cache[string]
+	workers int
+	timeout time.Duration
+
+	mu     sync.Mutex
+	misses int
+	all    chan struct{}
+}
+
+func (c *slowMissCache) Get(key string) (interface{}, bool) {
+	value, found := c.Cache.Get(key)
+	if found {
+		return value, found
+	}
+	c.mu.Lock()
+	c.misses++
+	if c.misses == c.workers {
+		close(c.all)
+	}
+	c.mu.Unlock()
+	select {
+	case <-c.all:
+	case <-time.After(c.timeout):
+	}
+	return value, found
+}
+
 func TestInMemoryContextStorageConcurrentGetOrCreate(t *testing.T) {
 	r := require.New(t)
-	store := newStoreForTest()
-
 	const workers = 16
+	store := &inMemoryContextStorage{
+		contexts: &slowMissCache{
+			Cache:   cache.NewMemoryCacheStore[string](context.Background()),
+			workers: workers,
+			timeout: 100 * time.Millisecond,
+			all:     make(chan struct{}),
+		},
+	}
+
 	start := make(chan struct{})
 	results := make([]*corev1.ConfigMap, workers)
 	var wg sync.WaitGroup
