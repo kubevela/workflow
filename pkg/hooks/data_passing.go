@@ -66,17 +66,16 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.Workflo
 		SetAdditionalNameInStatus(stepStatus, step.Name, step.Properties, status)
 		for _, output := range step.Outputs {
 			v, err := value.LookupValueByScript(taskValue, output.ValueFrom)
-			if (err != nil && strings.Contains(err.Error(), "not exist") || v.Err() != nil) && !strings.Contains(output.ValueFrom, "$returns.") {
-				parts := strings.Split(output.ValueFrom, "output.")
-				if len(parts) > 1 {
-					if parts[0] == "" {
-						v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("output.$returns.%s", strings.Join(parts[1:], ".")))
-					} else {
-						v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%soutput.$returns.%s", parts[0], strings.Join(parts[1:], ".")))
+			if !strings.Contains(output.ValueFrom, "$returns.") {
+				if err != nil && strings.Contains(err.Error(), "not exist") || v.Err() != nil {
+					v, err = lookupOutputInReturns(taskValue, output.ValueFrom)
+				} else if err == nil && v.Validate(cue.Concrete(true)) != nil {
+					// A script, such as one that imports a package, reports no error
+					// when it reads a field that the provider returns under $returns,
+					// only an incomplete value. Use $returns when it gives a concrete one.
+					if rv, rerr := lookupOutputInReturns(taskValue, output.ValueFrom); rerr == nil && rv.Validate(cue.Concrete(true)) == nil {
+						v = rv
 					}
-
-				} else {
-					v, err = value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns", output.ValueFrom))
 				}
 			}
 			// if the error is not nil and the step is not skipped, return the error
@@ -97,6 +96,17 @@ func Output(ctx wfContext.Context, taskValue cue.Value, step oamv1alpha1.Workflo
 		return errors.New(errMsg)
 	}
 	return nil
+}
+
+func lookupOutputInReturns(taskValue cue.Value, valueFrom string) (cue.Value, error) {
+	parts := strings.Split(valueFrom, "output.")
+	if len(parts) > 1 {
+		if parts[0] == "" {
+			return value.LookupValueByScript(taskValue, fmt.Sprintf("output.$returns.%s", strings.Join(parts[1:], ".")))
+		}
+		return value.LookupValueByScript(taskValue, fmt.Sprintf("%soutput.$returns.%s", parts[0], strings.Join(parts[1:], ".")))
+	}
+	return value.LookupValueByScript(taskValue, fmt.Sprintf("%s.$returns", valueFrom))
 }
 
 // SetAdditionalNameInStatus sets additional name from properties to status map
