@@ -17,7 +17,6 @@ limitations under the License.
 package context
 
 import (
-	"fmt"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,13 +37,15 @@ var MemStore = &inMemoryContextStorage{
 	contexts: map[string]*v1.ConfigMap{},
 }
 
-func (o *inMemoryContextStorage) getKey(cm *v1.ConfigMap) string {
-	ns := cm.GetNamespace()
+func contextKey(name, ns string) string {
 	if ns == "" {
 		ns = "default"
 	}
-	name := cm.GetName()
 	return ns + "/" + name
+}
+
+func (o *inMemoryContextStorage) getKey(cm *v1.ConfigMap) string {
+	return contextKey(cm.GetName(), cm.GetNamespace())
 }
 
 func (o *inMemoryContextStorage) GetOrCreateInMemoryContext(cm *v1.ConfigMap) {
@@ -56,7 +57,7 @@ func (o *inMemoryContextStorage) GetOrCreateInMemoryContext(cm *v1.ConfigMap) {
 }
 
 func (o *inMemoryContextStorage) GetInMemoryContext(name, ns string) *v1.ConfigMap {
-	return o.contexts[ns+"/"+name]
+	return o.contexts[contextKey(name, ns)]
 }
 
 func (o *inMemoryContextStorage) CreateInMemoryContext(cm *v1.ConfigMap) {
@@ -72,9 +73,11 @@ func (o *inMemoryContextStorage) UpdateInMemoryContext(cm *v1.ConfigMap) {
 	o.contexts[o.getKey(cm)] = cm
 }
 
-func (o *inMemoryContextStorage) DeleteInMemoryContext(appName string) {
+// DeleteInMemoryContext drops the stored context of an application. The key
+// has to be built the same way getKey builds it, with the namespace included,
+// or the delete silently matches nothing.
+func (o *inMemoryContextStorage) DeleteInMemoryContext(appName, namespace string) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	key := fmt.Sprintf("workflow-%s-context", appName)
-	delete(o.contexts, key)
+	delete(o.contexts, contextKey(generateStoreName(appName), namespace))
 }
