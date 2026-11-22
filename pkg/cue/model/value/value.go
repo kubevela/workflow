@@ -131,6 +131,108 @@ func SetValueByScript(base, v cue.Value, path ...string) (cue.Value, error) {
 	return base.Context().CompileBytes(b), nil
 }
 
+// DeletePath removes the field at the given path, returning the value without
+// it. A path that is not there is not an error: the caller wants the field
+// gone, and it already is.
+//
+// There is no CUE operation for this -- a value can be unified but not
+// un-unified -- so the field is removed from the syntax and the result
+// recompiled, the same route SetValueByScript takes to edit a value in place.
+// Working on the syntax rather than a decoded copy keeps values that are not
+// concrete, which a decode through JSON would reject.
+// nolint:staticcheck
+func DeletePath(val cue.Value, paths ...string) (cue.Value, error) {
+	if len(paths) == 0 {
+		return val, nil
+	}
+	if err := val.Err(); err != nil {
+		return cue.Value{}, err
+	}
+
+	syntaxLock.Lock()
+	node := val.Syntax(cue.ResolveReferences(true))
+	syntaxLock.Unlock()
+
+	if err := deleteValue(node, FieldPath(paths...).Selectors()); err != nil {
+		return cue.Value{}, err
+	}
+	b, err := format.Node(node)
+	if err != nil {
+		return cue.Value{}, err
+	}
+	out := val.Context().CompileBytes(b)
+	if err := out.Err(); err != nil {
+		return cue.Value{}, err
+	}
+	return out, nil
+}
+
+// deleteValue drops the field the selectors name from a syntax tree.
+func deleteValue(orig ast.Node, selectors []cue.Selector) error {
+	if len(selectors) == 0 {
+		return nil
+	}
+	key := selectors[0]
+	selectors = selectors[1:]
+	switch x := orig.(type) {
+	case *ast.File:
+		kept, err := deleteFromDecls(x.Decls, key, selectors)
+		if err != nil {
+			return err
+		}
+		x.Decls = kept
+		return nil
+	case *ast.StructLit:
+		kept, err := deleteFromDecls(x.Elts, key, selectors)
+		if err != nil {
+			return err
+		}
+		x.Elts = kept
+		return nil
+	case *ast.ListLit:
+		if key.Type() != cue.IndexLabel {
+			return fmt.Errorf("invalid key type %s in list lit", key.Type())
+		}
+		if key.Index() >= len(x.Elts) {
+			return nil
+		}
+		if len(selectors) == 0 {
+			x.Elts = append(x.Elts[:key.Index()], x.Elts[key.Index()+1:]...)
+			return nil
+		}
+		return deleteValue(x.Elts[key.Index()], selectors)
+	default:
+		return fmt.Errorf("not support type %T", orig)
+	}
+}
+
+// deleteFromDecls returns decls without the field key names, or with that
+// field's own subtree edited when the path goes deeper.
+func deleteFromDecls(decls []ast.Decl, key cue.Selector, selectors []cue.Selector) ([]ast.Decl, error) {
+	if key.Type() != cue.StringLabel {
+		return nil, fmt.Errorf("invalid key type %s in struct lit", key.Type())
+	}
+	want := strings.Trim(key.String(), `"`)
+	kept := make([]ast.Decl, 0, len(decls))
+	for _, decl := range decls {
+		field, ok := decl.(*ast.Field)
+		if !ok || strings.Trim(sets.LabelStr(field.Label), `"`) != want {
+			kept = append(kept, decl)
+			continue
+		}
+		if len(selectors) == 0 {
+			// Drop it, and keep scanning: a duplicated label would otherwise
+			// leave one copy behind.
+			continue
+		}
+		if err := deleteValue(field.Value, selectors); err != nil {
+			return nil, err
+		}
+		kept = append(kept, decl)
+	}
+	return kept, nil
+}
+
 func isScript(content string) (bool, error) {
 	content = strings.TrimSpace(content)
 	scriptFile, err := parser.ParseFile("-", content, parser.ParseComments)

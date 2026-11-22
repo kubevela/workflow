@@ -39,6 +39,7 @@ import (
 	"github.com/kubevela/workflow/pkg/cue/model"
 	"github.com/kubevela/workflow/pkg/cue/model/value"
 	"github.com/kubevela/workflow/pkg/cue/process"
+	"github.com/kubevela/workflow/pkg/cue/sensitive"
 	"github.com/kubevela/workflow/pkg/expressions"
 	"github.com/kubevela/workflow/pkg/hooks"
 	providertypes "github.com/kubevela/workflow/pkg/providers/types"
@@ -92,6 +93,14 @@ func (tr *taskRunner) FillContextData(ctx monitorContext.Context, processCtx pro
 
 // nolint:gocyclo
 func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error) {
+	// Read the template's `// +sensitive` markers here, once per template,
+	// rather than on every run of every step that uses it: the markers are
+	// comments, so they live in the template text and not in the value it
+	// evaluates to, and the answer cannot change between runs of the same text.
+	// A template whose markers could not be read is not treated as having none
+	// -- sensitiveErr travels with the paths and makes the output hook fail
+	// closed. See pkg/cue/sensitive.
+	sensitivePaths, sensitiveErr := sensitive.ExtractPathsCached(templ)
 	return func(wfStep oamv1alpha1.WorkflowStep, genOpt *types.TaskGeneratorOptions) (types.TaskRunner, error) {
 
 		initialStatus := v1alpha1.StepStatus{
@@ -207,7 +216,14 @@ func (t *TaskLoader) makeTaskGenerator(templ string) (types.TaskGenerator, error
 						tracer.Error(err, "failed to debug")
 					}
 				}
-				for _, hook := range options.PostStopHooks {
+				// A local list: options is shared by every step in the run, so
+				// defaulting it in place would hand the next step this step's
+				// template paths.
+				postStopHooks := options.PostStopHooks
+				if len(postStopHooks) == 0 {
+					postStopHooks = []types.TaskPostStopHook{hooks.OutputWithSensitive(sensitivePaths, sensitiveErr)}
+				}
+				for _, hook := range postStopHooks {
 					if err := hook(wfCtx, taskv, step, exec.status(), options.StepStatus); err != nil {
 						exec.wfStatus.Message = err.Error()
 						stepStatus = exec.status()
@@ -426,9 +442,6 @@ func NewTaskLoader(lt LoadTaskTemplate, logLevel int, pCtx process.Context, comp
 		runOptionsProcess: func(options *types.TaskRunOptions) {
 			if len(options.PreStartHooks) == 0 {
 				options.PreStartHooks = append(options.PreStartHooks, hooks.Input)
-			}
-			if len(options.PostStopHooks) == 0 {
-				options.PostStopHooks = append(options.PostStopHooks, hooks.Output)
 			}
 			options.PCtx = pCtx
 			options.Compiler = compiler

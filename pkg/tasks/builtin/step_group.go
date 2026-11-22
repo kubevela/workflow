@@ -28,6 +28,7 @@ import (
 	wfContext "github.com/kubevela/workflow/pkg/context"
 	"github.com/kubevela/workflow/pkg/cue/process"
 	"github.com/kubevela/workflow/pkg/expressions"
+	"github.com/kubevela/workflow/pkg/hooks"
 	"github.com/kubevela/workflow/pkg/providers"
 	"github.com/kubevela/workflow/pkg/tasks/custom"
 	"github.com/kubevela/workflow/pkg/types"
@@ -252,6 +253,13 @@ func getStepGroupStatus(status v1alpha1.StepStatus, stepStatus v1alpha1.Workflow
 }
 
 func handleOutput(ctx wfContext.Context, stepStatus *v1alpha1.StepStatus, operations *types.Operation, step oamv1alpha1.WorkflowStep, postStopHooks []types.TaskPostStopHook, basicVal cue.Value) {
+	if len(postStopHooks) == 0 {
+		// A step group has no template of its own, so there are no
+		// `// +sensitive` markers to read and nothing to route to the companion
+		// Secret. The plain output hook is the right default here; a templated
+		// step builds its own in pkg/tasks/custom.
+		postStopHooks = []types.TaskPostStopHook{hooks.Output}
+	}
 	if len(step.Outputs) > 0 {
 		for _, hook := range postStopHooks {
 			if err := hook(ctx, basicVal, step, *stepStatus, nil); err != nil {

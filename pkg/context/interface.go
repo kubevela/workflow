@@ -27,6 +27,10 @@ import (
 type Context interface {
 	GetVar(paths ...string) (cue.Value, error)
 	SetVar(v cue.Value, paths ...string) error
+	// SetSensitiveVar stores a variable like SetVar, but persists it to a
+	// companion Secret instead of the plaintext context ConfigMap. Use it for
+	// values derived from Kubernetes Secrets. Reads go through GetVar.
+	SetSensitiveVar(v cue.Value, paths ...string) error
 	GetStore() *corev1.ConfigMap
 	GetMutableValue(path ...string) string
 	SetMutableValue(data string, path ...string)
