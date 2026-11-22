@@ -72,3 +72,73 @@ systemDefinitionNamespace value defaulter
     {{ .Release.Namespace }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Returns "true" when vela-workflow manages its admission webhook serving cert.
+*/}}
+{{- define "kubevela.webhookRuntimeCerts" -}}
+{{- if and .Values.admissionWebhooks.enabled .Values.admissionWebhooks.patch.enabled (not .Values.admissionWebhooks.certManager.enabled) -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+Returns the webhooks of an existing webhook configuration as JSON, keyed by
+webhook name. Takes a dict of "kind" and "name".
+*/}}
+{{- define "kubevela.existingWebhooks" -}}
+{{- $hooks := dict -}}
+{{- $existing := lookup "admissionregistration.k8s.io/v1" .kind "" .name -}}
+{{- if $existing -}}
+{{- range $existing.webhooks -}}{{- $_ := set $hooks .name . -}}{{- end -}}
+{{- end -}}
+{{- toJson $hooks -}}
+{{- end -}}
+
+{{/*
+Renders the caBundle for one webhook, preserving a valid live bundle on upgrade.
+Runtime cert management leaves it empty until the controller patches it.
+*/}}
+{{- define "kubevela.webhookCABundle" -}}
+{{- $ca := dig .name "clientConfig" "caBundle" "" .hooks -}}
+{{- if include "kubevela.webhookRuntimeCerts" .root -}}
+{{- if and $ca (ne $ca "Cg==") }}caBundle: {{ $ca }}{{ end -}}
+{{- else -}}
+caBundle: {{ default "Cg==" $ca }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Renders the failurePolicy. Runtime management starts new webhooks as Ignore and
+the controller applies the requested policy after the server is listening.
+*/}}
+{{- define "kubevela.webhookFailurePolicy" -}}
+{{- $live := dig .name "failurePolicy" "" .hooks -}}
+{{- if and (include "kubevela.webhookRuntimeCerts" .root) $live -}}
+failurePolicy: {{ $live }}
+{{- else if .root.Values.admissionWebhooks.patch.enabled -}}
+failurePolicy: Ignore
+{{- else -}}
+failurePolicy: {{ .policy }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns an index of the built-in definitions by kind.
+*/}}
+{{- define "kubevela.builtinDefinitions" -}}
+{{- $index := dict -}}
+{{- range $path, $_ := .Files.Glob "definitions/*.yaml" -}}
+{{-   $def := tpl ($.Files.Get $path) $ | fromYaml -}}
+{{-   $kind := $def.kind -}}
+{{-   $entry := get $index $kind | default (dict "resource" (printf "%ss.core.oam.dev" (lower $kind)) "names" list) -}}
+{{-   $_ := set $entry "names" (append $entry.names $def.metadata.name) -}}
+{{-   $_ := set $index $kind $entry -}}
+{{- end -}}
+{{- toYaml $index -}}
+{{- end -}}
+
+{{/*
+Names the ConfigMap holding built-in definitions of one kind.
+*/}}
+{{- define "kubevela.builtinDefinitionsConfigMap" -}}
+{{- printf "%s-builtin-%ss" (include "kubevela.fullname" .root) (lower .kind) -}}
+{{- end -}}

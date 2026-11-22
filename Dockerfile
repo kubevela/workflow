@@ -12,6 +12,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY cmd/http_deny.go cmd/http_deny.go
+COPY cmd/webhook_tls.go cmd/webhook_tls.go
 COPY api/ api/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
@@ -25,7 +26,7 @@ RUN GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -a -ldflags "-s -w -X github.com/kubevela/workflow/version.VelaVersion=${VERSION:-undefined} -X github.com/kubevela/workflow/version.GitRevision=${GITVERSION:-undefined}" \
     -o vela-workflow-${TARGETARCH} ./cmd
 
-FROM ${BASE_IMAGE:-alpine:3.15}
+FROM ${BASE_IMAGE:-alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf}
 # This is required by daemon connecting with cri
 RUN apk add --no-cache ca-certificates bash expat
 

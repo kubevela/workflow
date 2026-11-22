@@ -86,6 +86,7 @@ func init() {
 
 func main() {
 	var metricsAddr, logFilePath, probeAddr, pprofAddr, leaderElectionResourceLock, userAgent, certDir string
+	var webhookTLSSecret, webhookConfiguration, webhookFailurePolicy string
 	var backupStrategy, backupIgnoreStrategy, backupPersistType, groupByLabel, backupConfigSecretName, backupConfigSecretNamespace string
 	var workflowHTTPDenyConfigTemplateName string
 	var enableLeaderElection, useWebhook, logDebug, backupCleanOnBackup bool
@@ -116,6 +117,9 @@ func main() {
 	flag.BoolVar(&useWebhook, "use-webhook", false, "Enable Admission Webhook")
 	flag.StringVar(&certDir, "webhook-cert-dir", "/k8s-webhook-server/serving-certs", "Admission webhook cert/key dir.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "admission webhook listen address")
+	flag.StringVar(&webhookTLSSecret, "webhook-tls-secret", "", "Secret containing the admission webhook serving certificate, as <namespace>/<name>.")
+	flag.StringVar(&webhookConfiguration, "webhook-configuration", "", "Name of the MutatingWebhookConfiguration and ValidatingWebhookConfiguration to patch.")
+	flag.StringVar(&webhookFailurePolicy, "webhook-failure-policy", "", "Failure policy to apply after the admission webhook starts serving.")
 	flag.IntVar(&controllerArgs.ConcurrentReconciles, "concurrent-reconciles", 4, "concurrent-reconciles is the concurrent reconcile number of the controller. The default value is 4")
 	flag.BoolVar(&controllerArgs.IgnoreWorkflowWithoutControllerRequirement, "ignore-workflow-without-controller-requirement", false, "If true, workflow controller will not process the workflowrun without 'workflowrun.oam.dev/controller-version-require' annotation")
 	flag.Float64Var(&qps, "kube-api-qps", 50, "the qps for reconcile clients. Low qps may lead to low throughput. High qps may give stress to api-server. Raise this value if concurrent-reconciles is set to be high.")
@@ -224,6 +228,14 @@ func main() {
 		utilruntime.Must(triggerv1alpha1.AddToScheme(scheme))
 	}
 
+	certClient, webhookTLS, err := setupRuntimeWebhookTLS(rootCtx, restConfig, useWebhook,
+		webhookTLSSecret, webhookConfiguration, webhookFailurePolicy, certDir)
+	if err != nil {
+		klog.ErrorS(err, "Unable to configure runtime webhook TLS")
+		os.Exit(1)
+	}
+	runtimeWebhookCerts := certClient != nil
+
 	leaderElectionID := fmt.Sprintf("workflow-%s", strings.ToLower(strings.ReplaceAll(version.VelaVersion, ".", "-")))
 	leaderElectionID += sharding.GetShardIDSuffix()
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
@@ -248,6 +260,10 @@ func main() {
 	if err != nil {
 		klog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+	if runtimeWebhookCerts {
+		started := mgr.GetWebhookServer().StartedChecker()
+		go resyncWebhookTLS(rootCtx, certClient, webhookTLS, certDir, func() bool { return started(nil) == nil })
 	}
 
 	kubeClient := mgr.GetClient()
