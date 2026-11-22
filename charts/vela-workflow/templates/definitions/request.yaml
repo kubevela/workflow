@@ -56,7 +56,10 @@ spec:
           }
         }
 
-        response: json.Unmarshal(req.$returns.body)
+        // HEAD and 204 responses have no body to decode
+        if req.$returns != _|_ if req.$returns.body != "" {
+          response: json.Unmarshal(req.$returns.body)
+        }
 
         parameter: {
           url:    string
