@@ -31,7 +31,7 @@ import (
 // its vela imports for stubs, so it can be evaluated without the engine.
 func requestStepTemplate(t *testing.T) string {
 	t.Helper()
-	raw, err := os.ReadFile("../../../charts/vela-workflow/templates/definitions/request.yaml")
+	raw, err := os.ReadFile("../../../charts/vela-workflow/definitions/request.yaml")
 	require.NoError(t, err)
 	_, tmpl, found := strings.Cut(string(raw), "template: |\n")
 	require.True(t, found)
