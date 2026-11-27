@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Actions
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: "oam-dev/kubevela-github-actions"
           path: ./actions
@@ -65,7 +65,7 @@ jobs:
             })
             console.log("Added '" + label + "' label.")
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Open Backport PR
